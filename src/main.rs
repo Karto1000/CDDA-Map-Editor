@@ -6,9 +6,9 @@ use bevy::asset::{Asset, AssetServer};
 use bevy::DefaultPlugins;
 use bevy::input::Input;
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
-use bevy::prelude::{Assets, Bundle, Camera2dBundle, Commands, Component, EventReader, Mesh, MouseButton, NonSend, Query, Res, ResMut, Resource, shape, Transform, TypePath, Vec2, Vec2Swizzles, Vec3, Window, With, Without};
+use bevy::prelude::{Assets, Bundle, Camera2dBundle, Commands, Component, EventReader, Mesh, MouseButton, NonSend, Query, Res, ResMut, Resource, shape, Transform, TypePath, Vec2, Vec2Swizzles, Window, With, Without};
 use bevy::render::render_resource::{AsBindGroup, ShaderRef};
-use bevy::sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle, SpriteBundle};
+use bevy::sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle};
 use bevy::utils::default;
 use bevy::window::{CursorMoved, WindowPlugin, WindowResized};
 use bevy::winit::WinitWindows;
@@ -65,7 +65,7 @@ fn main() {
         .insert_resource(grid)
         .insert_resource(drag_info)
         .add_systems(Startup, (setup, set_window_icon))
-        .add_systems(Update, (update, window_resize_system, drag_system, grid_resize_system))
+        .add_systems(Update, (update, window_resize_system, drag_system, grid_resize_system, tile_place_system))
         .run();
 }
 
@@ -170,6 +170,36 @@ fn drag_system(
     }
 }
 
+fn tile_place_system(
+    mut commands: Commands,
+    q_windows: Query<&Window, With<PrimaryWindow>>,
+    mut res_map: ResMut<MapEntity>,
+    buttons: Res<Input<MouseButton>>,
+    res_grid: Res<Grid>,
+) {
+    if buttons.pressed(MouseButton::Left) {
+        let xy = q_windows.single().cursor_position().unwrap().xy();
+
+        // TODO - REPLACE
+        let tile_to_place: TileType = TileType::Test;
+
+        let tile_cords = Vec2::new(
+            ((xy.x + res_grid.offset.x) / res_grid.tile_size).floor(),
+            ((xy.y + res_grid.offset.y) / res_grid.tile_size).floor(),
+        );
+
+        println!("{}", tile_cords);
+
+        res_map.set_tile_at(
+            &mut commands,
+            (-tile_cords.x as i32, -tile_cords.y as i32),
+            tile_to_place,
+            &res_grid,
+            q_windows.single(),
+        );
+    }
+}
+
 fn set_window_icon(windows: NonSend<WinitWindows>) {
     let (icon_rgba, icon_width, icon_height) = {
         let image = image::open("./assets/grass.png")
@@ -192,15 +222,20 @@ fn setup(
     asset_server: Res<AssetServer>,
     mut materials: ResMut<Assets<GridMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
-    window_query: Query<&Window, With<PrimaryWindow>>,
+    q_windows: Query<&Window, With<PrimaryWindow>>,
     res_grid: Res<Grid>,
 ) {
     commands.spawn(Camera2dBundle::default());
 
-    let mut map: MapEntity = MapEntity::new("NewHouse".into());
+    let grass = asset_server.load("grass.png");
 
-    let window_width = window_query.single().physical_width();
-    let window_height = window_query.single().physical_height();
+    let mut map: MapEntity = MapEntity::new(
+        "NewHouse".into(),
+        grass,
+    );
+
+    let window_width = q_windows.single().physical_width();
+    let window_height = q_windows.single().physical_height();
 
     commands.spawn((
         MaterialMesh2dBundle {
@@ -219,41 +254,34 @@ fn setup(
     ));
 
     map.set_tile_at(
+        &mut commands,
         (0, 0),
         TileType::Test,
+        &res_grid,
+        q_windows.single(),
     );
     map.set_tile_at(
+        &mut commands,
         (1, 1),
         TileType::Test,
+        &res_grid,
+        q_windows.single(),
     );
+
     map.set_tile_at(
+        &mut commands,
         (1, 0),
         TileType::Test,
+        &res_grid,
+        q_windows.single(),
     );
     map.set_tile_at(
+        &mut commands,
         (0, 2),
         TileType::Test,
+        &res_grid,
+        q_windows.single(),
     );
-
-    let grass = asset_server.load("grass.png");
-
-    map.tiles.iter().for_each(|(k, v)| {
-        commands.spawn((
-            *v,
-            SpriteBundle {
-                texture: grass.clone(),
-                transform: Transform {
-                    translation: Vec3 {
-                        x: k.0 as f32 * res_grid.tile_size,
-                        y: k.1 as f32 * res_grid.tile_size,
-                        z: 0.0,
-                    },
-                    ..default()
-                },
-                ..default()
-            },
-        ));
-    });
 
     commands.insert_resource(map);
 }
@@ -270,7 +298,7 @@ pub struct GridMaterial {
     #[uniform(3)]
     offset: Vec2,
     #[uniform(4)]
-    mouse_pos: Vec2
+    mouse_pos: Vec2,
 }
 
 
