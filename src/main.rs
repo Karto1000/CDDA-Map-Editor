@@ -1,5 +1,6 @@
 use std::default::Default;
 
+use bevy::{prelude::*, window::PrimaryWindow};
 use bevy::app::{App, PluginGroup};
 use bevy::asset::{Asset, AssetServer};
 use bevy::DefaultPlugins;
@@ -10,9 +11,8 @@ use bevy::render::render_resource::{AsBindGroup, ShaderRef};
 use bevy::sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle, SpriteBundle};
 use bevy::utils::default;
 use bevy::window::{CursorMoved, WindowPlugin, WindowResized};
-use bevy_egui::EguiPlugin;
 use bevy::winit::WinitWindows;
-use bevy::{prelude::*, window::PrimaryWindow};
+use bevy_egui::EguiPlugin;
 use winit::window::Icon;
 
 use crate::mapgen::map_entity::{MapEntity, Tile, TileType};
@@ -27,7 +27,9 @@ pub struct Grid {
     tile_size: f32,
     default_tile_size: f32,
     offset: Vec2,
-    tile_offset: Vec2,
+
+    min_zoom: f32,
+    max_zoom: f32,
 }
 
 #[derive(Resource, Debug)]
@@ -41,7 +43,8 @@ fn main() {
         tile_size: 32.0,
         default_tile_size: 32.0,
         offset: Vec2::new(0., 0.),
-        tile_offset: Vec2::new(0., 0.),
+        min_zoom: 6.,
+        max_zoom: 128.,
     };
 
     let drag_info: DragInfo = DragInfo {
@@ -70,10 +73,19 @@ fn update(
     res_grid: Res<Grid>,
     mut tiles: Query<(&mut Tile, &mut Transform), Without<GridMarker>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
+    mut grid_material: ResMut<Assets<GridMaterial>>,
 ) {
+    let grid_material = grid_material.iter_mut().next().unwrap();
+    let window = q_windows.single();
+
+    grid_material.1.offset = res_grid.offset;
+    grid_material.1.tile_size = res_grid.tile_size;
+    grid_material.1.mouse_pos = window.cursor_position().unwrap_or(Vec2::default());
+
     for (tile, mut transform) in tiles.iter_mut() {
-        transform.translation.x = -q_windows.single().resolution.width() / 2. + res_grid.tile_size / 2. + res_grid.tile_size * tile.x as f32 + -res_grid.tile_offset.x * res_grid.tile_size;
-        transform.translation.y = q_windows.single().resolution.height() / 2. - res_grid.tile_size / 2. - res_grid.tile_size * tile.y as f32 + res_grid.tile_offset.y * res_grid.tile_size;
+        //                                              < CENTER TO TOP LEFT >                                  < ALIGN ON GRID >
+        transform.translation.x = (-window.resolution.width() / 2. + res_grid.tile_size / 2.) - (res_grid.offset.x + tile.x as f32 * res_grid.tile_size);
+        transform.translation.y = (window.resolution.height() / 2. - res_grid.tile_size / 2.) + (res_grid.offset.y + tile.y as f32 * res_grid.tile_size);
     }
 }
 
@@ -104,21 +116,20 @@ fn window_resize_system(
 fn grid_resize_system(
     mut scroll_event: EventReader<MouseWheel>,
     mut res_grid: ResMut<Grid>,
-    mut grid_material: ResMut<Assets<GridMaterial>>,
     mut tiles: Query<(&mut Tile, &mut Transform), Without<GridMarker>>,
 ) {
-    let grid_material = grid_material.iter_mut().next().unwrap();
-
     for event in scroll_event.read() {
         match event.unit {
             MouseScrollUnit::Line => {
-                res_grid.tile_size += event.y * 2.;
+                if res_grid.tile_size <= res_grid.min_zoom && event.y <= -1. { return; }
+                if res_grid.tile_size >= res_grid.max_zoom && event.y >= 1. { return; }
 
-                grid_material.1.tile_size += event.y * 2.;
+                let size = res_grid.tile_size.clone();
+                res_grid.tile_size = size + event.y * 2.;
 
                 for (_, mut transform) in tiles.iter_mut() {
-                    transform.scale.x = res_grid.tile_size / 32.;
-                    transform.scale.y = res_grid.tile_size / 32.;
+                    transform.scale.x = res_grid.tile_size / res_grid.default_tile_size;
+                    transform.scale.y = res_grid.tile_size / res_grid.default_tile_size;
                 }
             }
             MouseScrollUnit::Pixel => panic!("Not Implemented")
@@ -151,11 +162,8 @@ fn drag_system(
         match cursor_motion.read().last() {
             None => return,
             Some(m) => {
-                res_grid.offset += res_drag.last_position.unwrap_or(m.position) - m.position;
-                res_grid.tile_offset = Vec2::new(
-                    ((res_grid.offset.x + res_grid.default_tile_size / 2.) / res_grid.default_tile_size).floor(),
-                    ((res_grid.offset.y + res_grid.default_tile_size / 2.) / res_grid.default_tile_size).floor(),
-                );
+                let offset = res_grid.offset.clone();
+                res_grid.offset = offset + res_drag.last_position.unwrap_or(m.position) - m.position;
                 res_drag.last_position = Some(m.position);
             }
         }
@@ -202,6 +210,8 @@ fn setup(
                 viewport_width: window_width as f32,
                 viewport_height: window_height as f32,
                 tile_size: res_grid.tile_size,
+                offset: Vec2::default(),
+                mouse_pos: Default::default(),
             }),
             ..default()
         },
@@ -257,6 +267,10 @@ pub struct GridMaterial {
     viewport_height: f32,
     #[uniform(2)]
     tile_size: f32,
+    #[uniform(3)]
+    offset: Vec2,
+    #[uniform(4)]
+    mouse_pos: Vec2
 }
 
 
