@@ -7,7 +7,7 @@ use bevy::DefaultPlugins;
 use bevy::input::Input;
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::{Assets, Bundle, Camera2dBundle, Commands, Component, EventReader, Mesh, MouseButton, NonSend, Query, Res, ResMut, Resource, shape, Transform, TypePath, Vec2, Vec2Swizzles, Window, With, Without};
-use bevy::render::render_resource::{AsBindGroup, ShaderRef};
+use bevy::render::render_resource::{AsBindGroup, AsBindGroupShaderType, ShaderRef};
 use bevy::sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle};
 use bevy::utils::default;
 use bevy::window::{CursorMoved, WindowPlugin, WindowResized};
@@ -38,6 +38,14 @@ pub struct DragInfo {
     last_position: Option<Vec2>,
 }
 
+#[derive(Resource, Debug)]
+pub struct PlaceInfo {
+    last_place_position: Option<Vec2>,
+}
+
+#[derive(Component)]
+pub struct MouseLocationTextMarker;
+
 fn main() {
     let grid: Grid = Grid {
         tile_size: 32.0,
@@ -52,6 +60,10 @@ fn main() {
         last_position: None,
     };
 
+    let place_info: PlaceInfo = PlaceInfo {
+        last_place_position: None
+    };
+
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
@@ -64,8 +76,9 @@ fn main() {
         .add_plugins(Material2dPlugin::<GridMaterial>::default())
         .insert_resource(grid)
         .insert_resource(drag_info)
+        .insert_resource(place_info)
         .add_systems(Startup, (setup, set_window_icon))
-        .add_systems(Update, (update, window_resize_system, drag_system, grid_resize_system, tile_place_system))
+        .add_systems(Update, (update, window_resize_system, drag_system, grid_resize_system, tile_place_system, update_mouse_location))
         .run();
 }
 
@@ -146,7 +159,7 @@ fn drag_system(
     q_windows: Query<&Window, With<PrimaryWindow>>,
 ) {
     if buttons.just_pressed(MouseButton::Right) {
-        let xy = q_windows.single().cursor_position().unwrap().xy();
+        let xy = q_windows.single().cursor_position().unwrap_or(Vec2::default()).xy();
         commands.insert_resource(DragInfo {
             drag_started: Some(xy),
             last_position: Some(xy),
@@ -172,13 +185,21 @@ fn drag_system(
 
 fn tile_place_system(
     mut commands: Commands,
-    q_windows: Query<&Window, With<PrimaryWindow>>,
     mut res_map: ResMut<MapEntity>,
     buttons: Res<Input<MouseButton>>,
+    q_windows: Query<&Window, With<PrimaryWindow>>,
     res_grid: Res<Grid>,
+    mut res_place_info: ResMut<PlaceInfo>,
 ) {
+    if buttons.just_released(MouseButton::Left) {
+        res_place_info.last_place_position = None
+    }
+
     if buttons.pressed(MouseButton::Left) {
-        let xy = q_windows.single().cursor_position().unwrap().xy();
+        let xy = match q_windows.single().cursor_position() {
+            None => return,
+            Some(p) => p.xy()
+        };
 
         // TODO - REPLACE
         let tile_to_place: TileType = TileType::Test;
@@ -188,8 +209,6 @@ fn tile_place_system(
             ((xy.y + res_grid.offset.y) / res_grid.tile_size).floor(),
         );
 
-        println!("{}", tile_cords);
-
         res_map.set_tile_at(
             &mut commands,
             (-tile_cords.x as i32, -tile_cords.y as i32),
@@ -197,6 +216,53 @@ fn tile_place_system(
             &res_grid,
             q_windows.single(),
         );
+
+        let dist = (xy + res_grid.offset) - (res_place_info.last_place_position.unwrap_or(xy) + res_grid.offset);
+        let grid_dist = (dist / res_grid.tile_size).round().abs();
+        let dir = dist.clamp(Vec2::new(-1., -1.), Vec2::new(1., 1.));
+
+        res_place_info.last_place_position = Some(xy);
+
+        match grid_dist.y.abs() > grid_dist.x.abs() {
+            true => {
+                // Y in greater
+                let slope = grid_dist.x / grid_dist.y;
+
+                for y in 0..grid_dist.y as i32 {
+                    let tile_cords = Vec2::new(
+                        ((xy.x + res_grid.offset.x) / res_grid.tile_size + slope * dir.x).floor(),
+                        ((xy.y + res_grid.offset.y) / res_grid.tile_size + y as f32 * dir.y).floor(),
+                    );
+
+                    res_map.set_tile_at(
+                        &mut commands,
+                        (-tile_cords.x as i32, -tile_cords.y as i32),
+                        tile_to_place,
+                        &res_grid,
+                        q_windows.single(),
+                    );
+                };
+            }
+            false => {
+                // X in greater
+                let slope = grid_dist.y / grid_dist.x;
+
+                for x in 0..grid_dist.x as i32 {
+                    let tile_cords = Vec2::new(
+                        ((xy.x + res_grid.offset.x) / res_grid.tile_size + x as f32 * dir.x).floor(),
+                        ((xy.y + res_grid.offset.y) / res_grid.tile_size + slope * dir.y).floor(),
+                    );
+
+                    res_map.set_tile_at(
+                        &mut commands,
+                        (-tile_cords.x as i32, -tile_cords.y as i32),
+                        tile_to_place,
+                        &res_grid,
+                        q_windows.single(),
+                    );
+                };
+            }
+        };
     }
 }
 
@@ -214,6 +280,22 @@ fn set_window_icon(windows: NonSend<WinitWindows>) {
     // do it for all windows
     for window in windows.windows.values() {
         window.set_window_icon(Some(icon.clone()));
+    }
+}
+
+fn update_mouse_location(
+    mut event_cursor: EventReader<CursorMoved>,
+    mut location_text: Query<(&mut Text, &MouseLocationTextMarker)>,
+    query_windows: Query<&Window, With<PrimaryWindow>>,
+    res_grid: Res<Grid>,
+) {
+    let mut text = location_text.single_mut();
+    let window = query_windows.single();
+    let xy = window.cursor_position().unwrap_or(Vec2::default()).xy();
+
+    for _ in event_cursor.read() {
+        let pos = ((xy + res_grid.offset) / res_grid.tile_size).floor();
+        text.0.sections[0].value = format!("{}, {}", pos.x, pos.y);
     }
 }
 
@@ -253,35 +335,24 @@ fn setup(
         GridMarker {}
     ));
 
-    map.set_tile_at(
-        &mut commands,
-        (0, 0),
-        TileType::Test,
-        &res_grid,
-        q_windows.single(),
-    );
-    map.set_tile_at(
-        &mut commands,
-        (1, 1),
-        TileType::Test,
-        &res_grid,
-        q_windows.single(),
-    );
-
-    map.set_tile_at(
-        &mut commands,
-        (1, 0),
-        TileType::Test,
-        &res_grid,
-        q_windows.single(),
-    );
-    map.set_tile_at(
-        &mut commands,
-        (0, 2),
-        TileType::Test,
-        &res_grid,
-        q_windows.single(),
-    );
+    commands.spawn((
+        TextBundle::from_section(
+            "0, 0",
+            TextStyle {
+                font: asset_server.load("fonts/unifont.ttf"),
+                font_size: 24.0,
+                ..default()
+            },
+        )
+            .with_text_alignment(TextAlignment::Center)
+            .with_style(Style {
+                position_type: PositionType::Absolute,
+                top: Val::Px(5.0),
+                right: Val::Px(5.0),
+                ..default()
+            }),
+        MouseLocationTextMarker {}
+    ));
 
     commands.insert_resource(map);
 }
