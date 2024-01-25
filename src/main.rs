@@ -19,6 +19,7 @@ use crate::grid::systems::{grid_resize_system, window_grid_resize_system};
 use crate::map::MapEntity;
 use crate::tiles::{Tile, TileType};
 use crate::tiles::systems::{tile_place_system, tile_resize_system, window_tile_resize_system};
+use crate::map::system::map_save_system;
 
 mod grid;
 mod tiles;
@@ -71,7 +72,17 @@ fn main() {
         .insert_resource(drag_info)
         .insert_resource(place_info)
         .add_systems(Startup, (setup))
-        .add_systems(Update, (update, window_grid_resize_system, drag_system, window_tile_resize_system, tile_place_system, update_mouse_location, grid_resize_system, tile_resize_system))
+        .add_systems(Update, (
+            update,
+            window_grid_resize_system,
+            drag_system,
+            window_tile_resize_system,
+            tile_place_system,
+            update_mouse_location,
+            grid_resize_system,
+            tile_resize_system,
+            map_save_system
+        ))
         .run();
 }
 
@@ -163,8 +174,8 @@ fn update(
 
     for (tile, mut transform) in tiles.iter_mut() {
         //                                              < CENTER TO TOP LEFT >                                  < ALIGN ON GRID >
-        transform.translation.x = (-window.resolution.width() / 2. + res_grid.tile_size / 2.) - (res_grid.offset.x + tile.x as f32 * res_grid.tile_size);
-        transform.translation.y = (window.resolution.height() / 2. - res_grid.tile_size / 2.) + (res_grid.offset.y + tile.y as f32 * res_grid.tile_size);
+        transform.translation.x = (-window.resolution.width() / 2. + res_grid.tile_size / 2.) - (res_grid.offset.x - tile.x as f32 * res_grid.tile_size);
+        transform.translation.y = (window.resolution.height() / 2. - res_grid.tile_size / 2.) + (res_grid.offset.y - tile.y as f32 * res_grid.tile_size);
     }
 }
 

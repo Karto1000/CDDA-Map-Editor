@@ -67,7 +67,7 @@ pub fn tile_place_system(
 
         res_map.set_tile_at(
             &mut commands,
-            (-tile_cords.x as i32, -tile_cords.y as i32),
+            (tile_cords.x as i32, tile_cords.y as i32),
             tile_to_place,
             &res_grid,
             q_windows.single(),
@@ -92,7 +92,7 @@ pub fn tile_place_system(
 
                     res_map.set_tile_at(
                         &mut commands,
-                        (-tile_cords.x as i32, -tile_cords.y as i32),
+                        (tile_cords.x as i32, tile_cords.y as i32),
                         tile_to_place,
                         &res_grid,
                         q_windows.single(),
@@ -111,7 +111,7 @@ pub fn tile_place_system(
 
                     res_map.set_tile_at(
                         &mut commands,
-                        (-tile_cords.x as i32, -tile_cords.y as i32),
+                        (tile_cords.x as i32, tile_cords.y as i32),
                         tile_to_place,
                         &res_grid,
                         q_windows.single(),
