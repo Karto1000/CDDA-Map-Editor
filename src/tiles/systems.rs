@@ -4,7 +4,7 @@ use bevy::prelude::{Commands, EventReader, MouseButton, Query, Res, ResMut, Tran
 use bevy::window::{PrimaryWindow, WindowResized};
 
 use crate::grid::{Grid, GridMarker};
-use crate::mapgen::map_entity::MapEntity;
+use crate::map::MapEntity;
 use crate::PlaceInfo;
 use crate::tiles::{Tile, TileType};
 

@@ -16,13 +16,13 @@ use winit::window::Icon;
 
 use crate::grid::{Grid, GridMarker, GridMaterial};
 use crate::grid::systems::{grid_resize_system, window_grid_resize_system};
-use crate::mapgen::map_entity::MapEntity;
+use crate::map::MapEntity;
 use crate::tiles::{Tile, TileType};
 use crate::tiles::systems::{tile_place_system, tile_resize_system, window_tile_resize_system};
 
-mod mapgen;
 mod grid;
 mod tiles;
+mod map;
 
 
 #[derive(Resource, Debug)]

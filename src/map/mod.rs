@@ -1,10 +1,8 @@
 use std::collections::HashMap;
-
-use bevy::prelude::{Commands, Component, default, Entity, Handle, Image, Res, Resource, SpriteBundle, Transform, Vec3};
-use bevy::window::Window;
+use bevy::asset::Handle;
+use bevy::prelude::{Commands, default, Entity, Image, Res, Resource, SpriteBundle, Transform, Vec3, Window};
 use serde::{Deserialize, Serialize};
-
-use crate::Grid;
+use crate::grid::Grid;
 use crate::tiles::{Tile, TileType};
 
 #[derive(Serialize, Deserialize, Debug, Resource)]
