@@ -15,11 +15,11 @@ use bevy_egui::EguiPlugin;
 use winit::window::Icon;
 
 use crate::grid::{Grid, GridMarker, GridMaterial};
-use crate::grid::systems::{grid_resize_system, window_grid_resize_system};
+use crate::grid::systems::{grid_resize_system, map_resize_system, window_grid_resize_system};
 use crate::map::MapEntity;
-use crate::tiles::{Tile, TileType};
-use crate::tiles::systems::{tile_place_system, tile_resize_system, window_tile_resize_system};
 use crate::map::system::map_save_system;
+use crate::tiles::systems::{tile_delete_system, tile_place_system, tile_resize_system, window_tile_resize_system};
+use crate::tiles::Tile;
 
 mod grid;
 mod tiles;
@@ -43,6 +43,7 @@ pub struct MouseLocationTextMarker;
 fn main() {
     let grid: Grid = Grid {
         tile_size: 32.0,
+        map_size: Vec2 { x: 24., y: 24. },
         default_tile_size: 32.0,
         offset: Vec2::new(0., 0.),
         min_zoom: 6.,
@@ -81,7 +82,9 @@ fn main() {
             update_mouse_location,
             grid_resize_system,
             tile_resize_system,
-            map_save_system
+            map_save_system,
+            tile_delete_system,
+            map_resize_system
         ))
         .run();
 }
@@ -100,8 +103,9 @@ fn setup(
 
     let grass = asset_server.load("grass.png");
 
-    let mut map: MapEntity = MapEntity::new(
+    let map: MapEntity = MapEntity::new(
         "test_tile_01".into(),
+        res_grid.map_size,
         grass,
     );
 
@@ -130,6 +134,7 @@ fn setup(
                 tile_size: res_grid.tile_size,
                 offset: Vec2::default(),
                 mouse_pos: Default::default(),
+                map_size: res_grid.map_size,
             }),
             ..default()
         },
@@ -171,6 +176,7 @@ fn update(
     grid_material.1.offset = res_grid.offset;
     grid_material.1.tile_size = res_grid.tile_size;
     grid_material.1.mouse_pos = window.cursor_position().unwrap_or(Vec2::default());
+    grid_material.1.map_size = res_grid.map_size;
 
     for (tile, mut transform) in tiles.iter_mut() {
         //                                              < CENTER TO TOP LEFT >                                  < ALIGN ON GRID >
@@ -188,7 +194,7 @@ fn drag_system(
     mut res_drag: ResMut<DragInfo>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
 ) {
-    if buttons.just_pressed(MouseButton::Right) {
+    if buttons.just_pressed(MouseButton::Middle) {
         let xy = q_windows.single().cursor_position().unwrap_or(Vec2::default()).xy();
         commands.insert_resource(DragInfo {
             drag_started: Some(xy),
@@ -196,12 +202,12 @@ fn drag_system(
         })
     }
 
-    if buttons.just_released(MouseButton::Right) {
+    if buttons.just_released(MouseButton::Middle) {
         res_drag.last_position = None;
         res_drag.drag_started = None
     }
 
-    if buttons.pressed(MouseButton::Right) {
+    if buttons.pressed(MouseButton::Middle) {
         match cursor_motion.read().last() {
             None => return,
             Some(m) => {

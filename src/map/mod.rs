@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::error::Error;
 
 use bevy::asset::Handle;
-use bevy::prelude::{Commands, default, Entity, Image, IVec2, Res, Resource, SpriteBundle, Transform, Vec3};
+use bevy::prelude::{Commands, default, Entity, Image, IVec2, Res, Resource, SpriteBundle, Transform, Vec2, Vec3};
 use serde::{Deserializer, Serialize};
 use serde_json::Value;
 
@@ -13,6 +13,7 @@ pub(crate) mod system;
 
 #[derive(Serialize, Debug, Resource)]
 pub struct Tiles {
+    pub size: Vec2,
     pub tiles: HashMap<(i32, i32), Tile>,
 
     #[serde(skip)]
@@ -21,12 +22,11 @@ pub struct Tiles {
 
 impl Tiles {
     pub fn json(&self) -> Result<Value, Box<dyn Error>> {
-        let size = self.get_size().unwrap();
         let mut rows: Vec<String> = vec![];
 
-        for _ in 0..size.y {
-            let mut row = String::with_capacity(size.x as usize);
-            (0..size.x).for_each(|i| {
+        for _ in 0..self.size.y as i32 {
+            let mut row = String::with_capacity(self.size.x as usize);
+            (0..self.size.x as i32).for_each(|i| {
                 row.insert(i as usize, " ".parse::<char>().unwrap())
             });
             rows.push(row);
@@ -101,11 +101,11 @@ pub struct MapEntity {
 }
 
 impl MapEntity {
-    pub fn new(name: String, texture: Handle<Image>) -> Self {
+    pub fn new(name: String, size: Vec2, texture: Handle<Image>) -> Self {
         return Self {
             name,
             weight: 100,
-            map: Tiles { tiles: HashMap::new(), texture },
+            map: Tiles { tiles: HashMap::new(), texture, size },
         };
     }
 

@@ -5,6 +5,7 @@
 @group(1) @binding(2) var<uniform> tile_size: f32;
 @group(1) @binding(3) var<uniform> offset: vec2<f32>;
 @group(1) @binding(4) var<uniform> mouse_pos: vec2<f32>;
+@group(1) @binding(5) var<uniform> map_size: vec2<f32>;
 
 @fragment
 fn fragment(output: VertexOutput) -> @location(0) vec4<f32> {
@@ -41,6 +42,21 @@ fn fragment(output: VertexOutput) -> @location(0) vec4<f32> {
          color.x = 1.0;
          color.y = 1.0;
          color.z = 1.0;
+    }
+
+    let tile_x = i32(output.position.x + offset.x) / i32(tile_size);
+    let tile_y = i32(output.position.y + offset.y) / i32(tile_size);
+
+    if (
+        i32(abs(tile_x)) >= i32(map_size.x) ||
+        i32(tile_x) <= 0 ||
+        i32(abs(tile_y)) >= i32(map_size.y) ||
+        i32(tile_y) <= 0
+    ) {
+        color.x = 0.;
+        color.y = 0.;
+        color.z = 0.;
+        alpha = 0.5;
     }
 
    return vec4<f32>(color, alpha);

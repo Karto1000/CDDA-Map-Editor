@@ -1,9 +1,11 @@
 use bevy::asset::Assets;
+use bevy::input::Input;
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
-use bevy::prelude::{EventReader, Query, ResMut, Transform, With, Without};
+use bevy::prelude::{EventReader, KeyCode, Query, Res, ResMut, Transform, With, Without};
 use bevy::window::WindowResized;
 
 use crate::grid::{Grid, GridMarker, GridMaterial};
+use crate::map::MapEntity;
 use crate::tiles::Tile;
 
 pub fn window_grid_resize_system(
@@ -45,4 +47,28 @@ pub fn grid_resize_system(
             MouseScrollUnit::Pixel => panic!("Not Implemented")
         }
     }
+}
+
+pub fn map_resize_system(
+    mut res_grid: ResMut<Grid>,
+    mut res_map: ResMut<MapEntity>,
+    keys: Res<Input<KeyCode>>,
+) {
+    if keys.pressed(KeyCode::Right) {
+        res_grid.map_size.x += 1.;
+    }
+
+    if keys.pressed(KeyCode::Down) {
+        res_grid.map_size.y += 1.;
+    }
+
+    if keys.pressed(KeyCode::Left) {
+        res_grid.map_size.x -= 1.;
+    }
+
+    if keys.pressed(KeyCode::Up) {
+        res_grid.map_size.y -= 1.;
+    }
+
+    res_map.map.size = res_grid.map_size
 }

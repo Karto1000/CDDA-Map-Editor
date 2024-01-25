@@ -1,6 +1,6 @@
 use bevy::input::Input;
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
-use bevy::prelude::{Commands, EventReader, MouseButton, Query, Res, ResMut, Transform, Vec2, Vec2Swizzles, Window, With, Without};
+use bevy::prelude::{Commands, Entity, EventReader, MouseButton, Query, Res, ResMut, Transform, Vec2, Vec2Swizzles, Window, With, Without};
 use bevy::window::{PrimaryWindow, WindowResized};
 
 use crate::grid::{Grid, GridMarker};
@@ -65,6 +65,13 @@ pub fn tile_place_system(
             ((xy.y + res_grid.offset.y) / res_grid.tile_size).floor(),
         );
 
+        if tile_cords.x >= res_grid.map_size.x ||
+            tile_cords.y >= res_grid.map_size.y ||
+            tile_cords.x <= 0. ||
+            tile_cords.y <= 0. {
+            return;
+        }
+
         res_map.map.set_tile_at(
             &mut commands,
             (tile_cords.x as i32, tile_cords.y as i32),
@@ -72,48 +79,76 @@ pub fn tile_place_system(
             &res_grid,
         );
 
-        let dist = (xy + res_grid.offset) - (res_place_info.last_place_position.unwrap_or(xy) + res_grid.offset);
-        let grid_dist = (dist / res_grid.tile_size).round().abs();
-        let dir = dist.clamp(Vec2::new(-1., -1.), Vec2::new(1., 1.));
+        // let dist = (xy + res_grid.offset) - (res_place_info.last_place_position.unwrap_or(xy) + res_grid.offset);
+        // let grid_dist = (dist / res_grid.tile_size).round().abs();
+        // let dir = dist.clamp(Vec2::new(-1., -1.), Vec2::new(1., 1.));
+        //
+        // res_place_info.last_place_position = Some(xy);
+        //
+        // match grid_dist.y.abs() > grid_dist.x.abs() {
+        //     true => {
+        //         // Y in greater
+        //         let slope = grid_dist.x / grid_dist.y;
+        //
+        //         for y in 0..grid_dist.y as i32 {
+        //             let tile_cords = Vec2::new(
+        //                 ((xy.x + res_grid.offset.x) / res_grid.tile_size + slope * dir.x).floor(),
+        //                 ((xy.y + res_grid.offset.y) / res_grid.tile_size + y as f32 * dir.y).floor(),
+        //             );
+        //
+        //             res_map.map.set_tile_at(
+        //                 &mut commands,
+        //                 (tile_cords.x as i32, tile_cords.y as i32),
+        //                 tile_to_place,
+        //                 &res_grid,
+        //             );
+        //         };
+        //     }
+        //     false => {
+        //         // X in greater
+        //         let slope = grid_dist.y / grid_dist.x;
+        //
+        //         for x in 0..grid_dist.x as i32 {
+        //             let tile_cords = Vec2::new(
+        //                 ((xy.x + res_grid.offset.x) / res_grid.tile_size + x as f32 * dir.x).floor(),
+        //                 ((xy.y + res_grid.offset.y) / res_grid.tile_size + slope * dir.y).floor(),
+        //             );
+        //
+        //             res_map.map.set_tile_at(
+        //                 &mut commands,
+        //                 (tile_cords.x as i32, tile_cords.y as i32),
+        //                 tile_to_place,
+        //                 &res_grid,
+        //             );
+        //         };
+        //     }
+        // };
+    }
+}
 
-        res_place_info.last_place_position = Some(xy);
+pub fn tile_delete_system(
+    mut commands: Commands,
+    mut res_map: ResMut<MapEntity>,
+    mut tiles: Query<(Entity, &Tile), Without<GridMarker>>,
+    buttons: Res<Input<MouseButton>>,
+    q_windows: Query<&Window, With<PrimaryWindow>>,
+    res_grid: Res<Grid>,
+) {
+    if buttons.pressed(MouseButton::Right) {
+        let xy = match q_windows.single().cursor_position() {
+            None => return,
+            Some(p) => p.xy()
+        };
 
-        match grid_dist.y.abs() > grid_dist.x.abs() {
-            true => {
-                // Y in greater
-                let slope = grid_dist.x / grid_dist.y;
+        let tile_cords = Vec2::new(
+            ((xy.x + res_grid.offset.x) / res_grid.tile_size).floor(),
+            ((xy.y + res_grid.offset.y) / res_grid.tile_size).floor(),
+        );
 
-                for y in 0..grid_dist.y as i32 {
-                    let tile_cords = Vec2::new(
-                        ((xy.x + res_grid.offset.x) / res_grid.tile_size + slope * dir.x).floor(),
-                        ((xy.y + res_grid.offset.y) / res_grid.tile_size + y as f32 * dir.y).floor(),
-                    );
-
-                    res_map.map.set_tile_at(
-                        &mut commands,
-                        (tile_cords.x as i32, tile_cords.y as i32),
-                        tile_to_place,
-                        &res_grid,
-                    );
-                };
-            }
-            false => {
-                // X in greater
-                let slope = grid_dist.y / grid_dist.x;
-
-                for x in 0..grid_dist.x as i32 {
-                    let tile_cords = Vec2::new(
-                        ((xy.x + res_grid.offset.x) / res_grid.tile_size + x as f32 * dir.x).floor(),
-                        ((xy.y + res_grid.offset.y) / res_grid.tile_size + slope * dir.y).floor(),
-                    );
-
-                    res_map.map.set_tile_at(
-                        &mut commands,
-                        (tile_cords.x as i32, tile_cords.y as i32),
-                        tile_to_place,
-                        &res_grid,
-                    );
-                };
+        for (entity, q_tile) in tiles.iter_mut() {
+            if (q_tile.x, q_tile.y) == (tile_cords.x as i32, tile_cords.y as i32) {
+                res_map.map.tiles.remove(&(tile_cords.x as i32, tile_cords.y as i32));
+                commands.get_entity(entity).unwrap().despawn();
             }
         };
     }
