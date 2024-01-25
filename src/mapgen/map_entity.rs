@@ -5,18 +5,7 @@ use bevy::window::Window;
 use serde::{Deserialize, Serialize};
 
 use crate::Grid;
-
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, Component)]
-pub struct Tile {
-    pub tile_type: TileType,
-    pub x: i32,
-    pub y: i32,
-}
-
-#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
-pub enum TileType {
-    Test
-}
+use crate::tiles::{Tile, TileType};
 
 #[derive(Serialize, Deserialize, Debug, Resource)]
 pub struct MapEntity {
