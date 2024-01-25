@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::error::Error;
 
 use bevy::asset::Handle;
-use bevy::prelude::{Commands, default, Entity, Image, Res, Resource, SpriteBundle, Transform, Vec3, Window};
+use bevy::prelude::{Commands, default, Entity, Image, IVec2, Res, Resource, SpriteBundle, Transform, Vec3};
 use serde::{Deserializer, Serialize};
 use serde_json::Value;
 
@@ -12,39 +12,27 @@ use crate::tiles::{Tile, TileType};
 pub(crate) mod system;
 
 #[derive(Serialize, Debug, Resource)]
-pub struct MapEntity {
-    pub name: String,
-    pub weight: u32,
+pub struct Tiles {
     pub tiles: HashMap<(i32, i32), Tile>,
 
     #[serde(skip)]
     pub texture: Handle<Image>,
 }
 
-impl MapEntity {
-    pub fn get_size(&self) -> Option<(i32, i32)> {
-        let mut keys_sorted_x: Vec<(i32, i32)> = self.tiles.clone().into_keys().collect();
-        let mut keys_sorted_y: Vec<(i32, i32)> = self.tiles.clone().into_keys().collect();
+impl Tiles {
+    pub fn json(&self) -> Result<Value, Box<dyn Error>> {
+        let size = self.get_size().unwrap();
+        let mut rows: Vec<String> = vec![];
 
-        keys_sorted_x.sort_by(|(x1, _), (x2, _)| x1.cmp(x2));
-        keys_sorted_y.sort_by(|(_, y1), (_, y2)| y1.cmp(y2));
-
-        let leftmost_tile = keys_sorted_x.first().cloned().unwrap();
-        let rightmost_tile = keys_sorted_x.last().cloned().unwrap();
-
-        let topmost_tile = keys_sorted_y.first().cloned().unwrap();
-        let bottommost_tile = keys_sorted_y.last().cloned().unwrap();
-
-        return Some(((rightmost_tile.0 - leftmost_tile.0).abs() + 1, (bottommost_tile.1 - topmost_tile.1).abs() + 1));
-    }
-
-    pub fn new(name: String, texture: Handle<Image>) -> Self {
-        return Self {
-            name,
-            weight: 100,
-            tiles: HashMap::new(),
-            texture,
+        for _ in 0..size.y {
+            let mut row = String::with_capacity(size.x as usize);
+            (0..size.x).for_each(|i| {
+                row.insert(i as usize, ".".parse::<char>().unwrap())
+            });
+            rows.push(row);
         };
+
+        return Ok(Value::Array(rows.iter().map(|e| Value::String(e.clone())).collect()));
     }
 
     pub fn set_tile_at(
@@ -53,7 +41,6 @@ impl MapEntity {
         cords: (i32, i32),
         tile_type: TileType,
         res_grid: &Res<Grid>,
-        window: &Window,
     ) -> Option<Entity> {
         if self.tiles.get(&(cords.0, cords.1)).is_some() { return None; }
 
@@ -89,27 +76,49 @@ impl MapEntity {
         return Some(c.id());
     }
 
-    pub fn json(&self) -> Result<Value, Box<dyn Error>> {
-        let size = self.get_size().unwrap();
+    pub fn get_size(&self) -> Option<IVec2> {
+        let mut keys_sorted_x: Vec<(i32, i32)> = self.tiles.clone().into_keys().collect();
+        let mut keys_sorted_y: Vec<(i32, i32)> = self.tiles.clone().into_keys().collect();
 
-        let mut rows: Vec<String> = vec![];
+        keys_sorted_x.sort_by(|(x1, _), (x2, _)| x1.cmp(x2));
+        keys_sorted_y.sort_by(|(_, y1), (_, y2)| y1.cmp(y2));
 
-        for size_y in 0..size.1 {
-            let mut row = String::with_capacity(size.0 as usize);
-            (0..size.0).for_each(|i| {
-                row.insert(i as usize, ".".parse::<char>().unwrap())
-            });
-            rows.push(row);
+        let leftmost_tile = keys_sorted_x.first().cloned().unwrap();
+        let rightmost_tile = keys_sorted_x.last().cloned().unwrap();
+
+        let topmost_tile = keys_sorted_y.first().cloned().unwrap();
+        let bottommost_tile = keys_sorted_y.last().cloned().unwrap();
+
+        return Some(IVec2::new((rightmost_tile.0 - leftmost_tile.0).abs() + 1, (bottommost_tile.1 - topmost_tile.1).abs() + 1));
+    }
+}
+
+#[derive(Serialize, Debug, Resource)]
+pub struct MapEntity {
+    pub name: String,
+    pub weight: u32,
+    pub map: Tiles,
+}
+
+impl MapEntity {
+    pub fn new(name: String, texture: Handle<Image>) -> Self {
+        return Self {
+            name,
+            weight: 100,
+            map: Tiles { tiles: HashMap::new(), texture },
         };
+    }
 
+    pub fn json(&self) -> Result<Value, Box<dyn Error>> {
         return Ok(serde_json::json!({
             "method": "json",
             "om_terrain": self.name,
             "type": "mapgen",
+            "palettes": [ "domestic_general_and_variant_palette" ],
             "weight": 100,
             "object": {
                 "fill_terr": "t_floor",
-                "rows": rows
+                "rows": self.map.json().unwrap()
             }
         }));
     }

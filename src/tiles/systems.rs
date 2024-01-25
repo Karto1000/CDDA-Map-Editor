@@ -65,12 +65,11 @@ pub fn tile_place_system(
             ((xy.y + res_grid.offset.y) / res_grid.tile_size).floor(),
         );
 
-        res_map.set_tile_at(
+        res_map.map.set_tile_at(
             &mut commands,
             (tile_cords.x as i32, tile_cords.y as i32),
             tile_to_place,
             &res_grid,
-            q_windows.single(),
         );
 
         let dist = (xy + res_grid.offset) - (res_place_info.last_place_position.unwrap_or(xy) + res_grid.offset);
@@ -90,12 +89,11 @@ pub fn tile_place_system(
                         ((xy.y + res_grid.offset.y) / res_grid.tile_size + y as f32 * dir.y).floor(),
                     );
 
-                    res_map.set_tile_at(
+                    res_map.map.set_tile_at(
                         &mut commands,
                         (tile_cords.x as i32, tile_cords.y as i32),
                         tile_to_place,
                         &res_grid,
-                        q_windows.single(),
                     );
                 };
             }
@@ -109,12 +107,11 @@ pub fn tile_place_system(
                         ((xy.y + res_grid.offset.y) / res_grid.tile_size + slope * dir.y).floor(),
                     );
 
-                    res_map.set_tile_at(
+                    res_map.map.set_tile_at(
                         &mut commands,
                         (tile_cords.x as i32, tile_cords.y as i32),
                         tile_to_place,
                         &res_grid,
-                        q_windows.single(),
                     );
                 };
             }
