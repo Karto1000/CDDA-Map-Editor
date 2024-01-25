@@ -101,7 +101,7 @@ fn setup(
     let grass = asset_server.load("grass.png");
 
     let mut map: MapEntity = MapEntity::new(
-        "NewHouse".into(),
+        "test_tile_01".into(),
         grass,
     );
 

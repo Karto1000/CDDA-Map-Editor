@@ -27,7 +27,7 @@ impl Tiles {
         for _ in 0..size.y {
             let mut row = String::with_capacity(size.x as usize);
             (0..size.x).for_each(|i| {
-                row.insert(i as usize, ".".parse::<char>().unwrap())
+                row.insert(i as usize, " ".parse::<char>().unwrap())
             });
             rows.push(row);
         };
@@ -110,16 +110,16 @@ impl MapEntity {
     }
 
     pub fn json(&self) -> Result<Value, Box<dyn Error>> {
-        return Ok(serde_json::json!({
+        return Ok(serde_json::json!([{
             "method": "json",
             "om_terrain": self.name,
             "type": "mapgen",
-            "palettes": [ "domestic_general_and_variant_palette" ],
             "weight": 100,
             "object": {
-                "fill_terr": "t_floor",
-                "rows": self.map.json().unwrap()
+                "fill_ter": "t_floor",
+                "rows": self.map.json().unwrap(),
+                "palettes": [ "domestic_general_and_variant_palette" ],
             }
-        }));
+        }]));
     }
 }
