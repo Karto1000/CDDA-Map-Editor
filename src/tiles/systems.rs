@@ -3,10 +3,11 @@ use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::{Commands, Entity, EventReader, MouseButton, Query, Res, ResMut, Transform, Vec2, Vec2Swizzles, Window, With, Without};
 use bevy::window::{PrimaryWindow, WindowResized};
 
-use crate::grid::{Grid, GridMarker};
+use crate::grid::{GridMarker};
+use crate::grid::resources::Grid;
 use crate::map::MapEntity;
-use crate::PlaceInfo;
 use crate::tiles::{Tile, TileType};
+use crate::tiles::resources::PlaceInfo;
 
 pub fn window_tile_resize_system(
     mut resize_reader: EventReader<WindowResized>,

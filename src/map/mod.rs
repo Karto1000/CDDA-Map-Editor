@@ -1,15 +1,25 @@
 use std::collections::HashMap;
 use std::error::Error;
 
+use bevy::app::{Plugin, Update, App};
 use bevy::asset::Handle;
 use bevy::prelude::{Commands, default, Entity, Image, IVec2, Res, Resource, SpriteBundle, Transform, Vec2, Vec3};
 use serde::{Deserializer, Serialize};
 use serde_json::Value;
 
-use crate::grid::Grid;
+use crate::grid::resources::Grid;
+use crate::map::system::map_save_system;
 use crate::tiles::{Tile, TileType};
 
 pub(crate) mod system;
+
+pub struct MapPlugin;
+
+impl Plugin for MapPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(Update, (map_save_system));
+    }
+}
 
 #[derive(Serialize, Debug, Resource)]
 pub struct Tiles {
@@ -55,7 +65,7 @@ impl Tiles {
                         // Spawn off screen
                         x: -1000.0,
                         y: -1000.0,
-                        z: 0.0,
+                        z: 1.0,
                     },
                     scale: Vec3 {
                         x: res_grid.tile_size / res_grid.default_tile_size,

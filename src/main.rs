@@ -4,8 +4,7 @@ use bevy::{prelude::*, window::PrimaryWindow};
 use bevy::app::{App, PluginGroup};
 use bevy::asset::{Asset, AssetServer};
 use bevy::DefaultPlugins;
-use bevy::input::Input;
-use bevy::prelude::{Assets, Bundle, Camera2dBundle, Commands, Component, EventReader, Mesh, MouseButton, NonSend, Query, Res, ResMut, Resource, shape, Transform, TypePath, Vec2, Vec2Swizzles, Window, With, Without};
+use bevy::prelude::{Assets, Bundle, Camera2dBundle, Commands, Component, EventReader, Mesh, NonSend, Query, Res, ResMut, Resource, shape, Transform, TypePath, Vec2, Vec2Swizzles, Window, With, Without};
 use bevy::render::render_resource::{AsBindGroup, AsBindGroupShaderType};
 use bevy::sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle};
 use bevy::utils::default;
@@ -14,51 +13,20 @@ use bevy::winit::WinitWindows;
 use bevy_egui::EguiPlugin;
 use winit::window::Icon;
 
-use crate::grid::{Grid, GridMarker, GridMaterial};
-use crate::grid::systems::{grid_resize_system, map_resize_system, window_grid_resize_system};
-use crate::map::MapEntity;
-use crate::map::system::map_save_system;
-use crate::tiles::systems::{tile_delete_system, tile_place_system, tile_resize_system, window_tile_resize_system};
-use crate::tiles::Tile;
+use crate::grid::{GridMarker, GridMaterial, GridPlugin};
+use crate::grid::resources::Grid;
+use crate::map::{MapEntity, MapPlugin};
+use crate::tiles::{Tile, TilePlugin};
 
 mod grid;
 mod tiles;
 mod map;
 
 
-#[derive(Resource, Debug)]
-pub struct DragInfo {
-    drag_started: Option<Vec2>,
-    last_position: Option<Vec2>,
-}
-
-#[derive(Resource, Debug)]
-pub struct PlaceInfo {
-    last_place_position: Option<Vec2>,
-}
-
 #[derive(Component)]
 pub struct MouseLocationTextMarker;
 
 fn main() {
-    let grid: Grid = Grid {
-        tile_size: 32.0,
-        map_size: Vec2 { x: 24., y: 24. },
-        default_tile_size: 32.0,
-        offset: Vec2::new(0., 0.),
-        min_zoom: 6.,
-        max_zoom: 128.,
-    };
-
-    let drag_info: DragInfo = DragInfo {
-        drag_started: None,
-        last_position: None,
-    };
-
-    let place_info: PlaceInfo = PlaceInfo {
-        last_place_position: None
-    };
-
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
@@ -69,23 +37,11 @@ fn main() {
         }))
         .add_plugins(EguiPlugin)
         .add_plugins(Material2dPlugin::<GridMaterial>::default())
-        .insert_resource(grid)
-        .insert_resource(drag_info)
-        .insert_resource(place_info)
-        .add_systems(Startup, (setup))
-        .add_systems(Update, (
-            update,
-            window_grid_resize_system,
-            drag_system,
-            window_tile_resize_system,
-            tile_place_system,
-            update_mouse_location,
-            grid_resize_system,
-            tile_resize_system,
-            map_save_system,
-            tile_delete_system,
-            map_resize_system
-        ))
+        .add_plugins(GridPlugin {})
+        .add_plugins(MapPlugin {})
+        .add_plugins(TilePlugin {})
+        .add_systems(Startup, setup)
+        .add_systems(Update, (update, update_mouse_location, ))
         .run();
 }
 
@@ -182,40 +138,6 @@ fn update(
         //                                              < CENTER TO TOP LEFT >                                  < ALIGN ON GRID >
         transform.translation.x = (-window.resolution.width() / 2. + res_grid.tile_size / 2.) - (res_grid.offset.x - tile.x as f32 * res_grid.tile_size);
         transform.translation.y = (window.resolution.height() / 2. - res_grid.tile_size / 2.) + (res_grid.offset.y - tile.y as f32 * res_grid.tile_size);
-    }
-}
-
-
-fn drag_system(
-    mut commands: Commands,
-    buttons: Res<Input<MouseButton>>,
-    mut cursor_motion: EventReader<CursorMoved>,
-    mut res_grid: ResMut<Grid>,
-    mut res_drag: ResMut<DragInfo>,
-    q_windows: Query<&Window, With<PrimaryWindow>>,
-) {
-    if buttons.just_pressed(MouseButton::Middle) {
-        let xy = q_windows.single().cursor_position().unwrap_or(Vec2::default()).xy();
-        commands.insert_resource(DragInfo {
-            drag_started: Some(xy),
-            last_position: Some(xy),
-        })
-    }
-
-    if buttons.just_released(MouseButton::Middle) {
-        res_drag.last_position = None;
-        res_drag.drag_started = None
-    }
-
-    if buttons.pressed(MouseButton::Middle) {
-        match cursor_motion.read().last() {
-            None => return,
-            Some(m) => {
-                let offset = res_grid.offset.clone();
-                res_grid.offset = offset + res_drag.last_position.unwrap_or(m.position) - m.position;
-                res_drag.last_position = Some(m.position);
-            }
-        }
     }
 }
 

@@ -1,10 +1,11 @@
 use bevy::asset::Assets;
 use bevy::input::Input;
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
-use bevy::prelude::{EventReader, KeyCode, Query, Res, ResMut, Transform, With, Without};
-use bevy::window::WindowResized;
+use bevy::math::Vec2;
+use bevy::prelude::{Commands, CursorMoved, EventReader, KeyCode, MouseButton, Query, Res, ResMut, Transform, Vec2Swizzles, Window, With, Without};
+use bevy::window::{PrimaryWindow, WindowResized};
 
-use crate::grid::{Grid, GridMarker, GridMaterial};
+use crate::grid::{DragInfo, Grid, GridMarker, GridMaterial};
 use crate::map::MapEntity;
 use crate::tiles::Tile;
 
@@ -71,4 +72,37 @@ pub fn map_resize_system(
     }
 
     res_map.map.size = res_grid.map_size
+}
+
+pub fn drag_system(
+    mut commands: Commands,
+    buttons: Res<Input<MouseButton>>,
+    mut cursor_motion: EventReader<CursorMoved>,
+    mut res_grid: ResMut<Grid>,
+    mut res_drag: ResMut<DragInfo>,
+    q_windows: Query<&Window, With<PrimaryWindow>>,
+) {
+    if buttons.just_pressed(MouseButton::Middle) {
+        let xy = q_windows.single().cursor_position().unwrap_or(Vec2::default()).xy();
+        commands.insert_resource(DragInfo {
+            drag_started: Some(xy),
+            last_position: Some(xy),
+        })
+    }
+
+    if buttons.just_released(MouseButton::Middle) {
+        res_drag.last_position = None;
+        res_drag.drag_started = None
+    }
+
+    if buttons.pressed(MouseButton::Middle) {
+        match cursor_motion.read().last() {
+            None => return,
+            Some(m) => {
+                let offset = res_grid.offset.clone();
+                res_grid.offset = offset + res_drag.last_position.unwrap_or(m.position) - m.position;
+                res_drag.last_position = Some(m.position);
+            }
+        }
+    }
 }

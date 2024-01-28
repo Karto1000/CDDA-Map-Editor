@@ -9,7 +9,7 @@
 
 @fragment
 fn fragment(output: VertexOutput) -> @location(0) vec4<f32> {
-    var color = vec3<f32>(0.0, 0.0, 0.0);
+    var color = vec3<f32>(0.23, 0.26, 0.26);
     var alpha = 0.05;
 
     // EXAMPLE -> 32. or 64. ...
@@ -35,13 +35,13 @@ fn fragment(output: VertexOutput) -> @location(0) vec4<f32> {
          color.x = 1.0;
          color.y = 1.0;
          color.z = 1.0;
-         alpha = 0.01;
     }
 
     if (abs(i32(output.position.x + offset.x)) % i32(tile_size) == i32(0) || abs(i32(output.position.y + offset.y)) % i32(tile_size) == i32(0)) {
          color.x = 1.0;
          color.y = 1.0;
          color.z = 1.0;
+         alpha = 0.025;
     }
 
     let tile_x = i32(output.position.x + offset.x) / i32(tile_size);
@@ -53,10 +53,9 @@ fn fragment(output: VertexOutput) -> @location(0) vec4<f32> {
         i32(abs(tile_y)) >= i32(map_size.y) ||
         i32(tile_y) <= 0
     ) {
-        color.x = 0.;
-        color.y = 0.;
-        color.z = 0.;
-        alpha = 0.5;
+        color.x -= 0.8;
+        color.y -= 0.8;
+        color.z -= 0.8;
     }
 
    return vec4<f32>(color, alpha);
