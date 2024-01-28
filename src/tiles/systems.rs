@@ -3,9 +3,10 @@ use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::{Commands, Entity, EventReader, MouseButton, Query, Res, ResMut, Transform, Vec2, Vec2Swizzles, Window, With, Without};
 use bevy::window::{PrimaryWindow, WindowResized};
 
-use crate::grid::{GridMarker};
+use crate::grid::GridMarker;
 use crate::grid::resources::Grid;
-use crate::map::MapEntity;
+use crate::IsCursorCaptured;
+use crate::map::resources::MapEntity;
 use crate::tiles::{Tile, TileType};
 use crate::tiles::resources::PlaceInfo;
 
@@ -46,6 +47,7 @@ pub fn tile_place_system(
     buttons: Res<Input<MouseButton>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     res_grid: Res<Grid>,
+    res_captured: Res<IsCursorCaptured>,
     mut res_place_info: ResMut<PlaceInfo>,
 ) {
     if buttons.just_released(MouseButton::Left) {
@@ -57,6 +59,10 @@ pub fn tile_place_system(
             None => return,
             Some(p) => p.xy()
         };
+
+        if res_captured.0 {
+            return;
+        }
 
         // TODO - REPLACE
         let tile_to_place: TileType = TileType::Test;
@@ -134,12 +140,17 @@ pub fn tile_delete_system(
     buttons: Res<Input<MouseButton>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     res_grid: Res<Grid>,
+    res_captured: Res<IsCursorCaptured>
 ) {
     if buttons.pressed(MouseButton::Right) {
         let xy = match q_windows.single().cursor_position() {
             None => return,
             Some(p) => p.xy()
         };
+
+        if res_captured.0 {
+            return;
+        }
 
         let tile_cords = Vec2::new(
             ((xy.x + res_grid.offset.x) / res_grid.tile_size).floor(),

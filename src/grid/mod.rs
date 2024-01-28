@@ -60,6 +60,9 @@ pub struct GridMaterial {
     pub mouse_pos: Vec2,
     #[uniform(5)]
     pub map_size: Vec2,
+    #[uniform(6)]
+    // This is an i32 because bevy won't let me pass a bool as a uniform
+    pub is_cursor_captured: i32
 }
 
 

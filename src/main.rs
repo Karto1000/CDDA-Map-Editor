@@ -8,40 +8,47 @@ use bevy::prelude::{Assets, Bundle, Camera2dBundle, Commands, Component, EventRe
 use bevy::render::render_resource::{AsBindGroup, AsBindGroupShaderType};
 use bevy::sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle};
 use bevy::utils::default;
-use bevy::window::{CursorMoved, WindowPlugin};
+use bevy::window::{CursorMoved, WindowMode, WindowPlugin};
 use bevy::winit::WinitWindows;
 use bevy_egui::EguiPlugin;
 use winit::window::Icon;
 
 use crate::grid::{GridMarker, GridMaterial, GridPlugin};
 use crate::grid::resources::Grid;
-use crate::map::{MapEntity, MapPlugin};
+use crate::hotbar::HotbarPlugin;
+use crate::map::MapPlugin;
+use crate::map::resources::MapEntity;
 use crate::tiles::{Tile, TilePlugin};
 
 mod grid;
 mod tiles;
 mod map;
+mod hotbar;
 
 
 #[derive(Component)]
 pub struct MouseLocationTextMarker;
+
+#[derive(Resource)]
+pub struct IsCursorCaptured(bool);
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "CDDA Map Editor".to_string(),
+                mode: WindowMode::BorderlessFullscreen,
                 ..Default::default()
             }),
             ..Default::default()
         }))
-        .add_plugins(EguiPlugin)
-        .add_plugins(Material2dPlugin::<GridMaterial>::default())
-        .add_plugins(GridPlugin {})
-        .add_plugins(MapPlugin {})
-        .add_plugins(TilePlugin {})
+        .insert_resource(IsCursorCaptured(false))
         .add_systems(Startup, setup)
-        .add_systems(Update, (update, update_mouse_location, ))
+        .add_plugins(EguiPlugin)
+        .add_plugins(bevy_svg::prelude::SvgPlugin)
+        .add_plugins(Material2dPlugin::<GridMaterial>::default())
+        .add_plugins((GridPlugin {}, MapPlugin {}, TilePlugin {}, HotbarPlugin {}))
+        .add_systems(Update, (update, update_mouse_location))
         .run();
 }
 
@@ -90,6 +97,7 @@ fn setup(
                 tile_size: res_grid.tile_size,
                 offset: Vec2::default(),
                 mouse_pos: Default::default(),
+                is_cursor_captured: 0,
                 map_size: res_grid.map_size,
             }),
             ..default()
@@ -122,6 +130,7 @@ fn setup(
 
 fn update(
     res_grid: Res<Grid>,
+    res_cursor: Res<IsCursorCaptured>,
     mut tiles: Query<(&mut Tile, &mut Transform), Without<GridMarker>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     mut grid_material: ResMut<Assets<GridMaterial>>,
@@ -133,6 +142,11 @@ fn update(
     grid_material.1.tile_size = res_grid.tile_size;
     grid_material.1.mouse_pos = window.cursor_position().unwrap_or(Vec2::default());
     grid_material.1.map_size = res_grid.map_size;
+    // Weird way to do this but bevy does not let me pass a bool as a uniform for some reason
+    grid_material.1.is_cursor_captured = match res_cursor.0 {
+        true => 1,
+        false => 0
+    };
 
     for (tile, mut transform) in tiles.iter_mut() {
         //                                              < CENTER TO TOP LEFT >                                  < ALIGN ON GRID >

@@ -12,12 +12,13 @@ use crate::map::system::map_save_system;
 use crate::tiles::{Tile, TileType};
 
 pub(crate) mod system;
+pub(crate) mod resources;
 
 pub struct MapPlugin;
 
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (map_save_system));
+        app.add_systems(Update, map_save_system);
     }
 }
 
@@ -100,36 +101,5 @@ impl Tiles {
         let bottommost_tile = keys_sorted_y.last().cloned().unwrap();
 
         return Some(IVec2::new((rightmost_tile.0 - leftmost_tile.0).abs() + 1, (bottommost_tile.1 - topmost_tile.1).abs() + 1));
-    }
-}
-
-#[derive(Serialize, Debug, Resource)]
-pub struct MapEntity {
-    pub name: String,
-    pub weight: u32,
-    pub map: Tiles,
-}
-
-impl MapEntity {
-    pub fn new(name: String, size: Vec2, texture: Handle<Image>) -> Self {
-        return Self {
-            name,
-            weight: 100,
-            map: Tiles { tiles: HashMap::new(), texture, size },
-        };
-    }
-
-    pub fn json(&self) -> Result<Value, Box<dyn Error>> {
-        return Ok(serde_json::json!([{
-            "method": "json",
-            "om_terrain": self.name,
-            "type": "mapgen",
-            "weight": 100,
-            "object": {
-                "fill_ter": "t_floor",
-                "rows": self.map.json().unwrap(),
-                "palettes": [ "domestic_general_and_variant_palette" ],
-            }
-        }]));
     }
 }

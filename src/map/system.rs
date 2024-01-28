@@ -4,7 +4,7 @@ use std::io::Write;
 use bevy::input::Input;
 use bevy::prelude::{KeyCode, Res};
 
-use crate::map::MapEntity;
+use crate::map::resources::MapEntity;
 
 pub fn map_save_system(
     res_map: Res<MapEntity>,

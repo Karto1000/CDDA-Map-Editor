@@ -6,6 +6,7 @@
 @group(1) @binding(3) var<uniform> offset: vec2<f32>;
 @group(1) @binding(4) var<uniform> mouse_pos: vec2<f32>;
 @group(1) @binding(5) var<uniform> map_size: vec2<f32>;
+@group(1) @binding(6) var<uniform> is_cursor_captured: i32;
 
 @fragment
 fn fragment(output: VertexOutput) -> @location(0) vec4<f32> {
@@ -26,15 +27,17 @@ fn fragment(output: VertexOutput) -> @location(0) vec4<f32> {
         tile_start_x -= i32(tile_size);
     }
 
-    if (
-        i32(output.position.x + offset.x) > tile_start_x &&
-        i32(output.position.x + offset.x) < tile_start_x + i32(tile_size) &&
-        i32(output.position.y + offset.y) > tile_start_y &&
-        i32(output.position.y + offset.y) < tile_start_y + i32(tile_size)
-    ) {
-         color.x = 1.0;
-         color.y = 1.0;
-         color.z = 1.0;
+    if (is_cursor_captured == 0) {
+        if (
+            i32(output.position.x + offset.x) > tile_start_x &&
+            i32(output.position.x + offset.x) < tile_start_x + i32(tile_size) &&
+            i32(output.position.y + offset.y) > tile_start_y &&
+            i32(output.position.y + offset.y) < tile_start_y + i32(tile_size)
+        ) {
+             color.x = 1.0;
+             color.y = 1.0;
+             color.z = 1.0;
+        }
     }
 
     if (abs(i32(output.position.x + offset.x)) % i32(tile_size) == i32(0) || abs(i32(output.position.y + offset.y)) % i32(tile_size) == i32(0)) {
