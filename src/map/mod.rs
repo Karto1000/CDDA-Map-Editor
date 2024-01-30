@@ -61,7 +61,7 @@ impl<'de> Deserialize<'de> for Coordinates {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Resource)]
+#[derive(Serialize, Deserialize, Debug, Resource, Clone)]
 pub struct Tiles {
     pub size: Vec2,
     pub tiles: HashMap<Coordinates, Tile>,

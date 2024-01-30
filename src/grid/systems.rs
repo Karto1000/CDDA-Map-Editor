@@ -7,6 +7,7 @@ use bevy::window::{PrimaryWindow, WindowResized};
 
 use crate::grid::{DragInfo, Grid, GridMarker, GridMaterial};
 use crate::map::resources::MapEntity;
+use crate::project::Project;
 use crate::tiles::Tile;
 
 pub fn window_grid_resize_system(
@@ -52,7 +53,7 @@ pub fn grid_resize_system(
 
 pub fn map_resize_system(
     mut res_grid: ResMut<Grid>,
-    mut res_map: ResMut<MapEntity>,
+    mut res_project: ResMut<Project>,
     keys: Res<Input<KeyCode>>,
 ) {
     if keys.pressed(KeyCode::Right) {
@@ -71,7 +72,7 @@ pub fn map_resize_system(
         res_grid.map_size.y -= 1.;
     }
 
-    res_map.map.size = res_grid.map_size
+    res_project.map_entity.tiles.size = res_grid.map_size
 }
 
 pub fn drag_system(

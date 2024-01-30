@@ -1,7 +1,7 @@
 use std::default::Default;
 
 use bevy::{prelude::*, window::PrimaryWindow};
-use bevy::app::{App, PluginGroup};
+use bevy::app::{App, AppExit, PluginGroup};
 use bevy::asset::{Asset, AssetServer};
 use bevy::DefaultPlugins;
 use bevy::prelude::{Assets, Bundle, Camera2dBundle, Commands, Component, EventReader, Mesh, NonSend, Query, Res, ResMut, Resource, shape, Transform, TypePath, Vec2, Vec2Swizzles, Window, With, Without};
@@ -19,12 +19,16 @@ use crate::grid::resources::Grid;
 use crate::hotbar::HotbarPlugin;
 use crate::map::MapPlugin;
 use crate::map::resources::MapEntity;
+use crate::project::loader::Load;
+use crate::project::Project;
+use crate::project::saver::Save;
 use crate::tiles::{Tile, TilePlugin};
 
 mod grid;
 mod tiles;
 mod map;
 mod hotbar;
+mod project;
 
 
 #[derive(Component)]
@@ -52,7 +56,7 @@ fn main() {
         )
         .add_plugins(Material2dPlugin::<GridMaterial>::default())
         .add_plugins((GridPlugin {}, MapPlugin {}, TilePlugin {}, HotbarPlugin {}))
-        .add_systems(Update, (update, update_mouse_location, map_loaded))
+        .add_systems(Update, (update, update_mouse_location, map_loaded, app_exit))
         .run();
 }
 
@@ -71,10 +75,15 @@ fn setup(
     let grass = asset_server.load("grass.png");
 
     let map: MapEntity = MapEntity::new(
-        "test_tile_01".into(),
+        "unnamed".into(),
         res_grid.map_size,
         grass,
     );
+
+    let project = Project {
+        map_entity: map,
+        map_save_path: None,
+    };
 
     let window_width = window.physical_width();
     let window_height = window.physical_height();
@@ -128,7 +137,7 @@ fn setup(
         MouseLocationTextMarker {}
     ));
 
-    commands.insert_resource(map);
+    commands.insert_resource(project);
 }
 
 
@@ -177,16 +186,22 @@ fn update_mouse_location(
 
 fn map_loaded(
     mut ev_loaded: EventReader<bevy_file_dialog::DialogFileLoaded<MapEntity>>,
-    mut res_map: ResMut<MapEntity>,
+    mut res_project: ResMut<Project>,
     mut commands: Commands,
     res_grid: Res<Grid>,
 ) {
     for ev in ev_loaded.read() {
         let map_entity: MapEntity = serde_json::from_slice(ev.contents.as_slice()).unwrap();
-        res_map.load(
+        res_project.map_entity.load(
             &mut commands,
             &res_grid,
             &map_entity,
         );
+    }
+}
+
+fn app_exit(mut e_exit: EventReader<AppExit>) {
+    for event in e_exit.read() {
+        // TODO, Create File in local appdata that describes which projects were open when the editor was closed
     }
 }

@@ -10,6 +10,7 @@ use crate::map::resources::MapEntity;
 use crate::tiles::{Tile, TileType};
 use crate::tiles::resources::PlaceInfo;
 use crate::map::Coordinates;
+use crate::project::Project;
 
 pub fn window_tile_resize_system(
     mut resize_reader: EventReader<WindowResized>,
@@ -44,7 +45,7 @@ pub fn tile_resize_system(
 
 pub fn tile_place_system(
     mut commands: Commands,
-    mut res_map: ResMut<MapEntity>,
+    mut res_project: ResMut<Project>,
     buttons: Res<Input<MouseButton>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     res_grid: Res<Grid>,
@@ -80,7 +81,7 @@ pub fn tile_place_system(
             return;
         }
 
-        res_map.map.set_tile_at(
+        res_project.map_entity.tiles.set_tile_at(
             &mut commands,
             (tile_cords.x as i32, tile_cords.y as i32),
             tile_to_place,
@@ -136,7 +137,7 @@ pub fn tile_place_system(
 
 pub fn tile_delete_system(
     mut commands: Commands,
-    mut res_map: ResMut<MapEntity>,
+    mut res_project: ResMut<Project>,
     mut tiles: Query<(Entity, &Tile), Without<GridMarker>>,
     buttons: Res<Input<MouseButton>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
@@ -160,7 +161,7 @@ pub fn tile_delete_system(
 
         for (entity, q_tile) in tiles.iter_mut() {
             if (q_tile.x, q_tile.y) == (tile_cords.x as i32, tile_cords.y as i32) {
-                res_map.map.tiles.remove(&Coordinates { x: tile_cords.x as i32, y: tile_cords.y as i32 });
+                res_project.map_entity.tiles.tiles.remove(&Coordinates { x: tile_cords.x as i32, y: tile_cords.y as i32 });
                 commands.get_entity(entity).unwrap().despawn();
             }
         };

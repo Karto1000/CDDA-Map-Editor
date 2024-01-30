@@ -9,13 +9,11 @@ use serde_json::Value;
 use crate::grid::resources::Grid;
 use crate::map::Tiles;
 
-#[derive(Serialize, Deserialize, Debug, Resource)]
+#[derive(Serialize, Deserialize, Debug, Resource, Clone)]
 pub struct MapEntity {
     pub name: String,
     pub weight: u32,
-    pub map: Tiles,
-
-    pub size: IVec2,
+    pub tiles: Tiles,
 }
 
 impl MapEntity {
@@ -23,8 +21,7 @@ impl MapEntity {
         return Self {
             name,
             weight: 100,
-            map: Tiles { tiles: HashMap::new(), texture, size },
-            size: IVec2::new(24, 24),
+            tiles: Tiles { tiles: HashMap::new(), texture, size },
         };
     }
 
@@ -36,7 +33,7 @@ impl MapEntity {
             "weight": 100,
             "object": {
                 "fill_ter": "t_floor",
-                "rows": self.map.export()?,
+                "rows": self.tiles.export()?,
                 "palettes": [ "domestic_general_and_variant_palette" ],
             }
         }]));
@@ -45,8 +42,7 @@ impl MapEntity {
     pub fn load(&mut self, commands: &mut Commands, res_grid: &Res<Grid>, entity: &MapEntity) {
         self.name = entity.name.clone();
         self.weight = entity.weight;
-        self.size = entity.size;
 
-        self.map.load(commands, res_grid, &entity.map);
+        self.tiles.load(commands, res_grid, &entity.tiles);
     }
 }

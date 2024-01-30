@@ -4,6 +4,7 @@ use bevy::prelude::{BackgroundColor, Button, Changed, Commands, EventWriter, Int
 use bevy_file_dialog::FileDialogExt;
 use crate::hotbar::systems::{CloseIconMarker, ImportIconMarker, OriginalColor, SaveIconMarker};
 use crate::map::resources::MapEntity;
+use crate::project::Project;
 
 pub fn close_button_interaction(interaction_query: Query<&Interaction, (Changed<Interaction>, With<CloseIconMarker>)>, mut exit: EventWriter<AppExit>) {
     for interaction in interaction_query.iter() {
@@ -16,17 +17,16 @@ pub fn close_button_interaction(interaction_query: Query<&Interaction, (Changed<
 
 pub fn save_button_interaction(
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<SaveIconMarker>)>,
-    res_map: Res<MapEntity>,
+    res_project: Res<Project>,
     mut commands: Commands,
 ) {
     for interaction in interaction_query.iter() {
         match interaction {
             Interaction::Pressed => {
-                println!("{:?}", res_map);
-                let map_json = serde_json::to_string(res_map.deref()).unwrap();
+                let map_json = serde_json::to_string(&res_project.map_entity).unwrap();
 
                 commands.dialog()
-                    .set_file_name(format!("{}.map", res_map.name))
+                    .set_file_name(format!("{}.map", res_project.map_entity.name))
                     .save_file::<MapEntity>(map_json.as_bytes().into());
             }
             _ => {}
