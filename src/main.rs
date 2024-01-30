@@ -11,6 +11,7 @@ use bevy::utils::default;
 use bevy::window::{CursorMoved, WindowMode, WindowPlugin};
 use bevy::winit::WinitWindows;
 use bevy_egui::EguiPlugin;
+use bevy_file_dialog::FileDialogPlugin;
 use winit::window::Icon;
 
 use crate::grid::{GridMarker, GridMaterial, GridPlugin};
@@ -45,10 +46,13 @@ fn main() {
         .insert_resource(IsCursorCaptured(false))
         .add_systems(Startup, setup)
         .add_plugins(EguiPlugin)
-        .add_plugins(bevy_svg::prelude::SvgPlugin)
+        .add_plugins(FileDialogPlugin::new()
+            .with_save_file::<MapEntity>()
+            .with_load_file::<MapEntity>()
+        )
         .add_plugins(Material2dPlugin::<GridMaterial>::default())
         .add_plugins((GridPlugin {}, MapPlugin {}, TilePlugin {}, HotbarPlugin {}))
-        .add_systems(Update, (update, update_mouse_location))
+        .add_systems(Update, (update, update_mouse_location, map_loaded))
         .run();
 }
 
@@ -171,3 +175,18 @@ fn update_mouse_location(
     }
 }
 
+fn map_loaded(
+    mut ev_loaded: EventReader<bevy_file_dialog::DialogFileLoaded<MapEntity>>,
+    mut res_map: ResMut<MapEntity>,
+    mut commands: Commands,
+    res_grid: Res<Grid>,
+) {
+    for ev in ev_loaded.read() {
+        let map_entity: MapEntity = serde_json::from_slice(ev.contents.as_slice()).unwrap();
+        res_map.load(
+            &mut commands,
+            &res_grid,
+            &map_entity,
+        );
+    }
+}

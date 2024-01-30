@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 use std::error::Error;
+use std::fmt::Formatter;
 
 use bevy::app::{Plugin, Update, App};
 use bevy::asset::Handle;
 use bevy::prelude::{Commands, default, Entity, Image, IVec2, Res, Resource, SpriteBundle, Transform, Vec2, Vec3};
-use serde::{Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::de::Visitor;
 use serde_json::Value;
 
 use crate::grid::resources::Grid;
@@ -22,17 +24,54 @@ impl Plugin for MapPlugin {
     }
 }
 
-#[derive(Serialize, Debug, Resource)]
+pub struct CoordinatesVisitor;
+
+impl<'de> Visitor<'de> for CoordinatesVisitor {
+    type Value = Coordinates;
+
+    fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
+        formatter.write_str("an string of two numbers separated by a semicolon (example: 10;10)")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E> where E: serde::de::Error {
+        let split: Vec<&str> = v.split(";").collect::<Vec<&str>>();
+
+        return Ok(Coordinates {
+            x: split.get(0).expect("Value before ';'").parse().expect("Valid i32"),
+            y: split.get(1).expect("Value after ';'").parse().expect("Valid i32")
+        });
+    }
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct Coordinates {
+    pub x: i32,
+    pub y: i32,
+}
+
+impl Serialize for Coordinates {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        return Ok(serializer.serialize_str(&format!("{};{}", self.x, self.y))?);
+    }
+}
+
+impl<'de> Deserialize<'de> for Coordinates {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        return Ok(deserializer.deserialize_str(CoordinatesVisitor)?);
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Resource)]
 pub struct Tiles {
     pub size: Vec2,
-    pub tiles: HashMap<(i32, i32), Tile>,
+    pub tiles: HashMap<Coordinates, Tile>,
 
     #[serde(skip)]
     pub texture: Handle<Image>,
 }
 
 impl Tiles {
-    pub fn json(&self) -> Result<Value, Box<dyn Error>> {
+    pub fn export(&self) -> Result<Value, anyhow::Error> {
         let mut rows: Vec<String> = vec![];
 
         for _ in 0..self.size.y as i32 {
@@ -53,7 +92,8 @@ impl Tiles {
         tile_type: TileType,
         res_grid: &Res<Grid>,
     ) -> Option<Entity> {
-        if self.tiles.get(&(cords.0, cords.1)).is_some() { return None; }
+        let coordinates = Coordinates {x: cords.0, y: cords.1};
+        if self.tiles.get(&coordinates).is_some() { return None; }
 
         let tile = Tile { tile_type, x: cords.0, y: cords.1 };
 
@@ -80,19 +120,30 @@ impl Tiles {
         ));
 
         self.tiles.insert(
-            cords,
+            coordinates,
             tile,
         );
 
         return Some(c.id());
     }
 
-    pub fn get_size(&self) -> Option<IVec2> {
-        let mut keys_sorted_x: Vec<(i32, i32)> = self.tiles.clone().into_keys().collect();
-        let mut keys_sorted_y: Vec<(i32, i32)> = self.tiles.clone().into_keys().collect();
+    pub fn load(&mut self, commands: &mut Commands, res_grid: &Res<Grid>, entity: &Tiles) {
+        for (cords, tile) in entity.tiles.iter() {
+            self.set_tile_at(
+                commands,
+                (cords.x, cords.y),
+                tile.tile_type,
+                res_grid
+            );
+        }
+    }
 
-        keys_sorted_x.sort_by(|(x1, _), (x2, _)| x1.cmp(x2));
-        keys_sorted_y.sort_by(|(_, y1), (_, y2)| y1.cmp(y2));
+    pub fn get_size(&self) -> Option<IVec2> {
+        let mut keys_sorted_x: Vec<Coordinates> = self.tiles.clone().into_keys().collect();
+        let mut keys_sorted_y: Vec<Coordinates> = self.tiles.clone().into_keys().collect();
+
+        keys_sorted_x.sort_by(|coords1, coords2| coords1.x.cmp(&coords2.x));
+        keys_sorted_y.sort_by(|coords1, coords2| coords1.y.cmp(&coords2.y));
 
         let leftmost_tile = keys_sorted_x.first().cloned().unwrap();
         let rightmost_tile = keys_sorted_x.last().cloned().unwrap();
@@ -100,6 +151,6 @@ impl Tiles {
         let topmost_tile = keys_sorted_y.first().cloned().unwrap();
         let bottommost_tile = keys_sorted_y.last().cloned().unwrap();
 
-        return Some(IVec2::new((rightmost_tile.0 - leftmost_tile.0).abs() + 1, (bottommost_tile.1 - topmost_tile.1).abs() + 1));
+        return Some(IVec2::new((rightmost_tile.x - leftmost_tile.x).abs() + 1, (bottommost_tile.y - topmost_tile.y).abs() + 1));
     }
 }

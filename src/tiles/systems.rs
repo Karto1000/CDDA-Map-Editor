@@ -9,6 +9,7 @@ use crate::IsCursorCaptured;
 use crate::map::resources::MapEntity;
 use crate::tiles::{Tile, TileType};
 use crate::tiles::resources::PlaceInfo;
+use crate::map::Coordinates;
 
 pub fn window_tile_resize_system(
     mut resize_reader: EventReader<WindowResized>,
@@ -140,7 +141,7 @@ pub fn tile_delete_system(
     buttons: Res<Input<MouseButton>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     res_grid: Res<Grid>,
-    res_captured: Res<IsCursorCaptured>
+    res_captured: Res<IsCursorCaptured>,
 ) {
     if buttons.pressed(MouseButton::Right) {
         let xy = match q_windows.single().cursor_position() {
@@ -159,7 +160,7 @@ pub fn tile_delete_system(
 
         for (entity, q_tile) in tiles.iter_mut() {
             if (q_tile.x, q_tile.y) == (tile_cords.x as i32, tile_cords.y as i32) {
-                res_map.map.tiles.remove(&(tile_cords.x as i32, tile_cords.y as i32));
+                res_map.map.tiles.remove(&Coordinates { x: tile_cords.x as i32, y: tile_cords.y as i32 });
                 commands.get_entity(entity).unwrap().despawn();
             }
         };

@@ -22,3 +22,5 @@ bevy = { version = "0.12.1", features = ["bevy_ui"] }
 bevy_egui = "0.24.0"
 image = { version = "0.24.7", features = ["default"] }
 winit = { version = "0.28.7", features = ["default"] }
+bevy_file_dialog = "0.3.1"
+anyhow = "1.0.79"

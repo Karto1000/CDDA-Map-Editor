@@ -1,6 +1,6 @@
 use bevy::asset::{AssetServer, Handle};
 use bevy::math::Vec2;
-use bevy::prelude::{AlignItems, BackgroundColor, BuildChildren, Button, ButtonBundle, Changed, ChildBuilder, Color, Commands, Component, default, GlobalTransform, Image, ImageBundle, NodeBundle, Query, Res, ResMut, TextBundle, Vec3Swizzles, Visibility, Window, With};
+use bevy::prelude::{AlignItems, BackgroundColor, BuildChildren, Bundle, Button, ButtonBundle, Changed, ChildBuilder, Color, Commands, Component, default, GlobalTransform, Image, ImageBundle, NodeBundle, Query, Res, ResMut, TextBundle, Vec3Swizzles, Visibility, Window, With};
 use bevy::text::{Text, TextStyle};
 use bevy::ui::{Display, Interaction, JustifyContent, Node, Style, UiImage, UiRect, Val};
 use bevy::window::PrimaryWindow;
@@ -14,6 +14,43 @@ const ERROR: Color = Color::rgba(0.79, 0.2, 0.21, 0.5);
 
 #[derive(Component)]
 pub struct OriginalColor(Color);
+
+#[derive(Component)]
+pub struct CloseIconMarker;
+
+#[derive(Component)]
+pub struct SaveIconMarker;
+
+#[derive(Component)]
+pub struct ImportIconMarker;
+
+fn spawn_button_icon<T: Bundle>(container: &mut ChildBuilder, icon: Handle<Image>, color: Color, marker: T) {
+    container.spawn((
+        ButtonBundle {
+            style: Style {
+                width: Val::Px(32.),
+                height: Val::Px(32.),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            background_color: BackgroundColor::from(color),
+            ..default()
+        },
+        OriginalColor(color),
+        marker
+    )).with_children(|icon_container| {
+        icon_container.spawn(
+            ImageBundle {
+                style: Style {
+                    ..default()
+                },
+                image: UiImage::from(icon),
+                ..default()
+            }
+        );
+    });
+}
 
 pub fn spawn_hotbar(mut commands: Commands, asset_server: Res<AssetServer>) {
     build_hotbar(&mut commands, &asset_server);
@@ -90,36 +127,7 @@ pub fn build_hotbar(commands: &mut Commands, asset_server: &Res<AssetServer>) {
                 },
                 ..default()
             }).with_children(|top_right| {
-                let create_icon = |container: &mut ChildBuilder, icon: Handle<Image>, color: Color| {
-                    container.spawn((
-                        ButtonBundle {
-                            style: Style {
-                                width: Val::Px(32.),
-                                height: Val::Px(32.),
-                                align_items: AlignItems::Center,
-                                justify_content: JustifyContent::Center,
-                                ..default()
-                            },
-                            background_color: BackgroundColor::from(color),
-                            ..default()
-                        },
-                        OriginalColor(color)
-                    )).with_children(|icon_container| {
-                        icon_container.spawn(
-                            ImageBundle {
-                                style: Style {
-                                    ..default()
-                                },
-                                image: UiImage::from(icon),
-                                ..default()
-                            }
-                        );
-                    });
-                };
-
-                create_icon(top_right, asset_server.load("icons/minimize.png"), PRIMARY_COLOR);
-                create_icon(top_right, asset_server.load("icons/bordered-window.png"), PRIMARY_COLOR);
-                create_icon(top_right, asset_server.load("icons/close.png"), PRIMARY_COLOR);
+                spawn_button_icon(top_right, asset_server.load("icons/close.png"), PRIMARY_COLOR, CloseIconMarker {});
             });
         });
 
@@ -144,40 +152,11 @@ pub fn build_hotbar(commands: &mut Commands, asset_server: &Res<AssetServer>) {
             },
             ..default()
         }).with_children(|icons_container| {
-            let create_icon = |container: &mut ChildBuilder, icon: Handle<Image>, color: Color| {
-                container.spawn((
-                    ButtonBundle {
-                        style: Style {
-                            width: Val::Px(32.),
-                            height: Val::Px(32.),
-                            align_items: AlignItems::Center,
-                            justify_content: JustifyContent::Center,
-                            ..default()
-                        },
-                        background_color: BackgroundColor::from(color),
-                        ..default()
-                    },
-                    OriginalColor(color)
-                )).with_children(|icon_container| {
-                    icon_container.spawn(
-                        ImageBundle {
-                            style: Style {
-                                width: Val::Px(14.),
-                                height: Val::Px(14.),
-                                ..default()
-                            },
-                            image: UiImage::from(icon),
-                            ..default()
-                        }
-                    );
-                });
-            };
-
-            create_icon(icons_container, asset_server.load("icons/floppy-disk.png"), PRIMARY_COLOR_FADED);
-            create_icon(icons_container, asset_server.load("icons/upload-file.png"), PRIMARY_COLOR_FADED);
-            create_icon(icons_container, asset_server.load("icons/download-file.png"), PRIMARY_COLOR_FADED);
-            create_icon(icons_container, asset_server.load("icons/new-folder.png"), PRIMARY_COLOR_FADED);
-            create_icon(icons_container, asset_server.load("icons/recycle-bin.png"), ERROR)
+            spawn_button_icon(icons_container, asset_server.load("icons/floppy-disk.png"), PRIMARY_COLOR_FADED, SaveIconMarker {});
+            //spawn_button_icon(icons_container, asset_server.load("icons/upload-file.png"), PRIMARY_COLOR_FADED);
+            spawn_button_icon(icons_container, asset_server.load("icons/download-file.png"), PRIMARY_COLOR_FADED, ImportIconMarker {});
+            //spawn_button_icon(icons_container, asset_server.load("icons/new-folder.png"), PRIMARY_COLOR_FADED);
+            //spawn_button_icon(icons_container, asset_server.load("icons/recycle-bin.png"), ERROR)
         });
     });
 }
