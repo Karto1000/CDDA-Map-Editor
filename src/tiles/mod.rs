@@ -28,7 +28,7 @@ pub struct Tile {
     pub y: i32,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Hash, Eq)]
 pub enum TileType {
     Test
 }

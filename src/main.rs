@@ -1,4 +1,6 @@
+use std::collections::HashMap;
 use std::default::Default;
+use std::rc::Rc;
 
 use bevy::{prelude::*, window::PrimaryWindow};
 use bevy::app::{App, AppExit, PluginGroup};
@@ -17,12 +19,12 @@ use winit::window::Icon;
 use crate::grid::{GridMarker, GridMaterial, GridPlugin};
 use crate::grid::resources::Grid;
 use crate::hotbar::HotbarPlugin;
-use crate::map::MapPlugin;
+use crate::map::{MapPlugin, TilePlaceEvent};
 use crate::map::resources::MapEntity;
+use crate::project::{EditorData, EditorDataSaver, Project};
 use crate::project::loader::Load;
-use crate::project::Project;
 use crate::project::saver::Save;
-use crate::tiles::{Tile, TilePlugin};
+use crate::tiles::{Tile, TilePlugin, TileType};
 
 mod grid;
 mod tiles;
@@ -36,6 +38,11 @@ pub struct MouseLocationTextMarker;
 
 #[derive(Resource)]
 pub struct IsCursorCaptured(bool);
+
+#[derive(Resource)]
+pub struct TextureResource {
+    pub textures: HashMap<TileType, Handle<Image>>
+}
 
 fn main() {
     App::new()
@@ -74,16 +81,11 @@ fn setup(
 
     let grass = asset_server.load("grass.png");
 
-    let map: MapEntity = MapEntity::new(
-        "unnamed".into(),
-        res_grid.map_size,
-        grass,
-    );
+    let mut textures: HashMap<TileType, Handle<Image>> = HashMap::new();
+    textures.insert(TileType::Test, grass);
 
-    let project = Project {
-        map_entity: map,
-        map_save_path: None,
-    };
+    let texture_resource = TextureResource {textures};
+    let editor_data = EditorData::default();
 
     let window_width = window.physical_width();
     let window_height = window.physical_height();
@@ -137,7 +139,8 @@ fn setup(
         MouseLocationTextMarker {}
     ));
 
-    commands.insert_resource(project);
+    commands.insert_resource(editor_data);
+    commands.insert_resource(texture_resource);
 }
 
 
@@ -186,22 +189,28 @@ fn update_mouse_location(
 
 fn map_loaded(
     mut ev_loaded: EventReader<bevy_file_dialog::DialogFileLoaded<MapEntity>>,
-    mut res_project: ResMut<Project>,
-    mut commands: Commands,
-    res_grid: Res<Grid>,
+    mut res_editor_data: ResMut<EditorData>,
+    mut e_set_tile: EventWriter<TilePlaceEvent>
 ) {
+    let project = res_editor_data.get_current_project_mut();
+
     for ev in ev_loaded.read() {
         let map_entity: MapEntity = serde_json::from_slice(ev.contents.as_slice()).unwrap();
-        res_project.map_entity.load(
-            &mut commands,
-            &res_grid,
+
+        project.map_entity.load(
+            &mut e_set_tile,
             &map_entity,
         );
     }
 }
 
-fn app_exit(mut e_exit: EventReader<AppExit>) {
-    for event in e_exit.read() {
-        // TODO, Create File in local appdata that describes which projects were open when the editor was closed
+fn app_exit(
+    mut e_exit: EventReader<AppExit>,
+    res_editor_data: Res<EditorData>
+) {
+    for _ in e_exit.read() {
+
+        let save_data_saver = EditorDataSaver {};
+        save_data_saver.save(&res_editor_data).unwrap();
     }
 }

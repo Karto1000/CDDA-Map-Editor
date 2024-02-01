@@ -1,16 +1,16 @@
+use std::rc::Rc;
 use bevy::input::Input;
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
-use bevy::prelude::{Commands, Entity, EventReader, MouseButton, Query, Res, ResMut, Transform, Vec2, Vec2Swizzles, Window, With, Without};
+use bevy::prelude::{Commands, Entity, EventReader, EventWriter, MouseButton, Query, Res, ResMut, Transform, Vec2, Vec2Swizzles, Window, With, Without};
 use bevy::window::{PrimaryWindow, WindowResized};
 
 use crate::grid::GridMarker;
 use crate::grid::resources::Grid;
 use crate::IsCursorCaptured;
-use crate::map::resources::MapEntity;
+use crate::map::{Coordinates, TilePlaceEvent};
+use crate::project::{EditorData, Project};
 use crate::tiles::{Tile, TileType};
 use crate::tiles::resources::PlaceInfo;
-use crate::map::Coordinates;
-use crate::project::Project;
 
 pub fn window_tile_resize_system(
     mut resize_reader: EventReader<WindowResized>,
@@ -44,14 +44,16 @@ pub fn tile_resize_system(
 }
 
 pub fn tile_place_system(
-    mut commands: Commands,
-    mut res_project: ResMut<Project>,
+    mut res_editor_data: ResMut<EditorData>,
     buttons: Res<Input<MouseButton>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     res_grid: Res<Grid>,
+    mut e_set_tile: EventWriter<TilePlaceEvent>,
     res_captured: Res<IsCursorCaptured>,
     mut res_place_info: ResMut<PlaceInfo>,
 ) {
+    let mut project = res_editor_data.get_current_project_mut();
+
     if buttons.just_released(MouseButton::Left) {
         res_place_info.last_place_position = None
     }
@@ -81,11 +83,10 @@ pub fn tile_place_system(
             return;
         }
 
-        res_project.map_entity.tiles.set_tile_at(
-            &mut commands,
+        project.map_entity.tiles.set_tile_at(
             (tile_cords.x as i32, tile_cords.y as i32),
             tile_to_place,
-            &res_grid,
+            &mut e_set_tile,
         );
 
         // let dist = (xy + res_grid.offset) - (res_place_info.last_place_position.unwrap_or(xy) + res_grid.offset);
@@ -137,13 +138,15 @@ pub fn tile_place_system(
 
 pub fn tile_delete_system(
     mut commands: Commands,
-    mut res_project: ResMut<Project>,
+    mut res_editor_data: ResMut<EditorData>,
     mut tiles: Query<(Entity, &Tile), Without<GridMarker>>,
     buttons: Res<Input<MouseButton>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     res_grid: Res<Grid>,
     res_captured: Res<IsCursorCaptured>,
 ) {
+    let mut project = res_editor_data.get_current_project_mut();
+
     if buttons.pressed(MouseButton::Right) {
         let xy = match q_windows.single().cursor_position() {
             None => return,
@@ -161,7 +164,7 @@ pub fn tile_delete_system(
 
         for (entity, q_tile) in tiles.iter_mut() {
             if (q_tile.x, q_tile.y) == (tile_cords.x as i32, tile_cords.y as i32) {
-                res_project.map_entity.tiles.tiles.remove(&Coordinates { x: tile_cords.x as i32, y: tile_cords.y as i32 });
+                project.map_entity.tiles.tiles.remove(&Coordinates { x: tile_cords.x as i32, y: tile_cords.y as i32 });
                 commands.get_entity(entity).unwrap().despawn();
             }
         };

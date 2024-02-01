@@ -5,14 +5,15 @@ use bevy::prelude::{Commands, KeyCode, Res};
 use directories::ProjectDirs;
 
 use crate::project;
-use crate::project::Project;
+use crate::project::{EditorData, Project};
 use crate::project::saver::Save;
 
 pub fn map_save_system(
-    res_project: Res<Project>,
+    res_editor_data: Res<EditorData>,
     keys: Res<Input<KeyCode>>,
-    mut commands: Commands,
 ) {
+    let project = res_editor_data.get_current_project();
+
     if keys.pressed(KeyCode::ControlLeft) && keys.just_pressed(KeyCode::S) {
         // let map_json = res_map.export().unwrap();
         //
@@ -30,6 +31,6 @@ pub fn map_save_system(
         if !auto_save_dir.exists() { fs::create_dir_all(auto_save_dir).unwrap(); }
 
         let saver = project::saver::ProjectSaver::new(auto_save_dir.into()).unwrap();
-        println!("{:?}", saver.save(&res_project));
+        println!("{:?}", saver.save(project));
     }
 }

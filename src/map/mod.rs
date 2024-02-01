@@ -2,15 +2,15 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::Formatter;
 
-use bevy::app::{Plugin, Update, App};
-use bevy::asset::Handle;
-use bevy::prelude::{Commands, default, Entity, Image, IVec2, Res, Resource, SpriteBundle, Transform, Vec2, Vec3};
+use bevy::app::{App, Plugin, Update};
+use bevy::prelude::{Commands, default, Event, EventReader, EventWriter, IVec2, Res, Resource, SpriteBundle, Transform, Vec2, Vec3};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::Visitor;
 use serde_json::Value;
 
 use crate::grid::resources::Grid;
 use crate::map::system::map_save_system;
+use crate::TextureResource;
 use crate::tiles::{Tile, TileType};
 
 pub(crate) mod system;
@@ -21,6 +21,8 @@ pub struct MapPlugin;
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, map_save_system);
+        app.add_systems(Update, tile_spawn_reader);
+        app.add_event::<TilePlaceEvent>();
     }
 }
 
@@ -38,12 +40,12 @@ impl<'de> Visitor<'de> for CoordinatesVisitor {
 
         return Ok(Coordinates {
             x: split.get(0).expect("Value before ';'").parse().expect("Valid i32"),
-            y: split.get(1).expect("Value after ';'").parse().expect("Valid i32")
+            y: split.get(1).expect("Value after ';'").parse().expect("Valid i32"),
         });
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Default)]
 pub struct Coordinates {
     pub x: i32,
     pub y: i32,
@@ -61,13 +63,46 @@ impl<'de> Deserialize<'de> for Coordinates {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Resource, Clone)]
+#[derive(Serialize, Deserialize, Debug, Resource, Clone, Default)]
 pub struct Tiles {
     pub size: Vec2,
     pub tiles: HashMap<Coordinates, Tile>,
+}
 
-    #[serde(skip)]
-    pub texture: Handle<Image>,
+#[derive(Event, Debug)]
+pub struct TilePlaceEvent {
+    tile: Tile,
+}
+
+pub fn tile_spawn_reader(
+    mut commands: Commands,
+    mut e_tile_place: EventReader<TilePlaceEvent>,
+    res_grid: Res<Grid>,
+    res_textures: Res<TextureResource>,
+) {
+    for e in e_tile_place.read() {
+        commands.spawn((
+            e.tile,
+            SpriteBundle {
+                texture: res_textures.textures.get(&e.tile.tile_type).unwrap().clone(),
+                transform: Transform {
+                    translation: Vec3 {
+                        // Spawn off screen
+                        x: -1000.0,
+                        y: -1000.0,
+                        z: 1.0,
+                    },
+                    scale: Vec3 {
+                        x: res_grid.tile_size / res_grid.default_tile_size,
+                        y: res_grid.tile_size / res_grid.default_tile_size,
+                        z: 0.,
+                    },
+                    ..default()
+                },
+                ..default()
+            },
+        ));
+    }
 }
 
 impl Tiles {
@@ -87,53 +122,29 @@ impl Tiles {
 
     pub fn set_tile_at(
         &mut self,
-        commands: &mut Commands,
         cords: (i32, i32),
         tile_type: TileType,
-        res_grid: &Res<Grid>,
-    ) -> Option<Entity> {
-        let coordinates = Coordinates {x: cords.0, y: cords.1};
-        if self.tiles.get(&coordinates).is_some() { return None; }
+        mut e_set_tile: &mut EventWriter<TilePlaceEvent>,
+    ) {
+        let coordinates = Coordinates { x: cords.0, y: cords.1 };
+        if self.tiles.get(&coordinates).is_some() { return; }
 
         let tile = Tile { tile_type, x: cords.0, y: cords.1 };
 
-        let c = commands.spawn((
-            tile,
-            SpriteBundle {
-                texture: self.texture.clone(),
-                transform: Transform {
-                    translation: Vec3 {
-                        // Spawn off screen
-                        x: -1000.0,
-                        y: -1000.0,
-                        z: 1.0,
-                    },
-                    scale: Vec3 {
-                        x: res_grid.tile_size / res_grid.default_tile_size,
-                        y: res_grid.tile_size / res_grid.default_tile_size,
-                        z: 0.,
-                    },
-                    ..default()
-                },
-                ..default()
-            },
-        ));
+        e_set_tile.send(TilePlaceEvent { tile });
 
         self.tiles.insert(
             coordinates,
             tile,
         );
-
-        return Some(c.id());
     }
 
-    pub fn load(&mut self, commands: &mut Commands, res_grid: &Res<Grid>, entity: &Tiles) {
+    pub fn load(&mut self, e_set_tile: &mut EventWriter<TilePlaceEvent>, entity: &Tiles) {
         for (cords, tile) in entity.tiles.iter() {
             self.set_tile_at(
-                commands,
                 (cords.x, cords.y),
                 tile.tile_type,
-                res_grid
+                e_set_tile,
             );
         }
     }

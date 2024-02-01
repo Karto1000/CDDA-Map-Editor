@@ -1,15 +1,15 @@
 use std::collections::HashMap;
-use std::error::Error;
-use anyhow::anyhow;
-use bevy::asset::Handle;
+use std::ops::Deref;
+use std::rc::Rc;
+
 use bevy::math::Vec2;
-use bevy::prelude::{Commands, Image, IVec2, Res, Resource};
+use bevy::prelude::{EventWriter, Resource};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::grid::resources::Grid;
-use crate::map::Tiles;
 
-#[derive(Serialize, Deserialize, Debug, Resource, Clone)]
+use crate::map::{TilePlaceEvent, Tiles};
+
+#[derive(Serialize, Deserialize, Debug, Resource, Clone, Default)]
 pub struct MapEntity {
     pub name: String,
     pub weight: u32,
@@ -17,11 +17,11 @@ pub struct MapEntity {
 }
 
 impl MapEntity {
-    pub fn new(name: String, size: Vec2, texture: Handle<Image>) -> Self {
+    pub fn new(name: String, size: Vec2) -> Self {
         return Self {
             name,
             weight: 100,
-            tiles: Tiles { tiles: HashMap::new(), texture, size },
+            tiles: Tiles { tiles: HashMap::new(), size },
         };
     }
 
@@ -39,10 +39,10 @@ impl MapEntity {
         }]));
     }
 
-    pub fn load(&mut self, commands: &mut Commands, res_grid: &Res<Grid>, entity: &MapEntity) {
+    pub fn load(&mut self, e_set_tile: &mut EventWriter<TilePlaceEvent>, entity: &MapEntity) {
         self.name = entity.name.clone();
         self.weight = entity.weight;
 
-        self.tiles.load(commands, res_grid, &entity.tiles);
+        self.tiles.load(e_set_tile, &entity.tiles);
     }
 }

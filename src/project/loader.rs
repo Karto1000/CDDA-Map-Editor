@@ -4,7 +4,6 @@ use std::io::Read;
 use std::path::Path;
 
 use directories::ProjectDirs;
-use serde_json::Value;
 
 use crate::project::loader::LoadError::NoAutoSave;
 use crate::project::Project;
@@ -22,10 +21,11 @@ pub trait Load<T> {
 
 pub struct ProjectAutoSaveLoader {
     directory: Box<Path>,
+    map_name: String,
 }
 
 impl ProjectAutoSaveLoader {
-    pub fn new() -> Result<Self, LoadError> {
+    pub fn new(map_name: String) -> Result<Self, LoadError> {
         let dir = match ProjectDirs::from_path("CDDA Map Editor".into()) {
             None => { return Err(LoadError::DirectoryNotFound); }
             Some(d) => d
@@ -36,7 +36,8 @@ impl ProjectAutoSaveLoader {
         if !auto_save_dir.exists() { fs::create_dir_all(auto_save_dir).unwrap(); }
 
         return Ok(Self {
-            directory: auto_save_dir.into()
+            directory: auto_save_dir.into(),
+            map_name,
         });
     }
 }
@@ -47,7 +48,7 @@ impl Load<Project> for ProjectAutoSaveLoader {
             return Err(LoadError::DirectoryNotFound);
         }
 
-        let mut file = match File::open(self.directory.join("auto_save.json")) {
+        let mut file = match File::open(self.directory.join(format!("auto_save_{}.json", self.map_name))) {
             Ok(f) => f,
             Err(_) => return Err(NoAutoSave)
         };
