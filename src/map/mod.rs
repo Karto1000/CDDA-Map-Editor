@@ -9,11 +9,11 @@ use serde::de::Visitor;
 use serde_json::Value;
 
 use crate::grid::resources::Grid;
-use crate::map::system::{map_save_system, save_directory_picked};
+use crate::map::systems::{map_save_system, save_directory_picked};
 use crate::TextureResource;
 use crate::tiles::{Tile, TileType};
 
-pub(crate) mod system;
+pub(crate) mod systems;
 pub(crate) mod resources;
 
 pub struct MapPlugin;

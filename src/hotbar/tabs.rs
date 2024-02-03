@@ -1,14 +1,19 @@
 use bevy::asset::AssetServer;
 use bevy::hierarchy::BuildChildren;
 use bevy::log::warn;
-use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Changed, Color, Commands, default, Display, Entity, Event, EventReader, EventWriter, FlexDirection, ImageBundle, Interaction, NodeBundle, Query, Res, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val, With};
+use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Changed, Color, Commands, Component, default, Display, Entity, Event, EventReader, EventWriter, FlexDirection, ImageBundle, Interaction, NodeBundle, Query, Res, ResMut, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val, With};
 
-use crate::hotbar::systems::{AddTabButtonMarker, PRIMARY_COLOR_FADED, TabContainerMarker, TopHotbarMarker};
-use crate::project::Project;
+use crate::hotbar::systems::{AddTabButtonMarker, OriginalColor, PRIMARY_COLOR_FADED, TabContainerMarker, TopHotbarMarker};
+use crate::project::{EditorData, Project};
 
 #[derive(Event)]
 pub struct SpawnTab {
-    pub project: Project,
+    pub name: String,
+}
+
+#[derive(Component)]
+pub struct Tab {
+    index: u32,
 }
 
 pub fn setup(
@@ -49,8 +54,8 @@ pub fn setup(
                     background_color: BackgroundColor::from(PRIMARY_COLOR_FADED),
                     ..default()
                 },
-                crate::hotbar::systems::OriginalColor { 0: PRIMARY_COLOR_FADED },
-                AddTabButtonMarker {}
+                OriginalColor { 0: PRIMARY_COLOR_FADED },
+                AddTabButtonMarker {},
             )).with_children(|parent| {
                 parent.spawn(
                     ImageBundle {
@@ -71,6 +76,7 @@ pub fn setup(
 
 pub fn on_add_tab_button_click(
     q_interaction: Query<(&Interaction), (Changed<Interaction>, With<AddTabButtonMarker>)>,
+    mut r_editor_data: ResMut<EditorData>,
     mut e_spawn_tab: EventWriter<SpawnTab>,
 ) {
     let interaction = match q_interaction.iter().next() {
@@ -80,37 +86,47 @@ pub fn on_add_tab_button_click(
 
     match interaction {
         Interaction::Pressed => {
-            e_spawn_tab.send(SpawnTab { project: Project::default() })
+            let project = Project::default();
+            let name = project.map_entity.name.clone();
+
+            r_editor_data.projects.push(project);
+            e_spawn_tab.send(SpawnTab { name })
         }
         _ => {}
     }
 }
 
 pub fn spawn_tab_reader(
-    mut e_spawn_tab: EventReader<SpawnTab>,
     top_hotbar: Query<(Entity), With<TabContainerMarker>>,
     asset_server: Res<AssetServer>,
+    editor_data: Res<EditorData>,
+    mut e_spawn_tab: EventReader<SpawnTab>,
     mut commands: Commands,
 ) {
     for event in e_spawn_tab.read() {
         let mut entity_commands = commands.get_entity(top_hotbar.single()).unwrap();
+
         entity_commands.with_children(|parent| {
-            parent.spawn(ButtonBundle {
-                style: Style {
-                    display: Display::Flex,
-                    column_gap: Val::Px(12.),
-                    height: Val::Px(32.),
-                    width: Val::Auto,
-                    align_content: AlignContent::Center,
-                    padding: UiRect::px(9., 9., 8., 8.),
+            parent.spawn((
+                ButtonBundle {
+                    style: Style {
+                        display: Display::Flex,
+                        column_gap: Val::Px(12.),
+                        height: Val::Px(32.),
+                        width: Val::Auto,
+                        align_content: AlignContent::Center,
+                        padding: UiRect::px(9., 9., 8., 8.),
+                        ..default()
+                    },
+                    background_color: BackgroundColor::from(PRIMARY_COLOR_FADED),
                     ..default()
                 },
-                background_color: BackgroundColor::from(PRIMARY_COLOR_FADED),
-                ..default()
-            }).with_children(|parent| {
+                OriginalColor { 0: PRIMARY_COLOR_FADED },
+                Tab { index: editor_data.projects.len() as u32 - 1 }
+            )).with_children(|parent| {
                 parent.spawn(TextBundle {
                     text: Text::from_section(
-                        event.project.map_entity.name.clone(),
+                        event.name.clone(),
                         TextStyle {
                             font: asset_server.load("fonts/unifont.ttf"),
                             font_size: 12.,
@@ -120,16 +136,19 @@ pub fn spawn_tab_reader(
                     ..default()
                 });
 
-                parent.spawn(ButtonBundle {
-                    style: Style {
-                        height: Val::Percent(100.),
-                        margin: UiRect::axes(Val::Px(0.), Val::Px(3.)),
-                        aspect_ratio: Some(1.),
+                parent.spawn((
+                    ButtonBundle {
+                        style: Style {
+                            height: Val::Auto,
+                            width: Val::Auto,
+                            margin: UiRect::axes(Val::Px(0.), Val::Px(3.)),
+                            aspect_ratio: Some(1.),
+                            ..default()
+                        },
+                        background_color: BackgroundColor::from(Color::rgba(1., 1., 1., 0.)),
                         ..default()
                     },
-                    background_color: BackgroundColor::from(Color::rgba(1., 1., 1., 0.)),
-                    ..default()
-                }).with_children(|parent| {
+                )).with_children(|parent| {
                     parent.spawn(ImageBundle {
                         style: Style {
                             width: Val::Px(10.),

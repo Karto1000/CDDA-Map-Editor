@@ -2,8 +2,8 @@ use bevy::asset::{AssetServer, Handle};
 use bevy::math::Vec2;
 use bevy::prelude::{AlignItems, BackgroundColor, BuildChildren, Bundle, Button, ButtonBundle, Changed, ChildBuilder, Color, Commands, Component, default, GlobalTransform, Image, ImageBundle, NodeBundle, Query, Res, ResMut, TextBundle, Vec3Swizzles, Visibility, Window, With};
 use bevy::text::{Text, TextStyle};
-use bevy::ui::{Display, FlexDirection, Interaction, JustifyContent, Node, Style, UiImage, UiRect, Val};
-use bevy::window::PrimaryWindow;
+use bevy::ui::{Display, Interaction, JustifyContent, Node, Style, UiImage, UiRect, Val};
+use bevy::window::{CursorIcon, PrimaryWindow};
 
 use crate::IsCursorCaptured;
 
@@ -32,6 +32,7 @@ pub struct TabContainerMarker;
 
 #[derive(Component)]
 pub struct AddTabButtonMarker;
+
 
 fn spawn_button_icon<T: Bundle>(container: &mut ChildBuilder, icon: Handle<Image>, color: Color, marker: T) {
     container.spawn((
@@ -170,7 +171,7 @@ pub fn build_hotbar(commands: &mut Commands, asset_server: &Res<AssetServer>) {
     });
 }
 
-pub fn button_system(
+pub fn button_color_system(
     mut interaction_query: Query<
         (
             &Interaction,
