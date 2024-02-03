@@ -6,11 +6,21 @@ use serde::{Deserialize, Serialize};
 
 use crate::map::{TilePlaceEvent, Tiles};
 
-#[derive(Serialize, Deserialize, Debug, Resource, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Resource, Clone)]
 pub struct MapEntity {
     pub name: String,
     pub weight: u32,
     pub tiles: Tiles,
+}
+
+impl Default for MapEntity {
+    fn default() -> Self {
+        return Self {
+            name: "unnamed".into(),
+            weight: 0,
+            tiles: Tiles::default(),
+        };
+    }
 }
 
 impl MapEntity {

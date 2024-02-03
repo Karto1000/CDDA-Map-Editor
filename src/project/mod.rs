@@ -16,7 +16,7 @@ use crate::project::saver::{Save, SaveError};
 pub(crate) mod saver;
 pub(crate) mod loader;
 
-#[derive(Debug, Default, Resource, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Resource, Serialize, Deserialize)]
 pub struct Project {
     pub map_entity: MapEntity,
     pub map_save_path: Option<Box<Path>>,

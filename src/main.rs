@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::default::Default;
+use std::ops::Deref;
 
 use bevy::{prelude::*, window::PrimaryWindow};
 use bevy::app::{App, AppExit, PluginGroup};
@@ -18,6 +19,7 @@ use winit::window::Icon;
 use crate::grid::{GridMarker, GridMaterial, GridPlugin};
 use crate::grid::resources::Grid;
 use crate::hotbar::HotbarPlugin;
+use crate::hotbar::tabs::SpawnTab;
 use crate::map::{MapPlugin, TilePlaceEvent};
 use crate::map::resources::MapEntity;
 use crate::project::{EditorData, EditorDataSaver, Project};
@@ -75,6 +77,7 @@ fn setup(
     win_windows: NonSend<WinitWindows>,
     res_grid: Res<Grid>,
     mut e_set_tile: EventWriter<TilePlaceEvent>,
+    mut e_spawn_tab: EventWriter<SpawnTab>,
 ) {
     commands.spawn(Camera2dBundle::default());
     let window = query_windows.single();
@@ -86,6 +89,11 @@ fn setup(
 
     let mut editor_data = EditorDataSaver {}.load().unwrap();
     editor_data.get_current_project_mut().unwrap_or(&mut Project::default()).map_entity.spawn(&mut e_set_tile);
+
+    println!("{:?}", editor_data.projects);
+    for project in editor_data.projects.iter() {
+        e_spawn_tab.send(SpawnTab { project: (*project).clone() });
+    }
 
     let texture_resource = TextureResource { textures };
 

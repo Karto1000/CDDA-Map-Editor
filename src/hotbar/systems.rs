@@ -1,16 +1,16 @@
 use bevy::asset::{AssetServer, Handle};
 use bevy::math::Vec2;
 use bevy::prelude::{AlignItems, BackgroundColor, BuildChildren, Bundle, Button, ButtonBundle, Changed, ChildBuilder, Color, Commands, Component, default, GlobalTransform, Image, ImageBundle, NodeBundle, Query, Res, ResMut, TextBundle, Vec3Swizzles, Visibility, Window, With};
-use bevy::text::{Text, TextStyle};
-use bevy::ui::{Display, Interaction, JustifyContent, Node, Style, UiImage, UiRect, Val};
+use bevy::text::{Font, Text, TextStyle};
+use bevy::ui::{AlignContent, Display, Interaction, JustifyContent, Node, Style, UiImage, UiRect, Val};
 use bevy::window::PrimaryWindow;
 
 use crate::IsCursorCaptured;
 
-const PRIMARY_COLOR: Color = Color::rgb(0.19, 0.21, 0.23);
-const PRIMARY_COLOR_FADED: Color = Color::rgb(0.23, 0.25, 0.27);
-const PRIMARY_COLOR_SELECTED: Color = Color::rgb(0.63, 0.70, 0.76);
-const ERROR: Color = Color::rgba(0.79, 0.2, 0.21, 0.5);
+pub const PRIMARY_COLOR: Color = Color::rgb(0.19, 0.21, 0.23);
+pub const PRIMARY_COLOR_FADED: Color = Color::rgb(0.23, 0.25, 0.27);
+pub const PRIMARY_COLOR_SELECTED: Color = Color::rgb(0.63, 0.70, 0.76);
+pub const ERROR: Color = Color::rgba(0.79, 0.2, 0.21, 0.5);
 
 #[derive(Component)]
 pub struct OriginalColor(Color);
@@ -23,6 +23,9 @@ pub struct SaveIconMarker;
 
 #[derive(Component)]
 pub struct ImportIconMarker;
+
+#[derive(Component)]
+pub struct TopHotbarMarker;
 
 fn spawn_button_icon<T: Bundle>(container: &mut ChildBuilder, icon: Handle<Image>, color: Color, marker: T) {
     container.spawn((
@@ -74,7 +77,7 @@ pub fn build_hotbar(commands: &mut Commands, asset_server: &Res<AssetServer>) {
             ..default()
         },
     ).with_children(|parent| {
-        parent.spawn(NodeBundle {
+        parent.spawn((NodeBundle {
             style: Style {
                 height: Val::Percent(100.),
                 column_gap: Val::Px(5.),
@@ -83,7 +86,7 @@ pub fn build_hotbar(commands: &mut Commands, asset_server: &Res<AssetServer>) {
                 ..default()
             },
             ..default()
-        })
+        }, TopHotbarMarker {}))
             .with_children(|top_left| {
                 top_left.spawn(
                     ImageBundle {
@@ -107,7 +110,7 @@ pub fn build_hotbar(commands: &mut Commands, asset_server: &Res<AssetServer>) {
                         text: Text::from_section(
                             "CDDA Map Editor",
                             TextStyle {
-                                font,
+                                font: font.clone(),
                                 font_size: 12.,
                                 color: Color::hex("#FFFFFF").unwrap(),
                             }),
