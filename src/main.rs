@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::default::Default;
-use std::rc::Rc;
 
 use bevy::{prelude::*, window::PrimaryWindow};
 use bevy::app::{App, AppExit, PluginGroup};
@@ -41,7 +40,7 @@ pub struct IsCursorCaptured(bool);
 
 #[derive(Resource)]
 pub struct TextureResource {
-    pub textures: HashMap<TileType, Handle<Image>>
+    pub textures: HashMap<TileType, Handle<Image>>,
 }
 
 fn main() {
@@ -75,6 +74,7 @@ fn setup(
     query_windows: Query<&Window, With<PrimaryWindow>>,
     win_windows: NonSend<WinitWindows>,
     res_grid: Res<Grid>,
+    mut e_set_tile: EventWriter<TilePlaceEvent>,
 ) {
     commands.spawn(Camera2dBundle::default());
     let window = query_windows.single();
@@ -84,8 +84,10 @@ fn setup(
     let mut textures: HashMap<TileType, Handle<Image>> = HashMap::new();
     textures.insert(TileType::Test, grass);
 
-    let texture_resource = TextureResource {textures};
-    let editor_data = EditorData::default();
+    let mut editor_data = EditorDataSaver {}.load().unwrap();
+    editor_data.get_current_project_mut().unwrap_or(&mut Project::default()).map_entity.spawn(&mut e_set_tile);
+
+    let texture_resource = TextureResource { textures };
 
     let window_width = window.physical_width();
     let window_height = window.physical_height();
@@ -190,9 +192,12 @@ fn update_mouse_location(
 fn map_loaded(
     mut ev_loaded: EventReader<bevy_file_dialog::DialogFileLoaded<MapEntity>>,
     mut res_editor_data: ResMut<EditorData>,
-    mut e_set_tile: EventWriter<TilePlaceEvent>
+    mut e_set_tile: EventWriter<TilePlaceEvent>,
 ) {
-    let project = res_editor_data.get_current_project_mut();
+    let project = match res_editor_data.get_current_project_mut() {
+        None => return,
+        Some(p) => p
+    };
 
     for ev in ev_loaded.read() {
         let map_entity: MapEntity = serde_json::from_slice(ev.contents.as_slice()).unwrap();
@@ -206,10 +211,9 @@ fn map_loaded(
 
 fn app_exit(
     mut e_exit: EventReader<AppExit>,
-    res_editor_data: Res<EditorData>
+    res_editor_data: Res<EditorData>,
 ) {
     for _ in e_exit.read() {
-
         let save_data_saver = EditorDataSaver {};
         save_data_saver.save(&res_editor_data).unwrap();
     }

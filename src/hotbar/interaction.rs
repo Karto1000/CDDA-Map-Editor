@@ -4,7 +4,7 @@ use bevy_file_dialog::FileDialogExt;
 
 use crate::hotbar::systems::{CloseIconMarker, ImportIconMarker, SaveIconMarker};
 use crate::map::resources::MapEntity;
-use crate::project::{EditorData, Project};
+use crate::project::EditorData;
 
 pub fn close_button_interaction(
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<CloseIconMarker>)>,
@@ -23,7 +23,10 @@ pub fn save_button_interaction(
     res_editor_data: Res<EditorData>,
     mut commands: Commands,
 ) {
-    let project = res_editor_data.get_current_project();
+    let project = match res_editor_data.get_current_project() {
+        None => return,
+        Some(p) => p
+    };
 
     for interaction in interaction_query.iter() {
         match interaction {

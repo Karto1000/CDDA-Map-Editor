@@ -56,7 +56,10 @@ pub fn map_resize_system(
     mut res_editor_data: ResMut<EditorData>,
     keys: Res<Input<KeyCode>>,
 ) {
-    let project = res_editor_data.get_current_project_mut();
+    let project = match res_editor_data.get_current_project_mut() {
+        None => return,
+        Some(p) => p
+    };
 
     if keys.pressed(KeyCode::Right) {
         res_grid.map_size.x += 1.;

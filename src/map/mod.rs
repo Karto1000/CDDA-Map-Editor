@@ -139,6 +139,15 @@ impl Tiles {
         );
     }
 
+    pub fn spawn(&mut self, e_set_tile: &mut EventWriter<TilePlaceEvent>) {
+        let tile_clone = self.tiles.clone();
+
+        for cords in tile_clone.keys().into_iter() {
+            let tile = self.tiles.get(cords).unwrap();
+            e_set_tile.send(TilePlaceEvent { tile: *tile })
+        }
+    }
+
     pub fn load(&mut self, e_set_tile: &mut EventWriter<TilePlaceEvent>, entity: &Tiles) {
         for (cords, tile) in entity.tiles.iter() {
             self.set_tile_at(

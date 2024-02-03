@@ -1,4 +1,3 @@
-use std::rc::Rc;
 use bevy::input::Input;
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::{Commands, Entity, EventReader, EventWriter, MouseButton, Query, Res, ResMut, Transform, Vec2, Vec2Swizzles, Window, With, Without};
@@ -8,7 +7,7 @@ use crate::grid::GridMarker;
 use crate::grid::resources::Grid;
 use crate::IsCursorCaptured;
 use crate::map::{Coordinates, TilePlaceEvent};
-use crate::project::{EditorData, Project};
+use crate::project::EditorData;
 use crate::tiles::{Tile, TileType};
 use crate::tiles::resources::PlaceInfo;
 
@@ -52,7 +51,10 @@ pub fn tile_place_system(
     res_captured: Res<IsCursorCaptured>,
     mut res_place_info: ResMut<PlaceInfo>,
 ) {
-    let mut project = res_editor_data.get_current_project_mut();
+    let mut project = match res_editor_data.get_current_project_mut() {
+        None => return,
+        Some(p) => p
+    };
 
     if buttons.just_released(MouseButton::Left) {
         res_place_info.last_place_position = None
@@ -145,7 +147,10 @@ pub fn tile_delete_system(
     res_grid: Res<Grid>,
     res_captured: Res<IsCursorCaptured>,
 ) {
-    let mut project = res_editor_data.get_current_project_mut();
+    let mut project = match res_editor_data.get_current_project_mut() {
+        None => return,
+        Some(p) => p
+    };
 
     if buttons.pressed(MouseButton::Right) {
         let xy = match q_windows.single().cursor_position() {

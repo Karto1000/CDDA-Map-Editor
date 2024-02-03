@@ -12,7 +12,10 @@ pub fn map_save_system(
     res_editor_data: Res<EditorData>,
     keys: Res<Input<KeyCode>>,
 ) {
-    let project = res_editor_data.get_current_project();
+    let project = match res_editor_data.get_current_project() {
+        None => return,
+        Some(p) => p
+    };
 
     if keys.pressed(KeyCode::ControlLeft) && keys.just_pressed(KeyCode::S) {
         // let map_json = res_map.export().unwrap();

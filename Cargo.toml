@@ -25,3 +25,4 @@ winit = { version = "0.28.7", features = ["default"] }
 bevy_file_dialog = "0.3.1"
 anyhow = "1.0.79"
 directories = "5.0.1"
+log = "0.4.20"
