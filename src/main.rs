@@ -21,7 +21,6 @@ use crate::grid::resources::Grid;
 use crate::hotbar::HotbarPlugin;
 use crate::hotbar::tabs::SpawnTab;
 use crate::map::{MapPlugin, TilePlaceEvent};
-use crate::map::resources::MapEntity;
 use crate::project::{EditorData, EditorDataSaver, Project};
 use crate::project::loader::Load;
 use crate::project::saver::Save;
@@ -59,12 +58,11 @@ fn main() {
         .add_systems(Startup, setup)
         .add_plugins(EguiPlugin)
         .add_plugins(FileDialogPlugin::new()
-            .with_save_file::<MapEntity>()
-            .with_load_file::<MapEntity>()
+            .with_save_file::<Project>()
         )
         .add_plugins(Material2dPlugin::<GridMaterial>::default())
         .add_plugins((GridPlugin {}, MapPlugin {}, TilePlugin {}, HotbarPlugin {}))
-        .add_systems(Update, (update, update_mouse_location, map_loaded, app_exit))
+        .add_systems(Update, (update, update_mouse_location, app_exit))
         .run();
 }
 
@@ -90,7 +88,6 @@ fn setup(
     let mut editor_data = EditorDataSaver {}.load().unwrap();
     editor_data.get_current_project_mut().unwrap_or(&mut Project::default()).map_entity.spawn(&mut e_set_tile);
 
-    println!("{:?}", editor_data.projects);
     for project in editor_data.projects.iter() {
         e_spawn_tab.send(SpawnTab { project: (*project).clone() });
     }
@@ -197,25 +194,25 @@ fn update_mouse_location(
     }
 }
 
-fn map_loaded(
-    mut ev_loaded: EventReader<bevy_file_dialog::DialogFileLoaded<MapEntity>>,
-    mut res_editor_data: ResMut<EditorData>,
-    mut e_set_tile: EventWriter<TilePlaceEvent>,
-) {
-    let project = match res_editor_data.get_current_project_mut() {
-        None => return,
-        Some(p) => p
-    };
-
-    for ev in ev_loaded.read() {
-        let map_entity: MapEntity = serde_json::from_slice(ev.contents.as_slice()).unwrap();
-
-        project.map_entity.load(
-            &mut e_set_tile,
-            &map_entity,
-        );
-    }
-}
+// fn map_loaded(
+//     mut ev_loaded: EventReader<bevy_file_dialog::DialogFileLoaded<MapEntity>>,
+//     mut res_editor_data: ResMut<EditorData>,
+//     mut e_set_tile: EventWriter<TilePlaceEvent>,
+// ) {
+//     let project = match res_editor_data.get_current_project_mut() {
+//         None => return,
+//         Some(p) => p
+//     };
+//
+//     for ev in ev_loaded.read() {
+//         let map_entity: MapEntity = serde_json::from_slice(ev.contents.as_slice()).unwrap();
+//
+//         project.map_entity.load(
+//             &mut e_set_tile,
+//             &map_entity,
+//         );
+//     }
+// }
 
 fn app_exit(
     mut e_exit: EventReader<AppExit>,

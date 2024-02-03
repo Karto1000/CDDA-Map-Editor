@@ -9,7 +9,7 @@ use serde::de::Visitor;
 use serde_json::Value;
 
 use crate::grid::resources::Grid;
-use crate::map::system::map_save_system;
+use crate::map::system::{map_save_system, save_directory_picked};
 use crate::TextureResource;
 use crate::tiles::{Tile, TileType};
 
@@ -22,6 +22,8 @@ impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, map_save_system);
         app.add_systems(Update, tile_spawn_reader);
+        app.add_systems(Update, save_directory_picked);
+
         app.add_event::<TilePlaceEvent>();
     }
 }

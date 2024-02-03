@@ -4,7 +4,7 @@ use bevy_file_dialog::FileDialogExt;
 
 use crate::hotbar::systems::{CloseIconMarker, ImportIconMarker, SaveIconMarker};
 use crate::map::resources::MapEntity;
-use crate::project::EditorData;
+use crate::project::{EditorData, Project};
 
 pub fn close_button_interaction(
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<CloseIconMarker>)>,
@@ -31,11 +31,10 @@ pub fn save_button_interaction(
     for interaction in interaction_query.iter() {
         match interaction {
             Interaction::Pressed => {
-                let map_json = serde_json::to_string(&project.map_entity).unwrap();
-
+                let project_json= serde_json::to_string(&project).unwrap();
                 commands.dialog()
                     .set_file_name(format!("{}.map", project.map_entity.name))
-                    .save_file::<MapEntity>(map_json.as_bytes().into());
+                    .save_file::<Project>(project_json.into_bytes());
             }
             _ => {}
         };
