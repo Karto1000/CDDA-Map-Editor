@@ -1,8 +1,9 @@
 use bevy::asset::AssetServer;
 use bevy::hierarchy::BuildChildren;
-use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Color, Commands, default, Display, Entity, Event, EventReader, ImageBundle, Query, Res, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val, With};
+use bevy::log::warn;
+use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Changed, Color, Commands, default, Display, Entity, Event, EventReader, EventWriter, FlexDirection, ImageBundle, Interaction, NodeBundle, Query, Res, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val, With};
 
-use crate::hotbar::systems::{PRIMARY_COLOR_SELECTED, TopHotbarMarker};
+use crate::hotbar::systems::{AddTabButtonMarker, PRIMARY_COLOR_FADED, TabContainerMarker, TopHotbarMarker};
 use crate::project::Project;
 
 #[derive(Event)]
@@ -10,9 +11,84 @@ pub struct SpawnTab {
     pub project: Project,
 }
 
+pub fn setup(
+    r_asset_server: Res<AssetServer>,
+    q_top_hotbar: Query<Entity, With<TopHotbarMarker>>,
+    mut commands: Commands,
+) {
+    let hotbar = match q_top_hotbar.iter().next() {
+        None => {
+            warn!("No Hotbar");
+            return;
+        }
+        Some(h) => h
+    };
+
+    let mut entity = commands.get_entity(hotbar).unwrap();
+    entity.with_children(|parent| {
+        parent.spawn((
+            NodeBundle {
+                style: Style {
+                    width: Val::Auto,
+                    height: Val::Px(32.),
+                    display: Display::Flex,
+                    flex_direction: FlexDirection::RowReverse,
+                    ..default()
+                },
+                ..default()
+            },
+            TabContainerMarker {}
+        )).with_children(|parent| {
+            parent.spawn((
+                ButtonBundle {
+                    style: Style {
+                        width: Val::Px(32.),
+                        height: Val::Px(32.),
+                        ..default()
+                    },
+                    background_color: BackgroundColor::from(PRIMARY_COLOR_FADED),
+                    ..default()
+                },
+                crate::hotbar::systems::OriginalColor { 0: PRIMARY_COLOR_FADED },
+                AddTabButtonMarker {}
+            )).with_children(|parent| {
+                parent.spawn(
+                    ImageBundle {
+                        style: Style {
+                            width: Val::Px(10.),
+                            height: Val::Px(10.),
+                            margin: UiRect::all(Val::Auto),
+                            ..default()
+                        },
+                        image: UiImage::new(r_asset_server.load("icons/add.png")),
+                        ..default()
+                    }
+                );
+            });
+        });
+    });
+}
+
+pub fn on_add_tab_button_click(
+    q_interaction: Query<(&Interaction), (Changed<Interaction>, With<AddTabButtonMarker>)>,
+    mut e_spawn_tab: EventWriter<SpawnTab>,
+) {
+    let interaction = match q_interaction.iter().next() {
+        None => { return; }
+        Some(i) => i
+    };
+
+    match interaction {
+        Interaction::Pressed => {
+            e_spawn_tab.send(SpawnTab { project: Project::default() })
+        }
+        _ => {}
+    }
+}
+
 pub fn spawn_tab_reader(
     mut e_spawn_tab: EventReader<SpawnTab>,
-    top_hotbar: Query<(Entity), With<TopHotbarMarker>>,
+    top_hotbar: Query<(Entity), With<TabContainerMarker>>,
     asset_server: Res<AssetServer>,
     mut commands: Commands,
 ) {
@@ -29,7 +105,7 @@ pub fn spawn_tab_reader(
                     padding: UiRect::px(9., 9., 8., 8.),
                     ..default()
                 },
-                background_color: BackgroundColor::from(PRIMARY_COLOR_SELECTED),
+                background_color: BackgroundColor::from(PRIMARY_COLOR_FADED),
                 ..default()
             }).with_children(|parent| {
                 parent.spawn(TextBundle {

@@ -1,7 +1,7 @@
 use std::fs;
 use std::fs::File;
 use std::io::Write;
-use std::path::Path;
+use std::path::PathBuf;
 
 use bevy::prelude::{Resource, Vec2};
 use directories::ProjectDirs;
@@ -19,18 +19,21 @@ pub(crate) mod loader;
 #[derive(Debug, Default, Clone, Resource, Serialize, Deserialize)]
 pub struct Project {
     pub map_entity: MapEntity,
-    pub map_save_path: Option<Box<Path>>,
+    pub save_state: ProjectSaveState,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub enum ProjectSaveState {
     /// If the Project was saved somewhere
     /// Contains the path to the saved project
-    Saved(Box<Path>),
+    Saved(PathBuf),
+
+    /// If the project was auto saved
+    /// Contains the path to an auto save file
+    AutoSaved(PathBuf),
 
     /// If the project was not saved
-    /// Contains the path to an auto save file (if one exists)
-    NotSaved(Option<Box<Path>>),
+    #[default] NotSaved,
 }
 
 /// Struct that stores the data that should be saved permanently in the users app data directory
@@ -60,7 +63,7 @@ impl Default for EditorData {
 
         let project = Project {
             map_entity: map,
-            map_save_path: None,
+            save_state: ProjectSaveState::NotSaved,
         };
 
         return Self {
@@ -95,10 +98,7 @@ impl Save<EditorData> for EditorDataSaver {
         let data = converted.as_object_mut().unwrap();
 
         let open_projects: Vec<ProjectSaveState> = value.projects.iter().map(|project| {
-            return match &project.map_save_path {
-                None => ProjectSaveState::NotSaved(Some(data_dir.join(format!("auto_save_{}.json", project.map_entity.name)).into_boxed_path())),
-                Some(p) => ProjectSaveState::Saved(p.clone())
-            };
+            return project.save_state.clone();
         }).collect();
 
         data.insert("open_projects".into(), serde_json::to_value(open_projects).unwrap());
@@ -142,7 +142,7 @@ impl Load<EditorData> for EditorDataSaver {
 
         let projects_array: Vec<Project> = value
             .get("open_projects")
-            .expect("open_proects field")
+            .expect("open_projects field")
             .as_array()
             .expect("Valid array")
             .iter()
@@ -161,25 +161,21 @@ impl Load<EditorData> for EditorDataSaver {
                             }
                         }
                     }
-                    ProjectSaveState::NotSaved(path) => {
-                        match path {
-                            None => {
-                                warn!("Could not Load Not Saved Project");
-                                None
+                    ProjectSaveState::AutoSaved(path) => {
+                        match fs::read_to_string(path.clone()) {
+                            Ok(s) => {
+                                let project: Project = serde_json::from_str(s.as_str()).expect("Valid Project");
+                                Some(project)
                             }
-                            Some(p) => {
-                                match fs::read_to_string(p.clone()) {
-                                    Ok(s) => {
-                                        let project: Project = serde_json::from_str(s.as_str()).expect("Valid Project");
-                                        Some(project)
-                                    }
-                                    Err(_) => {
-                                        warn!("Could not Load Not Saved Project at path {:?}", p);
-                                        Some(Project::default())
-                                    }
-                                }
+                            Err(_) => {
+                                warn!("Could not Load Not Saved Project at path {:?}", path);
+                                Some(Project::default())
                             }
                         }
+                    }
+                    ProjectSaveState::NotSaved => {
+                        warn!("Could not open Project because it was not saved");
+                        return None;
                     }
                 };
             })

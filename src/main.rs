@@ -21,6 +21,7 @@ use crate::grid::resources::Grid;
 use crate::hotbar::HotbarPlugin;
 use crate::hotbar::tabs::SpawnTab;
 use crate::map::{MapPlugin, TilePlaceEvent};
+use crate::map::system::NoData;
 use crate::project::{EditorData, EditorDataSaver, Project};
 use crate::project::loader::Load;
 use crate::project::saver::Save;

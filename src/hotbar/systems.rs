@@ -1,8 +1,8 @@
 use bevy::asset::{AssetServer, Handle};
 use bevy::math::Vec2;
 use bevy::prelude::{AlignItems, BackgroundColor, BuildChildren, Bundle, Button, ButtonBundle, Changed, ChildBuilder, Color, Commands, Component, default, GlobalTransform, Image, ImageBundle, NodeBundle, Query, Res, ResMut, TextBundle, Vec3Swizzles, Visibility, Window, With};
-use bevy::text::{Font, Text, TextStyle};
-use bevy::ui::{AlignContent, Display, Interaction, JustifyContent, Node, Style, UiImage, UiRect, Val};
+use bevy::text::{Text, TextStyle};
+use bevy::ui::{Display, FlexDirection, Interaction, JustifyContent, Node, Style, UiImage, UiRect, Val};
 use bevy::window::PrimaryWindow;
 
 use crate::IsCursorCaptured;
@@ -13,7 +13,7 @@ pub const PRIMARY_COLOR_SELECTED: Color = Color::rgb(0.63, 0.70, 0.76);
 pub const ERROR: Color = Color::rgba(0.79, 0.2, 0.21, 0.5);
 
 #[derive(Component)]
-pub struct OriginalColor(Color);
+pub struct OriginalColor(pub Color);
 
 #[derive(Component)]
 pub struct CloseIconMarker;
@@ -26,6 +26,12 @@ pub struct ImportIconMarker;
 
 #[derive(Component)]
 pub struct TopHotbarMarker;
+
+#[derive(Component)]
+pub struct TabContainerMarker;
+
+#[derive(Component)]
+pub struct AddTabButtonMarker;
 
 fn spawn_button_icon<T: Bundle>(container: &mut ChildBuilder, icon: Handle<Image>, color: Color, marker: T) {
     container.spawn((
