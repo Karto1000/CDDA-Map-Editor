@@ -100,8 +100,8 @@ fn setup(
         map_entity: Arc::new(project.map_entity)
     });
 
-    for project in editor_data.projects.iter() {
-        e_spawn_tab.send(SpawnTab { name: project.map_entity.name.clone() });
+    for (i, project) in editor_data.projects.iter().enumerate() {
+        e_spawn_tab.send(SpawnTab { name: project.map_entity.name.clone(), index: i as u32});
     }
 
     let texture_resource = TextureResource { textures };
@@ -161,7 +161,6 @@ fn setup(
     commands.insert_resource(editor_data);
     commands.insert_resource(texture_resource);
 }
-
 
 fn update(
     res_grid: Res<Grid>,

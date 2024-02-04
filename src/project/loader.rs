@@ -48,7 +48,7 @@ impl Load<Project> for ProjectAutoSaveLoader {
             return Err(LoadError::DirectoryNotFound);
         }
 
-        let mut file = match File::open(self.directory.join(format!("auto_save_{}.json", self.map_name))) {
+        let mut file = match File::open(self.directory.join(format!("auto_save_{}.map", self.map_name))) {
             Ok(f) => f,
             Err(_) => return Err(NoAutoSave)
         };

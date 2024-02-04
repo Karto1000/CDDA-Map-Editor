@@ -11,7 +11,7 @@ use serde_json::{Map, Value};
 
 use crate::map::resources::MapEntity;
 use crate::project::loader::{Load, LoadError};
-use crate::project::saver::{Save, SaveError};
+use crate::project::saver::{ProjectSaver, Save, SaveError};
 
 pub(crate) mod saver;
 pub(crate) mod loader;
@@ -98,7 +98,16 @@ impl Save<EditorData> for EditorDataSaver {
         let data = converted.as_object_mut().unwrap();
 
         let open_projects: Vec<ProjectSaveState> = value.projects.iter().map(|project| {
-            return project.save_state.clone();
+            match &project.save_state {
+                ProjectSaveState::AutoSaved(val) => ProjectSaveState::AutoSaved(val.clone()),
+                ProjectSaveState::Saved(val) => ProjectSaveState::Saved(val.clone()),
+                ProjectSaveState::NotSaved => {
+                    println!("autosaving {}", project.map_entity.name.clone());
+                    let project_saver = ProjectSaver { directory: Box::from(data_dir) };
+                    project_saver.save(project).unwrap();
+                    ProjectSaveState::AutoSaved(data_dir.join(format!("auto_save_{}.map", project.map_entity.name)))
+                }
+            }
         }).collect();
 
         data.insert("open_projects".into(), serde_json::to_value(open_projects).unwrap());
@@ -148,10 +157,12 @@ impl Load<EditorData> for EditorDataSaver {
             .iter()
             .map(|v| {
                 let state = serde_json::from_value::<ProjectSaveState>(v.clone()).unwrap();
+
                 return match state {
                     ProjectSaveState::Saved(path) => {
                         match fs::read_to_string(path.clone()) {
                             Ok(s) => {
+                                println!("{}", s);
                                 let project: Project = serde_json::from_str(s.as_str()).expect("Valid Project");
                                 Some(project)
                             }

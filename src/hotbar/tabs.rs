@@ -1,7 +1,6 @@
 use bevy::asset::AssetServer;
 use bevy::hierarchy::BuildChildren;
-use bevy::log::warn;
-use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Changed, Color, Commands, Component, default, Display, Entity, Event, EventReader, EventWriter, FlexDirection, ImageBundle, Interaction, NodeBundle, Query, Res, ResMut, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val, With};
+use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Changed, Color, Commands, Component, default, Display, Entity, Event, EventReader, EventWriter, ImageBundle, Interaction, NodeBundle, Query, Res, ResMut, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val, With};
 
 use crate::hotbar::systems::{AddTabButtonMarker, OriginalColor, PRIMARY_COLOR_FADED, TabContainerMarker, TopHotbarMarker};
 use crate::project::{EditorData, Project};
@@ -10,9 +9,10 @@ use crate::SwitchProject;
 #[derive(Event)]
 pub struct SpawnTab {
     pub name: String,
+    pub index: u32
 }
 
-#[derive(Component)]
+#[derive(Component, Debug)]
 pub struct Tab {
     pub index: u32,
 }
@@ -36,35 +36,49 @@ pub fn setup(
                 },
                 ..default()
             },
-            TabContainerMarker {}
-        )).with_children(|parent| {
-            parent.spawn((
-                ButtonBundle {
-                    style: Style {
-                        width: Val::Px(32.),
-                        height: Val::Px(32.),
-                        ..default()
-                    },
-                    background_color: BackgroundColor::from(PRIMARY_COLOR_FADED),
-                    ..default()
-                },
-                OriginalColor { 0: PRIMARY_COLOR_FADED },
-                AddTabButtonMarker {},
-            )).with_children(|parent| {
-                parent.spawn(
-                    ImageBundle {
+        ))
+            .with_children(|parent| {
+                parent.spawn((
+                    NodeBundle {
                         style: Style {
-                            width: Val::Px(10.),
-                            height: Val::Px(10.),
-                            margin: UiRect::all(Val::Auto),
+                            width: Val::Auto,
+                            height: Val::Px(32.),
+                            display: Display::Flex,
                             ..default()
                         },
-                        image: UiImage::new(r_asset_server.load("icons/add.png")),
                         ..default()
-                    }
-                );
+                    },
+                    TabContainerMarker {}
+                ));
+            })
+            .with_children(|parent| {
+                parent.spawn((
+                    ButtonBundle {
+                        style: Style {
+                            width: Val::Px(32.),
+                            height: Val::Px(32.),
+                            ..default()
+                        },
+                        background_color: BackgroundColor::from(PRIMARY_COLOR_FADED),
+                        ..default()
+                    },
+                    OriginalColor { 0: PRIMARY_COLOR_FADED },
+                    AddTabButtonMarker {},
+                )).with_children(|parent| {
+                    parent.spawn(
+                        ImageBundle {
+                            style: Style {
+                                width: Val::Px(10.),
+                                height: Val::Px(10.),
+                                margin: UiRect::all(Val::Auto),
+                                ..default()
+                            },
+                            image: UiImage::new(r_asset_server.load("icons/add.png")),
+                            ..default()
+                        }
+                    );
+                });
             });
-        });
     });
 }
 
@@ -84,7 +98,7 @@ pub fn on_add_tab_button_click(
             let name = project.map_entity.name.clone();
 
             r_editor_data.projects.push(project);
-            e_spawn_tab.send(SpawnTab { name })
+            e_spawn_tab.send(SpawnTab { name, index: r_editor_data.projects.len() as u32 - 1 })
         }
         _ => {}
     }
@@ -93,7 +107,6 @@ pub fn on_add_tab_button_click(
 pub fn spawn_tab_reader(
     top_hotbar: Query<Entity, With<TabContainerMarker>>,
     asset_server: Res<AssetServer>,
-    editor_data: Res<EditorData>,
     mut e_spawn_tab: EventReader<SpawnTab>,
     mut commands: Commands,
 ) {
@@ -116,7 +129,7 @@ pub fn spawn_tab_reader(
                     ..default()
                 },
                 OriginalColor { 0: PRIMARY_COLOR_FADED },
-                Tab { index: editor_data.projects.len() as u32 - 1 }
+                Tab { index: event.index }
             )).with_children(|parent| {
                 parent.spawn(TextBundle {
                     text: Text::from_section(

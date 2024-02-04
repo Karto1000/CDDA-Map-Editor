@@ -1,9 +1,12 @@
 use std::fs;
 
+use bevy::hierarchy::Children;
 use bevy::input::Input;
-use bevy::prelude::{Commands, EventReader, KeyCode, Res, ResMut};
+use bevy::prelude::{Commands, Entity, EventReader, KeyCode, Query, Res, ResMut, Text};
+use bevy::text::TextSection;
 use bevy_file_dialog::{DialogFileSaved, FileDialogExt};
 
+use crate::hotbar::tabs::Tab;
 use crate::project::{EditorData, Project, ProjectSaveState};
 
 pub struct NoData;
@@ -25,15 +28,18 @@ pub fn map_save_system(
 pub fn save_directory_picked(
     mut res_editor_data: ResMut<EditorData>,
     mut e_file_saved: EventReader<DialogFileSaved<Project>>,
+    q_tabs: Query<(Entity, &Tab, &Children)>,
+    mut q_text: Query<&mut Text>,
 ) {
-    let project = match res_editor_data.get_current_project_mut() {
+    let project_index = res_editor_data.current_project_index;
+    let current_project = match res_editor_data.get_current_project_mut() {
         None => return,
         Some(p) => p
     };
 
     for event in e_file_saved.read() {
-        project.save_state = ProjectSaveState::Saved(event.path.clone());
-        project.map_entity.name = event.path.file_name().unwrap().to_str().unwrap().to_string();
+        current_project.save_state = ProjectSaveState::Saved(event.path.clone());
+        current_project.map_entity.name = event.path.file_name().unwrap().to_str().unwrap().to_string();
 
         // Edit the file name in the saved file because we can't know the file name in advance
         let content = fs::read_to_string(&event.path).unwrap();
@@ -66,7 +72,22 @@ pub fn save_directory_picked(
             .collect::<Vec<String>>()
             .join("");
 
+        for (_, tab, children) in q_tabs.iter() {
+            if tab.index != project_index { continue; }
+
+            for child in children.iter() {
+                let mut text = match q_text.get_mut(*child) {
+                    Ok(t) => t,
+                    Err(_) => { continue; }
+                };
+
+                text.sections.clear();
+                text.sections.push(TextSection::from(project_name.clone()));
+            }
+        }
+
         entity.map_entity.name = project_name;
+        entity.save_state = ProjectSaveState::Saved(event.path.clone());
 
         // Remove the original file and Save it back and overwrite the original file
         fs::remove_file(&event.path).unwrap();
