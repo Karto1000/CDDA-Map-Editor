@@ -2,14 +2,14 @@ use bevy::asset::AssetServer;
 use bevy::hierarchy::BuildChildren;
 use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Changed, Color, Commands, Component, default, Display, Entity, Event, EventReader, EventWriter, ImageBundle, Interaction, NodeBundle, Query, Res, ResMut, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val, With};
 
-use crate::hotbar::systems::{AddTabButtonMarker, OriginalColor, PRIMARY_COLOR_FADED, TabContainerMarker, TopHotbarMarker};
+use crate::hotbar::systems::{AddTabButtonMarker, HoverEffect, OriginalColor, PRIMARY_COLOR, PRIMARY_COLOR_FADED, PRIMARY_COLOR_SELECTED, TabContainerMarker, ToggleEffect, TopHotbarMarker};
 use crate::project::{EditorData, Project};
 use crate::SwitchProject;
 
 #[derive(Event)]
 pub struct SpawnTab {
     pub name: String,
-    pub index: u32
+    pub index: u32,
 }
 
 #[derive(Component, Debug)]
@@ -128,7 +128,15 @@ pub fn spawn_tab_reader(
                     background_color: BackgroundColor::from(PRIMARY_COLOR_FADED),
                     ..default()
                 },
-                OriginalColor { 0: PRIMARY_COLOR_FADED },
+                HoverEffect {
+                    original_color: PRIMARY_COLOR_FADED,
+                    hover_color: PRIMARY_COLOR,
+                },
+                ToggleEffect {
+                    original_color: PRIMARY_COLOR_FADED,
+                    toggled_color: PRIMARY_COLOR_SELECTED,
+                    toggled: false,
+                },
                 Tab { index: event.index }
             )).with_children(|parent| {
                 parent.spawn(TextBundle {
@@ -175,9 +183,9 @@ pub fn spawn_tab_reader(
 pub fn tab_clicked(
     mut e_switch_project: EventWriter<SwitchProject>,
     r_editor_data: Res<EditorData>,
-    q_interaction: Query<(&Interaction, &Tab), (Changed<Interaction>, With<Tab>)>,
+    mut q_interaction: Query<(&Interaction, &Tab), (Changed<Interaction>, With<Tab>)>,
 ) {
-    for (interaction, tab) in q_interaction.iter() {
+    for (interaction, tab) in q_interaction.iter_mut() {
         match *interaction {
             Interaction::Pressed => {
                 match r_editor_data.projects.get(tab.index as usize) {

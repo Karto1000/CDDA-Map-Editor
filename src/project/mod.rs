@@ -162,7 +162,6 @@ impl Load<EditorData> for EditorDataSaver {
                     ProjectSaveState::Saved(path) => {
                         match fs::read_to_string(path.clone()) {
                             Ok(s) => {
-                                println!("{}", s);
                                 let project: Project = serde_json::from_str(s.as_str()).expect("Valid Project");
                                 Some(project)
                             }

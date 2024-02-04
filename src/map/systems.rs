@@ -19,9 +19,16 @@ pub fn map_save_system(
     if keys.pressed(KeyCode::ControlLeft) && keys.just_pressed(KeyCode::S) {
         let current_project = res_editor_data.get_current_project().unwrap();
 
-        commands.dialog()
-            .set_file_name("unnamed.map")
-            .save_file::<Project>(serde_json::to_string(&current_project).unwrap().into_bytes());
+        match &current_project.save_state {
+            ProjectSaveState::Saved(p) => {
+                fs::write(p, serde_json::to_string(&current_project).unwrap().into_bytes()).unwrap();
+            }
+            _ => {
+                commands.dialog()
+                    .set_file_name("unnamed.map")
+                    .save_file::<Project>(serde_json::to_string(&current_project).unwrap().into_bytes());
+            }
+        }
     }
 }
 

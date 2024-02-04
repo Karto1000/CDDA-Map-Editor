@@ -1,6 +1,6 @@
 use bevy::asset::{AssetServer, Handle};
 use bevy::math::Vec2;
-use bevy::prelude::{AlignItems, BackgroundColor, BuildChildren, Bundle, Button, ButtonBundle, Changed, ChildBuilder, Color, Commands, Component, default, GlobalTransform, Image, ImageBundle, NodeBundle, Query, Res, ResMut, TextBundle, Vec3Swizzles, Visibility, Window, With};
+use bevy::prelude::{AlignItems, BackgroundColor, BuildChildren, Bundle, Button, ButtonBundle, Changed, ChildBuilder, Color, Commands, Component, default, Entity, Event, EventReader, EventWriter, GlobalTransform, Image, ImageBundle, NodeBundle, Query, Res, ResMut, TextBundle, Vec3Swizzles, Visibility, Window, With};
 use bevy::text::{Text, TextStyle};
 use bevy::ui::{Display, Interaction, JustifyContent, Node, Style, UiImage, UiRect, Val};
 use bevy::window::PrimaryWindow;
@@ -32,6 +32,19 @@ pub struct TabContainerMarker;
 
 #[derive(Component)]
 pub struct AddTabButtonMarker;
+
+#[derive(Component, Debug)]
+pub struct HoverEffect {
+    pub original_color: Color,
+    pub hover_color: Color,
+}
+
+#[derive(Component, Debug)]
+pub struct ToggleEffect {
+    pub original_color: Color,
+    pub toggled_color: Color,
+    pub toggled: bool,
+}
 
 
 fn spawn_button_icon<T: Bundle>(container: &mut ChildBuilder, icon: Handle<Image>, color: Color, marker: T) {
@@ -173,31 +186,80 @@ pub fn build_hotbar(commands: &mut Commands, asset_server: &Res<AssetServer>) {
     });
 }
 
-pub fn button_color_system(
-    mut interaction_query: Query<
-        (
-            &Interaction,
-            &mut BackgroundColor,
-            &OriginalColor
-        ),
-        (Changed<Interaction>, With<Button>),
-    >,
+pub fn button_hover_system(
+    mut q_interaction: Query<(
+        Entity,
+        &Interaction,
+        &mut BackgroundColor,
+        &HoverEffect,
+    ), (
+        Changed<Interaction>,
+        With<Button>
+    )>,
+    q_toggle: Query<&ToggleEffect>,
 ) {
-    for (interaction, mut color, original_color) in &mut interaction_query {
+    for (entity, interaction, mut background_color, hover_effect) in q_interaction.iter_mut() {
         match *interaction {
-            Interaction::Pressed => {
-                *color = BackgroundColor::from(original_color.0).into();
-            }
+            Interaction::Pressed => {}
             Interaction::Hovered => {
-                *color = BackgroundColor::from(Color::rgba(
-                    color.0.r() + 0.2,
-                    color.0.g() + 0.2,
-                    color.0.b() + 0.2, color.0.a(),
-                )).into();
+                match q_toggle.get(entity) {
+                    Ok(e) => {
+                        if e.toggled { return; }
+                    }
+                    Err(_) => {}
+                };
+
+                background_color.0 = hover_effect.hover_color;
             }
             Interaction::None => {
-                *color = BackgroundColor::from(original_color.0).into();
+                match q_toggle.get(entity) {
+                    Ok(e) => {
+                        if e.toggled { return; }
+                    }
+                    Err(_) => {}
+                };
+
+                background_color.0 = hover_effect.original_color;
             }
+        }
+    }
+}
+
+#[derive(Event)]
+pub struct ResetToggle {
+    ignore: Entity,
+}
+
+pub fn reset_toggle_reader(
+    mut q_buttons: Query<(Entity, &mut BackgroundColor, &mut ToggleEffect), (With<Button>)>,
+    mut e_reset_toggle: EventReader<ResetToggle>,
+) {
+    for event in e_reset_toggle.read() {
+        for (entity, mut background_color, mut toggle_effect) in q_buttons.iter_mut() {
+            if entity == event.ignore { continue; }
+
+            background_color.0 = toggle_effect.original_color;
+            toggle_effect.toggled = false;
+        }
+    }
+}
+
+pub fn button_toggle_system(
+    mut q_interaction: Query<(Entity, &Interaction, &mut BackgroundColor, &mut ToggleEffect), (Changed<Interaction>, With<Button>)>,
+    mut e_reset_toggle_writer: EventWriter<ResetToggle>,
+) {
+    for (entity, interaction, mut background_color, mut toggle_effect) in q_interaction.iter_mut() {
+        match *interaction {
+            Interaction::Pressed => {
+                match toggle_effect.toggled {
+                    true => background_color.0 = toggle_effect.original_color,
+                    false => background_color.0 = toggle_effect.toggled_color
+                }
+                toggle_effect.toggled = !toggle_effect.toggled;
+                e_reset_toggle_writer.send(ResetToggle { ignore: entity });
+            }
+            Interaction::Hovered => {}
+            Interaction::None => {}
         }
     }
 }
