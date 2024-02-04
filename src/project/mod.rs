@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 
-use bevy::prelude::{Resource, Vec2};
+use bevy::prelude::{Event, Resource, Vec2};
 use directories::ProjectDirs;
 use log::warn;
 use serde::{Deserialize, Serialize};

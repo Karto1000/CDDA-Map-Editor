@@ -1,14 +1,14 @@
 use std::collections::HashMap;
-use std::error::Error;
 use std::fmt::Formatter;
+use std::sync::Arc;
 
 use bevy::app::{App, Plugin, Update};
-use bevy::prelude::{Commands, default, Event, EventReader, EventWriter, IVec2, Res, Resource, SpriteBundle, Transform, Vec2, Vec3};
+use bevy::prelude::{Commands, default, Entity, Event, EventReader, EventWriter, Query, Res, Resource, SpriteBundle, Transform, Vec2, Vec3, With};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::Visitor;
-use serde_json::Value;
 
 use crate::grid::resources::Grid;
+use crate::map::resources::MapEntity;
 use crate::map::systems::{map_save_system, save_directory_picked};
 use crate::TextureResource;
 use crate::tiles::{Tile, TileType};
@@ -23,8 +23,12 @@ impl Plugin for MapPlugin {
         app.add_systems(Update, map_save_system);
         app.add_systems(Update, tile_spawn_reader);
         app.add_systems(Update, save_directory_picked);
+        app.add_systems(Update, spawn_map_entity_reader);
+        app.add_systems(Update, clear_tiles_reader);
 
         app.add_event::<TilePlaceEvent>();
+        app.add_event::<SpawnMapEntity>();
+        app.add_event::<ClearTiles>();
     }
 }
 
@@ -108,25 +112,11 @@ pub fn tile_spawn_reader(
 }
 
 impl Tiles {
-    pub fn export(&self) -> Result<Value, anyhow::Error> {
-        let mut rows: Vec<String> = vec![];
-
-        for _ in 0..self.size.y as i32 {
-            let mut row = String::with_capacity(self.size.x as usize);
-            (0..self.size.x as i32).for_each(|i| {
-                row.insert(i as usize, " ".parse::<char>().unwrap())
-            });
-            rows.push(row);
-        };
-
-        return Ok(Value::Array(rows.iter().map(|e| Value::String(e.clone())).collect()));
-    }
-
     pub fn set_tile_at(
         &mut self,
         cords: (i32, i32),
         tile_type: TileType,
-        mut e_set_tile: &mut EventWriter<TilePlaceEvent>,
+        e_set_tile: &mut EventWriter<TilePlaceEvent>,
     ) {
         let coordinates = Coordinates { x: cords.0, y: cords.1 };
         if self.tiles.get(&coordinates).is_some() { return; }
@@ -149,30 +139,40 @@ impl Tiles {
             e_set_tile.send(TilePlaceEvent { tile: *tile })
         }
     }
+}
 
-    pub fn load(&mut self, e_set_tile: &mut EventWriter<TilePlaceEvent>, entity: &Tiles) {
-        for (cords, tile) in entity.tiles.iter() {
-            self.set_tile_at(
-                (cords.x, cords.y),
-                tile.tile_type,
-                e_set_tile,
-            );
+#[derive(Event)]
+pub struct SpawnMapEntity {
+    pub map_entity: Arc<MapEntity>,
+}
+
+pub fn spawn_map_entity_reader(
+    mut e_spawn_map_entity: EventReader<SpawnMapEntity>,
+    mut e_tile_place: EventWriter<TilePlaceEvent>,
+) {
+    for event in e_spawn_map_entity.read() {
+        for (_, tile) in event.map_entity.tiles.tiles.iter() {
+            e_tile_place.send(
+                TilePlaceEvent {
+                    tile: tile.clone()
+                }
+            )
         }
     }
+}
 
-    pub fn get_size(&self) -> Option<IVec2> {
-        let mut keys_sorted_x: Vec<Coordinates> = self.tiles.clone().into_keys().collect();
-        let mut keys_sorted_y: Vec<Coordinates> = self.tiles.clone().into_keys().collect();
+#[derive(Event)]
+pub struct ClearTiles;
 
-        keys_sorted_x.sort_by(|coords1, coords2| coords1.x.cmp(&coords2.x));
-        keys_sorted_y.sort_by(|coords1, coords2| coords1.y.cmp(&coords2.y));
-
-        let leftmost_tile = keys_sorted_x.first().cloned().unwrap();
-        let rightmost_tile = keys_sorted_x.last().cloned().unwrap();
-
-        let topmost_tile = keys_sorted_y.first().cloned().unwrap();
-        let bottommost_tile = keys_sorted_y.last().cloned().unwrap();
-
-        return Some(IVec2::new((rightmost_tile.x - leftmost_tile.x).abs() + 1, (bottommost_tile.y - topmost_tile.y).abs() + 1));
+pub fn clear_tiles_reader(
+    mut q_tiles: Query<Entity, With<Tile>>,
+    mut e_clear_tiles: EventReader<ClearTiles>,
+    mut commands: Commands,
+) {
+    for _ in e_clear_tiles.read() {
+        for entity in q_tiles.iter_mut() {
+            let mut entity_commands = commands.get_entity(entity).unwrap();
+            entity_commands.despawn();
+        }
     }
 }

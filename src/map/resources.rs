@@ -36,11 +36,4 @@ impl MapEntity {
     pub fn spawn(&mut self, e_set_tile: &mut EventWriter<TilePlaceEvent>) {
         self.tiles.spawn(e_set_tile)
     }
-
-    pub fn load(&mut self, e_set_tile: &mut EventWriter<TilePlaceEvent>, entity: &MapEntity) {
-        self.name = entity.name.clone();
-        self.weight = entity.weight;
-
-        self.tiles.load(e_set_tile, &entity.tiles);
-    }
 }

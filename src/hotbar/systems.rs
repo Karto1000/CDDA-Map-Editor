@@ -3,7 +3,7 @@ use bevy::math::Vec2;
 use bevy::prelude::{AlignItems, BackgroundColor, BuildChildren, Bundle, Button, ButtonBundle, Changed, ChildBuilder, Color, Commands, Component, default, GlobalTransform, Image, ImageBundle, NodeBundle, Query, Res, ResMut, TextBundle, Vec3Swizzles, Visibility, Window, With};
 use bevy::text::{Text, TextStyle};
 use bevy::ui::{Display, Interaction, JustifyContent, Node, Style, UiImage, UiRect, Val};
-use bevy::window::{CursorIcon, PrimaryWindow};
+use bevy::window::PrimaryWindow;
 
 use crate::IsCursorCaptured;
 
@@ -84,16 +84,19 @@ pub fn build_hotbar(commands: &mut Commands, asset_server: &Res<AssetServer>) {
             ..default()
         },
     ).with_children(|parent| {
-        parent.spawn((NodeBundle {
-            style: Style {
-                height: Val::Percent(100.),
-                column_gap: Val::Px(5.),
-                display: Display::Flex,
-                align_items: AlignItems::Center,
+        parent.spawn((
+            NodeBundle {
+                style: Style {
+                    height: Val::Percent(100.),
+                    column_gap: Val::Px(5.),
+                    display: Display::Flex,
+                    align_items: AlignItems::Center,
+                    ..default()
+                },
                 ..default()
             },
-            ..default()
-        }, TopHotbarMarker {}))
+            TopHotbarMarker {}
+        ))
             .with_children(|top_left| {
                 top_left.spawn(
                     ImageBundle {
@@ -125,21 +128,20 @@ pub fn build_hotbar(commands: &mut Commands, asset_server: &Res<AssetServer>) {
                     },
                 );
             });
-    })
-        .with_children(|parent| {
-            parent.spawn(NodeBundle {
-                style: Style {
-                    height: Val::Percent(100.),
-                    column_gap: Val::Px(5.),
-                    display: Display::Flex,
-                    align_items: AlignItems::Center,
-                    ..default()
-                },
+    }).with_children(|parent| {
+        parent.spawn(NodeBundle {
+            style: Style {
+                height: Val::Percent(100.),
+                column_gap: Val::Px(5.),
+                display: Display::Flex,
+                align_items: AlignItems::Center,
                 ..default()
-            }).with_children(|top_right| {
-                spawn_button_icon(top_right, asset_server.load("icons/close.png"), PRIMARY_COLOR, CloseIconMarker {});
-            });
+            },
+            ..default()
+        }).with_children(|top_right| {
+            spawn_button_icon(top_right, asset_server.load("icons/close.png"), PRIMARY_COLOR, CloseIconMarker {});
         });
+    });
 
     commands.spawn(
         NodeBundle {

@@ -5,6 +5,7 @@ use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Changed, Color,
 
 use crate::hotbar::systems::{AddTabButtonMarker, OriginalColor, PRIMARY_COLOR_FADED, TabContainerMarker, TopHotbarMarker};
 use crate::project::{EditorData, Project};
+use crate::SwitchProject;
 
 #[derive(Event)]
 pub struct SpawnTab {
@@ -13,7 +14,7 @@ pub struct SpawnTab {
 
 #[derive(Component)]
 pub struct Tab {
-    index: u32,
+    pub index: u32,
 }
 
 pub fn setup(
@@ -21,13 +22,7 @@ pub fn setup(
     q_top_hotbar: Query<Entity, With<TopHotbarMarker>>,
     mut commands: Commands,
 ) {
-    let hotbar = match q_top_hotbar.iter().next() {
-        None => {
-            warn!("No Hotbar");
-            return;
-        }
-        Some(h) => h
-    };
+    let hotbar = q_top_hotbar.iter().next().unwrap();
 
     let mut entity = commands.get_entity(hotbar).unwrap();
     entity.with_children(|parent| {
@@ -37,7 +32,6 @@ pub fn setup(
                     width: Val::Auto,
                     height: Val::Px(32.),
                     display: Display::Flex,
-                    flex_direction: FlexDirection::RowReverse,
                     ..default()
                 },
                 ..default()
@@ -97,7 +91,7 @@ pub fn on_add_tab_button_click(
 }
 
 pub fn spawn_tab_reader(
-    top_hotbar: Query<(Entity), With<TabContainerMarker>>,
+    top_hotbar: Query<Entity, With<TabContainerMarker>>,
     asset_server: Res<AssetServer>,
     editor_data: Res<EditorData>,
     mut e_spawn_tab: EventReader<SpawnTab>,
@@ -162,5 +156,27 @@ pub fn spawn_tab_reader(
             });
         }
         );
+    };
+}
+
+pub fn tab_clicked(
+    mut e_switch_project: EventWriter<SwitchProject>,
+    r_editor_data: Res<EditorData>,
+    q_interaction: Query<(&Interaction, &Tab), (Changed<Interaction>, With<Tab>)>,
+) {
+    for (interaction, tab) in q_interaction.iter() {
+        match *interaction {
+            Interaction::Pressed => {
+                match r_editor_data.projects.get(tab.index as usize) {
+                    None => { return; }
+                    Some(_) => {}
+                };
+
+                e_switch_project.send(SwitchProject {
+                    index: tab.index
+                })
+            }
+            _ => {}
+        }
     };
 }

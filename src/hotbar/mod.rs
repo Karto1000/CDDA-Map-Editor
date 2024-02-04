@@ -3,7 +3,7 @@ use bevy::prelude::{apply_deferred, IntoSystemConfigs};
 
 use crate::hotbar::interaction::{close_button_interaction, import_button_interaction, save_button_interaction};
 use crate::hotbar::systems::{button_color_system, check_ui_interaction, spawn_hotbar};
-use crate::hotbar::tabs::{on_add_tab_button_click, setup, spawn_tab_reader, SpawnTab};
+use crate::hotbar::tabs::{on_add_tab_button_click, setup, spawn_tab_reader, SpawnTab, tab_clicked};
 
 mod systems;
 mod interaction;
@@ -27,5 +27,6 @@ impl Plugin for HotbarPlugin {
         app.add_event::<SpawnTab>();
         app.add_systems(Update, spawn_tab_reader);
         app.add_systems(Update, on_add_tab_button_click);
+        app.add_systems(Update, tab_clicked);
     }
 }

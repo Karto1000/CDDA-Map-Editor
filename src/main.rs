@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::default::Default;
 use std::ops::Deref;
+use std::sync::Arc;
 
 use bevy::{prelude::*, window::PrimaryWindow};
 use bevy::app::{App, AppExit, PluginGroup};
@@ -20,8 +21,7 @@ use crate::grid::{GridMarker, GridMaterial, GridPlugin};
 use crate::grid::resources::Grid;
 use crate::hotbar::HotbarPlugin;
 use crate::hotbar::tabs::SpawnTab;
-use crate::map::{MapPlugin, TilePlaceEvent};
-use crate::map::systems::NoData;
+use crate::map::{ClearTiles, MapPlugin, SpawnMapEntity};
 use crate::project::{EditorData, EditorDataSaver, Project};
 use crate::project::loader::Load;
 use crate::project::saver::Save;
@@ -45,6 +45,11 @@ pub struct TextureResource {
     pub textures: HashMap<TileType, Handle<Image>>,
 }
 
+#[derive(Event)]
+pub struct SwitchProject {
+    pub index: u32,
+}
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
@@ -57,13 +62,14 @@ fn main() {
         }))
         .insert_resource(IsCursorCaptured(false))
         .add_systems(Startup, setup)
+        .add_event::<SwitchProject>()
         .add_plugins(EguiPlugin)
         .add_plugins(FileDialogPlugin::new()
             .with_save_file::<Project>()
         )
         .add_plugins(Material2dPlugin::<GridMaterial>::default())
         .add_plugins((GridPlugin {}, MapPlugin {}, TilePlugin {}, HotbarPlugin {}))
-        .add_systems(Update, (update, update_mouse_location, app_exit))
+        .add_systems(Update, (update, update_mouse_location, app_exit, switch_project))
         .run();
 }
 
@@ -75,7 +81,7 @@ fn setup(
     query_windows: Query<&Window, With<PrimaryWindow>>,
     win_windows: NonSend<WinitWindows>,
     res_grid: Res<Grid>,
-    mut e_set_tile: EventWriter<TilePlaceEvent>,
+    mut e_spawn_map_entity: EventWriter<SpawnMapEntity>,
     mut e_spawn_tab: EventWriter<SpawnTab>,
 ) {
     commands.spawn(Camera2dBundle::default());
@@ -87,7 +93,12 @@ fn setup(
     textures.insert(TileType::Test, grass);
 
     let mut editor_data = EditorDataSaver {}.load().unwrap();
-    editor_data.get_current_project_mut().unwrap_or(&mut Project::default()).map_entity.spawn(&mut e_set_tile);
+    let mut project = Project::default();
+    editor_data.get_current_project_mut().unwrap_or(&mut project);
+
+    e_spawn_map_entity.send(SpawnMapEntity {
+        map_entity: Arc::new(project.map_entity)
+    });
 
     for project in editor_data.projects.iter() {
         e_spawn_tab.send(SpawnTab { name: project.map_entity.name.clone() });
@@ -195,25 +206,24 @@ fn update_mouse_location(
     }
 }
 
-// fn map_loaded(
-//     mut ev_loaded: EventReader<bevy_file_dialog::DialogFileLoaded<MapEntity>>,
-//     mut res_editor_data: ResMut<EditorData>,
-//     mut e_set_tile: EventWriter<TilePlaceEvent>,
-// ) {
-//     let project = match res_editor_data.get_current_project_mut() {
-//         None => return,
-//         Some(p) => p
-//     };
-//
-//     for ev in ev_loaded.read() {
-//         let map_entity: MapEntity = serde_json::from_slice(ev.contents.as_slice()).unwrap();
-//
-//         project.map_entity.load(
-//             &mut e_set_tile,
-//             &map_entity,
-//         );
-//     }
-// }
+fn switch_project(
+    mut e_switch_project: EventReader<SwitchProject>,
+    mut e_clear_tiles: EventWriter<ClearTiles>,
+    mut e_spawn_map_entity: EventWriter<SpawnMapEntity>,
+    mut r_editor_data: ResMut<EditorData>,
+) {
+    for switch_project in e_switch_project.read() {
+        let new_project = r_editor_data.projects.get(switch_project.index as usize).unwrap();
+
+        e_clear_tiles.send(ClearTiles {});
+
+        e_spawn_map_entity.send(SpawnMapEntity {
+            map_entity: Arc::new(new_project.map_entity.clone())
+        });
+
+        r_editor_data.current_project_index = switch_project.index;
+    }
+}
 
 fn app_exit(
     mut e_exit: EventReader<AppExit>,
