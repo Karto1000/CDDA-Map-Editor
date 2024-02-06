@@ -1,5 +1,8 @@
 use std::collections::HashMap;
 use std::default::Default;
+use std::fs;
+use std::fs::File;
+use std::io::Write;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -8,13 +11,17 @@ use bevy::app::{App, AppExit, PluginGroup};
 use bevy::asset::{Asset, AssetServer};
 use bevy::DefaultPlugins;
 use bevy::prelude::{Assets, Bundle, Camera2dBundle, Commands, Component, EventReader, Mesh, NonSend, Query, Res, ResMut, Resource, shape, Transform, TypePath, Vec2, Vec2Swizzles, Window, With, Without};
-use bevy::render::render_resource::{AsBindGroup, AsBindGroupShaderType};
+use bevy::render::render_resource::{AsBindGroup, AsBindGroupShaderType, Extent3d, TextureDimension, TextureFormat};
 use bevy::sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle};
 use bevy::utils::default;
 use bevy::window::{CursorMoved, WindowMode, WindowPlugin};
 use bevy::winit::WinitWindows;
 use bevy_egui::EguiPlugin;
 use bevy_file_dialog::FileDialogPlugin;
+use directories::ProjectDirs;
+use image::io::Reader;
+use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 use winit::window::Icon;
 
 use crate::grid::{GridMarker, GridMaterial, GridPlugin};
@@ -22,10 +29,11 @@ use crate::grid::resources::Grid;
 use crate::hotbar::HotbarPlugin;
 use crate::hotbar::tabs::SpawnTab;
 use crate::map::{ClearTiles, MapPlugin, SpawnMapEntity};
-use crate::project::{EditorData, EditorDataSaver, Project};
-use crate::project::loader::Load;
-use crate::project::saver::Save;
-use crate::tiles::{Tile, TilePlugin, TileType};
+use crate::map::map_entity::MapEntity;
+use crate::project::{Project, ProjectSaveState};
+use crate::project::loader::{Load, LoadError};
+use crate::project::saver::{ProjectSaver, Save, SaveError};
+use crate::tiles::{Tile, TilePlugin};
 
 mod grid;
 mod tiles;
@@ -42,12 +50,182 @@ pub struct IsCursorCaptured(bool);
 
 #[derive(Resource)]
 pub struct TextureResource {
-    pub textures: HashMap<TileType, Handle<Image>>,
+    pub textures: HashMap<char, Handle<Image>>,
+}
+
+impl TextureResource {
+    pub fn get_texture(&self, character: &char) -> &Handle<Image> {
+        return self.textures.get(character).unwrap();
+    }
 }
 
 #[derive(Event)]
 pub struct SwitchProject {
     pub index: u32,
+}
+
+#[derive(Debug, Resource, Serialize, Deserialize)]
+pub struct EditorData {
+    pub current_project_index: u32,
+    pub projects: Vec<Project>,
+    pub history: Vec<ProjectSaveState>,
+}
+
+impl EditorData {
+    pub fn get_current_project(&self) -> Option<&Project> {
+        return self.projects.get(self.current_project_index as usize);
+    }
+
+    pub fn get_current_project_mut(&mut self) -> Option<&mut Project> {
+        return self.projects.get_mut(self.current_project_index as usize);
+    }
+}
+
+impl Default for EditorData {
+    fn default() -> Self {
+        let map: MapEntity = MapEntity::new(
+            "unnamed".into(),
+            Vec2::new(24., 24.),
+        );
+
+        let project = Project {
+            map_entity: map,
+            save_state: ProjectSaveState::NotSaved,
+        };
+
+        return Self {
+            current_project_index: 0,
+            projects: vec![project],
+            history: vec![],
+        };
+    }
+}
+
+pub struct EditorDataSaver;
+
+impl Save<EditorData> for EditorDataSaver {
+    fn save(&self, value: &EditorData) -> Result<(), SaveError> {
+        let dir = match ProjectDirs::from_path("CDDA Map Editor".into()) {
+            None => { return Err(SaveError::DirectoryNotFound("".into())); }
+            Some(d) => d
+        };
+
+        let data_dir = dir.data_local_dir();
+
+        if !data_dir.exists() { fs::create_dir_all(data_dir).unwrap(); }
+
+        let mut file = File::options()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(data_dir.join("data.json"))
+            .unwrap();
+
+        let mut converted = serde_json::to_value(value).unwrap();
+        let data = converted.as_object_mut().unwrap();
+
+        let open_projects: Vec<ProjectSaveState> = value.projects.iter().map(|project| {
+            match &project.save_state {
+                ProjectSaveState::AutoSaved(val) => ProjectSaveState::AutoSaved(val.clone()),
+                ProjectSaveState::Saved(val) => ProjectSaveState::Saved(val.clone()),
+                ProjectSaveState::NotSaved => {
+                    println!("autosaving {}", project.map_entity.name.clone());
+                    let project_saver = ProjectSaver { directory: Box::from(data_dir) };
+                    project_saver.save(project).unwrap();
+                    ProjectSaveState::AutoSaved(data_dir.join(format!("auto_save_{}.map", project.map_entity.name)))
+                }
+            }
+        }).collect();
+
+        data.insert("open_projects".into(), serde_json::to_value(open_projects).unwrap());
+
+        data.remove("projects".into());
+        data.remove("current_project_index".into());
+
+        file.write_all(serde_json::to_string(data).unwrap().as_bytes()).unwrap();
+
+        return Ok(());
+    }
+}
+
+impl Load<EditorData> for EditorDataSaver {
+    fn load(&self) -> Result<EditorData, LoadError> {
+        let dir = match ProjectDirs::from_path("CDDA Map Editor".into()) {
+            None => { return Err(LoadError::DirectoryNotFound); }
+            Some(d) => d
+        };
+
+        let data_dir = dir.data_local_dir();
+
+        if !data_dir.exists() { fs::create_dir_all(data_dir).unwrap(); }
+
+        let contents = match fs::read_to_string(data_dir.join("data.json")) {
+            Err(_) => return Ok(EditorData::default()),
+            Ok(f) => f
+        };
+
+        let value: Map<String, Value> = serde_json::from_str(contents.as_str())
+            .expect("Valid Json");
+
+        let history_array: Vec<ProjectSaveState> = value
+            .get("history")
+            .expect("history Field")
+            .as_array()
+            .expect("Valid Array")
+            .iter()
+            .map(|v| serde_json::from_value::<ProjectSaveState>(v.clone()).unwrap())
+            .collect();
+
+        let projects_array: Vec<Project> = value
+            .get("open_projects")
+            .expect("open_projects field")
+            .as_array()
+            .expect("Valid array")
+            .iter()
+            .map(|v| {
+                let state = serde_json::from_value::<ProjectSaveState>(v.clone()).unwrap();
+
+                return match state {
+                    ProjectSaveState::Saved(path) => {
+                        match fs::read_to_string(path.clone()) {
+                            Ok(s) => {
+                                let project: Project = serde_json::from_str(s.as_str()).expect("Valid Project");
+                                Some(project)
+                            }
+                            Err(_) => {
+                                log::warn!("Could not Load Saved Project at path {:?}", path);
+                                None
+                            }
+                        }
+                    }
+                    ProjectSaveState::AutoSaved(path) => {
+                        match fs::read_to_string(path.clone()) {
+                            Ok(s) => {
+                                let project: Project = serde_json::from_str(s.as_str()).expect("Valid Project");
+                                Some(project)
+                            }
+                            Err(_) => {
+                                log::warn!("Could not Load Not Saved Project at path {:?}", path);
+                                Some(Project::default())
+                            }
+                        }
+                    }
+                    ProjectSaveState::NotSaved => {
+                        log::warn!("Could not open Project because it was not saved");
+                        return None;
+                    }
+                };
+            })
+            .filter(|v| v.is_some())
+            .map(|v| v.unwrap())
+            .collect();
+
+        return Ok(EditorData {
+            current_project_index: 0,
+            projects: projects_array,
+            history: history_array,
+        });
+    }
 }
 
 fn main() {
@@ -83,28 +261,42 @@ fn setup(
     res_grid: Res<Grid>,
     mut e_spawn_map_entity: EventWriter<SpawnMapEntity>,
     mut e_spawn_tab: EventWriter<SpawnTab>,
+    mut r_images: ResMut<Assets<Image>>,
 ) {
     commands.spawn(Camera2dBundle::default());
     let window = query_windows.single();
 
-    let grass = asset_server.load("grass.png");
+    let grass = Reader::open("assets/grass.png").unwrap().decode().unwrap().as_bytes().to_vec();
 
-    let mut textures: HashMap<TileType, Handle<Image>> = HashMap::new();
-    textures.insert(TileType::Test, grass);
+    let mut textures: HashMap<char, Handle<Image>> = HashMap::new();
 
-    let mut editor_data = EditorDataSaver {}.load().unwrap();
-    let mut project = Project::default();
-    editor_data.get_current_project_mut().unwrap_or(&mut project);
+    let texture = Image::new(
+        Extent3d {
+            width: 32,
+            height: 32,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        grass,
+        TextureFormat::Rgba8UnormSrgb,
+    );
+
+    textures.insert('g', r_images.add(texture));
+
+    let texture_resource = TextureResource { textures };
+
+    let editor_data = EditorDataSaver {}.load().unwrap();
+
+    let default_project = Project::default();
+    let project = editor_data.get_current_project().unwrap_or(&default_project);
 
     e_spawn_map_entity.send(SpawnMapEntity {
-        map_entity: Arc::new(project.map_entity)
+        map_entity: Arc::new(project.map_entity.clone())
     });
 
     for (i, project) in editor_data.projects.iter().enumerate() {
-        e_spawn_tab.send(SpawnTab { name: project.map_entity.name.clone(), index: i as u32});
+        e_spawn_tab.send(SpawnTab { name: project.map_entity.name.clone(), index: i as u32 });
     }
-
-    let texture_resource = TextureResource { textures };
 
     let window_width = window.physical_width();
     let window_height = window.physical_height();

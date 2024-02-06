@@ -5,10 +5,9 @@ use bevy::window::{PrimaryWindow, WindowResized};
 
 use crate::grid::GridMarker;
 use crate::grid::resources::Grid;
-use crate::IsCursorCaptured;
+use crate::{EditorData, IsCursorCaptured};
 use crate::map::{Coordinates, TilePlaceEvent};
-use crate::project::EditorData;
-use crate::tiles::{Tile, TileType};
+use crate::tiles::{Tile};
 use crate::tiles::resources::PlaceInfo;
 
 pub fn window_tile_resize_system(
@@ -71,7 +70,7 @@ pub fn tile_place_system(
         }
 
         // TODO - REPLACE
-        let tile_to_place: TileType = TileType::Test;
+        let tile_to_place: char = 'g';
 
         let tile_cords = Vec2::new(
             ((xy.x + res_grid.offset.x) / res_grid.tile_size).floor(),
@@ -85,9 +84,9 @@ pub fn tile_place_system(
             return;
         }
 
-        project.map_entity.tiles.set_tile_at(
-            (tile_cords.x as i32, tile_cords.y as i32),
+        project.map_entity.set_tile_at(
             tile_to_place,
+            (tile_cords.x as i32, tile_cords.y as i32),
             &mut e_set_tile,
         );
 
@@ -169,7 +168,7 @@ pub fn tile_delete_system(
 
         for (entity, q_tile) in tiles.iter_mut() {
             if (q_tile.x, q_tile.y) == (tile_cords.x as i32, tile_cords.y as i32) {
-                project.map_entity.tiles.tiles.remove(&Coordinates { x: tile_cords.x as i32, y: tile_cords.y as i32 });
+                project.map_entity.tiles.remove(&Coordinates { x: tile_cords.x as i32, y: tile_cords.y as i32 });
                 commands.get_entity(entity).unwrap().despawn();
             }
         };

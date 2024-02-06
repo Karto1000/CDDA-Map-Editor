@@ -4,10 +4,9 @@ use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::math::Vec2;
 use bevy::prelude::{Commands, CursorMoved, EventReader, KeyCode, MouseButton, Query, Res, ResMut, Transform, Vec2Swizzles, Window, With, Without};
 use bevy::window::{PrimaryWindow, WindowResized};
+use crate::EditorData;
 
 use crate::grid::{DragInfo, Grid, GridMarker, GridMaterial};
-use crate::map::resources::MapEntity;
-use crate::project::{EditorData, Project};
 use crate::tiles::Tile;
 
 pub fn window_grid_resize_system(
@@ -77,7 +76,7 @@ pub fn map_resize_system(
         res_grid.map_size.y -= 1.;
     }
 
-    project.map_entity.tiles.size = res_grid.map_size
+    project.map_entity.size = res_grid.map_size
 }
 
 pub fn drag_system(

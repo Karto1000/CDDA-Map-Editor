@@ -5,9 +5,10 @@ use bevy::input::Input;
 use bevy::prelude::{Commands, Entity, EventReader, KeyCode, Query, Res, ResMut, Text};
 use bevy::text::TextSection;
 use bevy_file_dialog::{DialogFileSaved, FileDialogExt};
+use crate::EditorData;
 
 use crate::hotbar::tabs::Tab;
-use crate::project::{EditorData, Project, ProjectSaveState};
+use crate::project::{Project, ProjectSaveState};
 
 pub struct NoData;
 

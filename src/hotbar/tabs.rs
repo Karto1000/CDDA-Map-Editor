@@ -3,8 +3,8 @@ use bevy::hierarchy::BuildChildren;
 use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Changed, Color, Commands, Component, default, Display, Entity, Event, EventReader, EventWriter, ImageBundle, Interaction, NodeBundle, Query, Res, ResMut, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val, With};
 
 use crate::hotbar::systems::{AddTabButtonMarker, HoverEffect, OriginalColor, PRIMARY_COLOR, PRIMARY_COLOR_FADED, PRIMARY_COLOR_SELECTED, TabContainerMarker, ToggleEffect, TopHotbarMarker};
-use crate::project::{EditorData, Project};
-use crate::SwitchProject;
+use crate::project::{Project};
+use crate::{EditorData, SwitchProject};
 
 #[derive(Event)]
 pub struct SpawnTab {

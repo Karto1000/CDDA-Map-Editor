@@ -23,13 +23,8 @@ impl Plugin for TilePlugin {
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, Component, PartialEq)]
 pub struct Tile {
-    pub tile_type: TileType,
     pub x: i32,
     pub y: i32,
-}
-
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Hash, Eq)]
-pub enum TileType {
-    Test
+    pub character: char
 }
 

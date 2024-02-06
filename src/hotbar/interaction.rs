@@ -1,10 +1,11 @@
 use bevy::app::AppExit;
 use bevy::prelude::{Changed, Commands, EventWriter, Interaction, Query, Res, With};
 use bevy_file_dialog::FileDialogExt;
+use crate::EditorData;
 
 use crate::hotbar::systems::{CloseIconMarker, ImportIconMarker, SaveIconMarker};
-use crate::map::resources::MapEntity;
-use crate::project::{EditorData, Project};
+use crate::map::map_entity::MapEntity;
+use crate::project::{Project};
 
 pub fn close_button_interaction(
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<CloseIconMarker>)>,
