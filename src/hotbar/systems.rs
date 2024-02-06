@@ -33,6 +33,9 @@ pub struct TabContainerMarker;
 #[derive(Component)]
 pub struct AddTabButtonMarker;
 
+#[derive(Component)]
+pub struct OpenIconMarker;
+
 #[derive(Component, Debug)]
 pub struct HoverEffect {
     pub original_color: Color,
@@ -180,7 +183,7 @@ pub fn build_hotbar(commands: &mut Commands, asset_server: &Res<AssetServer>) {
             spawn_button_icon(icons_container, asset_server.load("icons/floppy-disk.png"), PRIMARY_COLOR_FADED, SaveIconMarker {});
             //spawn_button_icon(icons_container, asset_server.load("icons/upload-file.png"), PRIMARY_COLOR_FADED);
             spawn_button_icon(icons_container, asset_server.load("icons/download-file.png"), PRIMARY_COLOR_FADED, ImportIconMarker {});
-            //spawn_button_icon(icons_container, asset_server.load("icons/new-folder.png"), PRIMARY_COLOR_FADED);
+            spawn_button_icon(icons_container, asset_server.load("icons/new-folder.png"), PRIMARY_COLOR_FADED, OpenIconMarker {});
             //spawn_button_icon(icons_container, asset_server.load("icons/recycle-bin.png"), ERROR)
         });
     });

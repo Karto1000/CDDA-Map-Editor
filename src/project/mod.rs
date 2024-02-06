@@ -22,7 +22,7 @@ pub struct Project {
     pub save_state: ProjectSaveState,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ProjectSaveState {
     /// If the Project was saved somewhere
     /// Contains the path to the saved project
