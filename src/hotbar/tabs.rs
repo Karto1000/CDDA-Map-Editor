@@ -3,8 +3,8 @@ use bevy::hierarchy::BuildChildren;
 use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Changed, Color, Commands, Component, default, Display, Entity, Event, EventReader, EventWriter, ImageBundle, Interaction, NodeBundle, Query, Res, ResMut, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val, With};
 
 use crate::hotbar::systems::{AddTabButtonMarker, HoverEffect, OriginalColor, PRIMARY_COLOR, PRIMARY_COLOR_FADED, PRIMARY_COLOR_SELECTED, TabContainerMarker, ToggleEffect, TopHotbarMarker};
-use crate::project::{Project};
-use crate::{EditorData, SwitchProject};
+use crate::project::{Project, ProjectSaveState};
+use crate::SwitchProject;
 
 #[derive(Event)]
 pub struct SpawnTab {
@@ -94,7 +94,16 @@ pub fn on_add_tab_button_click(
 
     match interaction {
         Interaction::Pressed => {
-            let project = Project::default();
+           let mut project = Project::default();
+
+            let amount_of_unnamed = r_editor_data.projects.iter()
+                .filter(|p| p.save_state == ProjectSaveState::NotSaved)
+                .map(|p| p.map_entity.name.clone())
+                .filter(|n| n.contains("unnamed"))
+                .count();
+
+            project.map_entity.name = format!("unnamed{}", amount_of_unnamed).to_string();
+
             let name = project.map_entity.name.clone();
 
             r_editor_data.projects.push(project);

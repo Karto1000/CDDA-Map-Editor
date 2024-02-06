@@ -244,6 +244,7 @@ fn main() {
         .add_plugins(EguiPlugin)
         .add_plugins(FileDialogPlugin::new()
             .with_save_file::<Project>()
+            .with_load_file::<Project>()
         )
         .add_plugins(Material2dPlugin::<GridMaterial>::default())
         .add_plugins((GridPlugin {}, MapPlugin {}, TilePlugin {}, HotbarPlugin {}))
