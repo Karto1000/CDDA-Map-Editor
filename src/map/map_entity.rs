@@ -5,23 +5,27 @@ use bevy::prelude::{EventWriter, Resource};
 use serde::{Deserialize, Serialize};
 
 use crate::map::{Coordinates, TilePlaceEvent};
+use crate::palettes::Palette;
 use crate::tiles::Tile;
 
 #[derive(Serialize, Deserialize, Debug, Resource, Clone)]
 pub struct MapEntity {
-    pub name: String,
+    pub om_terrain: String,
     pub weight: u32,
     pub tiles: HashMap<Coordinates, Tile>,
     pub size: Vec2,
+
+    pub palettes: Vec<Palette>,
 }
 
 impl Default for MapEntity {
     fn default() -> Self {
         return Self {
-            name: "unnamed".into(),
+            om_terrain: "unnamed".into(),
             weight: 0,
             tiles: HashMap::new(),
             size: Vec2::new(24., 24.),
+            palettes: Vec::new(),
         };
     }
 }
@@ -29,10 +33,11 @@ impl Default for MapEntity {
 impl MapEntity {
     pub fn new(name: String, size: Vec2) -> Self {
         return Self {
-            name,
+            om_terrain: name,
             weight: 100,
             tiles: HashMap::new(),
             size,
+            palettes: Vec::new(),
         };
     }
 

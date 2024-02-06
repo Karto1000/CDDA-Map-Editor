@@ -2,9 +2,10 @@ use bevy::asset::AssetServer;
 use bevy::hierarchy::BuildChildren;
 use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Changed, Color, Commands, Component, default, Display, Entity, Event, EventReader, EventWriter, ImageBundle, Interaction, NodeBundle, Query, Res, ResMut, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val, With};
 
-use crate::hotbar::systems::{AddTabButtonMarker, HoverEffect, OriginalColor, PRIMARY_COLOR, PRIMARY_COLOR_FADED, PRIMARY_COLOR_SELECTED, TabContainerMarker, ToggleEffect, TopHotbarMarker};
+use crate::hotbar::systems::{AddTabButtonMarker, HoverEffect, OriginalColor, TabContainerMarker, ToggleEffect, TopHotbarMarker};
 use crate::project::{Project, ProjectSaveState};
-use crate::SwitchProject;
+use crate::{EditorData, SwitchProject};
+use crate::common::{PRIMARY_COLOR, PRIMARY_COLOR_FADED, PRIMARY_COLOR_SELECTED};
 
 #[derive(Event)]
 pub struct SpawnTab {
@@ -62,7 +63,7 @@ pub fn setup(
                         background_color: BackgroundColor::from(PRIMARY_COLOR_FADED),
                         ..default()
                     },
-                    OriginalColor { 0: PRIMARY_COLOR_FADED },
+                    HoverEffect { original_color: PRIMARY_COLOR_FADED, hover_color: PRIMARY_COLOR },
                     AddTabButtonMarker {},
                 )).with_children(|parent| {
                     parent.spawn(
@@ -98,13 +99,13 @@ pub fn on_add_tab_button_click(
 
             let amount_of_unnamed = r_editor_data.projects.iter()
                 .filter(|p| p.save_state == ProjectSaveState::NotSaved)
-                .map(|p| p.map_entity.name.clone())
+                .map(|p| p.map_entity.om_terrain.clone())
                 .filter(|n| n.contains("unnamed"))
                 .count();
 
-            project.map_entity.name = format!("unnamed{}", amount_of_unnamed).to_string();
+            project.map_entity.om_terrain = format!("unnamed{}", amount_of_unnamed).to_string();
 
-            let name = project.map_entity.name.clone();
+            let name = project.map_entity.om_terrain.clone();
 
             r_editor_data.projects.push(project);
             e_spawn_tab.send(SpawnTab { name, index: r_editor_data.projects.len() as u32 - 1 })

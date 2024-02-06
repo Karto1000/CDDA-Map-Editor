@@ -1,9 +1,10 @@
-use std::collections::HashMap;
 use std::default::Default;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::ops::Deref;
+use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use bevy::{prelude::*, window::PrimaryWindow};
@@ -11,7 +12,7 @@ use bevy::app::{App, AppExit, PluginGroup};
 use bevy::asset::{Asset, AssetServer};
 use bevy::DefaultPlugins;
 use bevy::prelude::{Assets, Bundle, Camera2dBundle, Commands, Component, EventReader, Mesh, NonSend, Query, Res, ResMut, Resource, shape, Transform, TypePath, Vec2, Vec2Swizzles, Window, With, Without};
-use bevy::render::render_resource::{AsBindGroup, AsBindGroupShaderType, Extent3d, TextureDimension, TextureFormat};
+use bevy::render::render_resource::{AsBindGroup, AsBindGroupShaderType};
 use bevy::sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle};
 use bevy::utils::default;
 use bevy::window::{CursorMoved, WindowMode, WindowPlugin};
@@ -19,20 +20,22 @@ use bevy::winit::WinitWindows;
 use bevy_egui::EguiPlugin;
 use bevy_file_dialog::FileDialogPlugin;
 use directories::ProjectDirs;
-use image::io::Reader;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use winit::window::Icon;
 
+use crate::graphics::GraphicsResource;
 use crate::grid::{GridMarker, GridMaterial, GridPlugin};
 use crate::grid::resources::Grid;
 use crate::hotbar::HotbarPlugin;
 use crate::hotbar::tabs::SpawnTab;
 use crate::map::{ClearTiles, MapPlugin, SpawnMapEntity};
 use crate::map::map_entity::MapEntity;
+use crate::palettes::loader::PaletteLoader;
 use crate::project::{Project, ProjectSaveState};
 use crate::project::loader::{Load, LoadError};
 use crate::project::saver::{ProjectSaver, Save, SaveError};
+use crate::tile_selector::TileSelectorPlugin;
 use crate::tiles::{Tile, TilePlugin};
 
 mod grid;
@@ -40,6 +43,10 @@ mod tiles;
 mod map;
 mod hotbar;
 mod project;
+mod graphics;
+mod palettes;
+mod tile_selector;
+mod common;
 
 
 #[derive(Component)]
@@ -48,16 +55,6 @@ pub struct MouseLocationTextMarker;
 #[derive(Resource)]
 pub struct IsCursorCaptured(bool);
 
-#[derive(Resource)]
-pub struct TextureResource {
-    pub textures: HashMap<char, Handle<Image>>,
-}
-
-impl TextureResource {
-    pub fn get_texture(&self, character: &char) -> &Handle<Image> {
-        return self.textures.get(character).unwrap();
-    }
-}
 
 #[derive(Event)]
 pub struct SwitchProject {
@@ -129,10 +126,10 @@ impl Save<EditorData> for EditorDataSaver {
                 ProjectSaveState::AutoSaved(val) => ProjectSaveState::AutoSaved(val.clone()),
                 ProjectSaveState::Saved(val) => ProjectSaveState::Saved(val.clone()),
                 ProjectSaveState::NotSaved => {
-                    println!("autosaving {}", project.map_entity.name.clone());
+                    println!("autosaving {}", project.map_entity.om_terrain.clone());
                     let project_saver = ProjectSaver { directory: Box::from(data_dir) };
                     project_saver.save(project).unwrap();
-                    ProjectSaveState::AutoSaved(data_dir.join(format!("auto_save_{}.map", project.map_entity.name)))
+                    ProjectSaveState::AutoSaved(data_dir.join(format!("auto_save_{}.map", project.map_entity.om_terrain)))
                 }
             }
         }).collect();
@@ -242,6 +239,7 @@ fn main() {
         .add_systems(Startup, setup)
         .add_event::<SwitchProject>()
         .add_plugins(EguiPlugin)
+        .add_plugins(TileSelectorPlugin)
         .add_plugins(FileDialogPlugin::new()
             .with_save_file::<Project>()
             .with_load_file::<Project>()
@@ -267,36 +265,24 @@ fn setup(
     commands.spawn(Camera2dBundle::default());
     let window = query_windows.single();
 
-    let grass = Reader::open("assets/grass.png").unwrap().decode().unwrap().as_bytes().to_vec();
+    let texture_resource = GraphicsResource::load(r_images);
 
-    let mut textures: HashMap<char, Handle<Image>> = HashMap::new();
+    let mut editor_data = EditorDataSaver {}.load().unwrap();
 
-    let texture = Image::new(
-        Extent3d {
-            width: 32,
-            height: 32,
-            depth_or_array_layers: 1,
-        },
-        TextureDimension::D2,
-        grass,
-        TextureFormat::Rgba8UnormSrgb,
-    );
+    let mut default_project = Project::default();
+    let project: &mut Project = editor_data.get_current_project_mut().unwrap_or(&mut default_project);
 
-    textures.insert('g', r_images.add(texture));
+    let palette_loader = PaletteLoader { path: PathBuf::from_str(r"C:\CDDA\testing\data\json\mapgen_palettes\building.json").unwrap() };
+    let palettes = palette_loader.load().unwrap();
 
-    let texture_resource = TextureResource { textures };
-
-    let editor_data = EditorDataSaver {}.load().unwrap();
-
-    let default_project = Project::default();
-    let project = editor_data.get_current_project().unwrap_or(&default_project);
+    project.map_entity.palettes = palettes;
 
     e_spawn_map_entity.send(SpawnMapEntity {
         map_entity: Arc::new(project.map_entity.clone())
     });
 
     for (i, project) in editor_data.projects.iter().enumerate() {
-        e_spawn_tab.send(SpawnTab { name: project.map_entity.name.clone(), index: i as u32 });
+        e_spawn_tab.send(SpawnTab { name: project.map_entity.om_terrain.clone(), index: i as u32 });
     }
 
     let window_width = window.physical_width();

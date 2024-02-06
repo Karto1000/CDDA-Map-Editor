@@ -10,7 +10,7 @@ use serde::de::Visitor;
 use crate::grid::resources::Grid;
 use crate::map::map_entity::MapEntity;
 use crate::map::systems::{map_save_system, save_directory_picked};
-use crate::TextureResource;
+use crate::GraphicsResource;
 use crate::tiles::Tile;
 
 pub(crate) mod systems;
@@ -78,7 +78,7 @@ pub fn tile_spawn_reader(
     mut commands: Commands,
     mut e_tile_place: EventReader<TilePlaceEvent>,
     res_grid: Res<Grid>,
-    res_textures: Res<TextureResource>,
+    res_textures: Res<GraphicsResource>,
 ) {
     for e in e_tile_place.read() {
         commands.spawn((

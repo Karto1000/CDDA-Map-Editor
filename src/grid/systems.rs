@@ -4,8 +4,8 @@ use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::math::Vec2;
 use bevy::prelude::{Commands, CursorMoved, EventReader, KeyCode, MouseButton, Query, Res, ResMut, Transform, Vec2Swizzles, Window, With, Without};
 use bevy::window::{PrimaryWindow, WindowResized};
-use crate::EditorData;
 
+use crate::EditorData;
 use crate::grid::{DragInfo, Grid, GridMarker, GridMaterial};
 use crate::tiles::Tile;
 
@@ -30,6 +30,7 @@ pub fn grid_resize_system(
     mut scroll_event: EventReader<MouseWheel>,
     mut res_grid: ResMut<Grid>,
     mut tiles: Query<(&mut Tile, &mut Transform), Without<GridMarker>>,
+    q_windows: Query<&Window, With<PrimaryWindow>>,
 ) {
     for event in scroll_event.read() {
         match event.unit {
@@ -37,8 +38,25 @@ pub fn grid_resize_system(
                 if res_grid.tile_size <= res_grid.min_zoom && event.y <= -1. { return; }
                 if res_grid.tile_size >= res_grid.max_zoom && event.y >= 1. { return; }
 
+                let window = q_windows.single();
+
+                let original_tile_amount = Vec2::new(
+                    window.resolution.width() / res_grid.tile_size,
+                    window.resolution.height() / res_grid.tile_size
+                );
+
                 let size = res_grid.tile_size.clone();
                 res_grid.tile_size = size + event.y * 2.;
+
+                let new_tile_amount = Vec2::new(
+                    window.resolution.width() / res_grid.tile_size,
+                    window.resolution.height() / res_grid.tile_size
+                );
+
+                let pixels_shifted = original_tile_amount - new_tile_amount;
+                let offset = res_grid.offset.clone();
+
+                res_grid.offset += (((window.cursor_position().unwrap() - pixels_shifted) + offset) / size) * event.y;
 
                 for (_, mut transform) in tiles.iter_mut() {
                     transform.scale.x = res_grid.tile_size / res_grid.default_tile_size;

@@ -34,7 +34,7 @@ impl Save<Project> for ProjectSaver {
             .create(true)
             .write(true)
             .truncate(true)
-            .open(self.directory.join(format!("auto_save_{}.map", value.map_entity.name))) {
+            .open(self.directory.join(format!("auto_save_{}.map", value.map_entity.om_terrain))) {
             Ok(f) => f,
             Err(e) => return Err(SaveError::InvalidPath(e.into()))
         };

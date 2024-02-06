@@ -35,7 +35,7 @@ pub fn save_button_interaction(
             Interaction::Pressed => {
                 let project_json = serde_json::to_string(&project).unwrap();
                 commands.dialog()
-                    .set_file_name(format!("{}.map", project.map_entity.name))
+                    .set_file_name(format!("{}.map", project.map_entity.om_terrain))
                     .save_file::<Project>(project_json.into_bytes());
             }
             _ => {}
@@ -95,7 +95,7 @@ pub fn file_loaded_reader(
         let project = serde_json::from_slice::<Project>(event.contents.as_slice()).unwrap();
 
         e_spawn_tab.send(SpawnTab {
-            name: project.map_entity.name.clone(),
+            name: project.map_entity.om_terrain.clone(),
             index: r_editor_data.projects.len() as u32,
         });
 
