@@ -1,13 +1,15 @@
 use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::str::FromStr;
 
 use bevy::asset::{Assets, Handle};
-use bevy::prelude::{Image, ResMut};
+use bevy::prelude::{Image, ResMut, Vec2};
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+use image::{GenericImageView, ImageEncoder};
+use image::codecs::png::PngEncoder;
 use image::io::Reader;
 use serde::Deserialize;
 use serde_json::Value;
@@ -17,6 +19,7 @@ use crate::graphics::tileset::TilesetLoader;
 use crate::project::loader::{Load, LoadError};
 
 const TILESET_INFO_NAME: &'static str = "tileset.txt";
+const AMOUNT_OF_SPRITES_PER_ROW: u32 = 16;
 
 #[derive(Debug)]
 pub struct TilesetInfo {
@@ -169,8 +172,83 @@ impl Load<LegacyTileset> for LegacyTilesetLoader {
 impl TilesetLoader<LegacyTileset> for LegacyTilesetLoader {
     fn get_textures(&self, image_resource: &mut ResMut<Assets<Image>>) -> Result<HashMap<TileId, Handle<Image>>, anyhow::Error> {
         let tileset = self.load().unwrap();
-
         let mut textures = HashMap::new();
+
+        let mut last_group_index = 0;
+        for group in tileset.tiles.iter() {
+            let image = Reader::open(self.path.join(PathBuf::from_str(group.file.as_str()).unwrap()))
+                .unwrap()
+                .decode()
+                .unwrap();
+
+            let mut amount_of_tiles = 0;
+
+            for tile in group.tiles.iter() {
+                let xy: Vec2 = match tile.fg.as_ref().unwrap() {
+                    MeabyMulti::Single(v) => {
+                        match v {
+                            MeabyWeighted::NotWeighted(v) => {
+                                let local_tile_index: u32 = (v - last_group_index) as u32;
+
+                                Vec2::new(
+                                    (local_tile_index % AMOUNT_OF_SPRITES_PER_ROW) as f32,
+                                    (local_tile_index / AMOUNT_OF_SPRITES_PER_ROW) as f32,
+                                )
+                            }
+                            MeabyWeighted::Weighted(_) => { panic!("Not Implemented") }
+                        }
+                    }
+                    MeabyMulti::Multi(_) => {
+                        println!("{:?}", textures);
+                        panic!("Not Implemented")
+                    }
+                };
+
+                let tile_sprite = image.view(
+                    xy.x as u32 * tileset.info.tile_width,
+                    xy.y as u32 * tileset.info.tile_height,
+                    tileset.info.tile_width,
+                    tileset.info.tile_height,
+                );
+
+                // let mut encoded_image = Vec::new();
+                // let sub_image = tile_sprite.to_image();
+                //
+                // {
+                //     PngEncoder::new(encoded_image.by_ref())
+                //         .write_image(
+                //             sub_image.as_raw(),
+                //             tileset.info.tile_width,
+                //             tileset.info.tile_height,
+                //             image.color(),
+                //         );
+                // }
+                //
+                // fs::write("test.png", encoded_image).unwrap();
+                // panic!();
+
+                let image = Image::new(
+                    Extent3d {
+                        width: tileset.info.tile_width,
+                        height: tileset.info.tile_height,
+                        depth_or_array_layers: 1,
+                    },
+                    TextureDimension::D2,
+                    tile_sprite.to_image().into_vec(),
+                    TextureFormat::Rgba8UnormSrgb,
+                );
+
+                let tile_id = match &tile.id {
+                    MeabyMulti::Single(v) => v,
+                    MeabyMulti::Multi(_) => { panic!("Not Implemented") }
+                };
+
+                textures.insert(TileId { 0: tile_id.clone() }, image_resource.add(image));
+                amount_of_tiles += 1;
+            };
+
+            last_group_index = amount_of_tiles;
+        };
 
         let grass = Reader::open("assets/grass.png").unwrap().decode().unwrap().as_bytes().to_vec();
 
