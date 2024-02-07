@@ -23,6 +23,7 @@ impl GraphicsResource {
     }
 
     pub fn get_texture(&self, tile_id: &TileId) -> &Handle<Image> {
-        return self.textures.get(tile_id).unwrap();
+        // TODO Add actual sensible default
+        return self.textures.get(tile_id).unwrap_or(self.textures.get(&TileId { 0: "t_bridge".into() }).unwrap());
     }
 }
