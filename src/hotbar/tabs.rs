@@ -2,10 +2,10 @@ use bevy::asset::AssetServer;
 use bevy::hierarchy::BuildChildren;
 use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Changed, Color, Commands, Component, default, Display, Entity, Event, EventReader, EventWriter, ImageBundle, Interaction, NodeBundle, Query, Res, ResMut, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val, With};
 
-use crate::hotbar::systems::{AddTabButtonMarker, HoverEffect, OriginalColor, TabContainerMarker, ToggleEffect, TopHotbarMarker};
-use crate::project::{Project, ProjectSaveState};
 use crate::{EditorData, SwitchProject};
 use crate::common::{PRIMARY_COLOR, PRIMARY_COLOR_FADED, PRIMARY_COLOR_SELECTED};
+use crate::hotbar::systems::{AddTabButtonMarker, HoverEffect, TabContainerMarker, ToggleEffect, TopHotbarMarker};
+use crate::project::{Project, ProjectSaveState};
 
 #[derive(Event)]
 pub struct SpawnTab {
@@ -95,7 +95,7 @@ pub fn on_add_tab_button_click(
 
     match interaction {
         Interaction::Pressed => {
-           let mut project = Project::default();
+            let mut project = Project::default();
 
             let amount_of_unnamed = r_editor_data.projects.iter()
                 .filter(|p| p.save_state == ProjectSaveState::NotSaved)

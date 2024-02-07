@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use bevy::prelude::{Event, Resource};
 use serde::{Deserialize, Serialize};
-use crate::map::map_entity::MapEntity;
 
+use crate::map::map_entity::MapEntity;
 use crate::project::loader::Load;
 use crate::project::saver::Save;
 

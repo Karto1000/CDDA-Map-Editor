@@ -60,7 +60,7 @@ pub struct GridMaterial {
     // This is an i32 because bevy won't let me pass a bool as a uniform
     pub is_cursor_captured: i32,
     #[uniform(5)]
-    pub scale_factor: f32
+    pub scale_factor: f32,
 }
 
 

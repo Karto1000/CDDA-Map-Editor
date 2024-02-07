@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
+
 use crate::common::{MeabyWeighted, TileId};
 
 pub(crate) mod loader;

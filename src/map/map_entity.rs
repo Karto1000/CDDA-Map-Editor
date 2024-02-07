@@ -86,6 +86,6 @@ impl MapEntity {
             }
         }
 
-        return TileId {0: "TODO_IMPLEMENT_DEFAULT".into()};
+        return TileId { 0: "TODO_IMPLEMENT_DEFAULT".into() };
     }
 }

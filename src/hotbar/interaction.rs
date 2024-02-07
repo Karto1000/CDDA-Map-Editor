@@ -1,8 +1,8 @@
 use bevy::app::AppExit;
 use bevy::prelude::{Changed, Commands, EventReader, EventWriter, Interaction, Query, Res, ResMut, With};
 use bevy_file_dialog::{DialogFileLoaded, FileDialogExt};
-use crate::EditorData;
 
+use crate::EditorData;
 use crate::hotbar::systems::{CloseIconMarker, ImportIconMarker, OpenIconMarker, SaveIconMarker};
 use crate::hotbar::tabs::SpawnTab;
 use crate::map::map_entity::MapEntity;

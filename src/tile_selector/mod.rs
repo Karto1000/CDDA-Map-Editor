@@ -1,7 +1,8 @@
-pub(crate) mod build;
+use bevy::app::{App, Plugin, Startup};
 
-use bevy::app::{App, Plugin, Startup, Update};
-use crate::tile_selector::build::{spawn_tile_selector};
+use crate::tile_selector::build::spawn_tile_selector;
+
+pub(crate) mod build;
 
 pub struct TileSelectorPlugin;
 

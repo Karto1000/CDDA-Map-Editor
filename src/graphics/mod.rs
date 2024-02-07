@@ -15,8 +15,6 @@ pub struct GraphicsResource {
 
 impl GraphicsResource {
     pub fn load<T>(tileset_loader: impl TilesetLoader<T>, mut image_resource: ResMut<Assets<Image>>) -> Self {
-        // Use the grass texture as a placeholder
-        // let mut textures: HashMap<TileId, Handle<Image>> = HashMap::new();
         let tileset = tileset_loader.get_textures(&mut image_resource).unwrap();
 
         return Self {

@@ -1,20 +1,19 @@
+use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::str::FromStr;
+
 use bevy::asset::{Assets, Handle};
 use bevy::prelude::{Image, ResMut};
-use either::Either;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use image::io::Reader;
-
+use serde::Deserialize;
 use serde_json::Value;
-use crate::common::{MeabyWeighted, TileId};
-use crate::graphics::tileset::{Tileset, TilesetLoader};
 
+use crate::common::{MeabyWeighted, TileId};
+use crate::graphics::tileset::TilesetLoader;
 use crate::project::loader::{Load, LoadError};
 
 const TILESET_INFO_NAME: &'static str = "tileset.txt";

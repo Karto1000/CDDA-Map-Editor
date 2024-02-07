@@ -1,4 +1,3 @@
-use bevy::asset::Assets;
 use bevy::input::Input;
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::math::Vec2;
@@ -6,7 +5,7 @@ use bevy::prelude::{Commands, CursorMoved, EventReader, KeyCode, MouseButton, Qu
 use bevy::window::{PrimaryWindow, WindowResized};
 
 use crate::EditorData;
-use crate::grid::{DragInfo, Grid, GridMarker, GridMaterial};
+use crate::grid::{DragInfo, Grid, GridMarker};
 use crate::tiles::Tile;
 
 pub fn window_grid_resize_system(
@@ -37,7 +36,7 @@ pub fn grid_resize_system(
 
                 let original_tile_amount = Vec2::new(
                     window.resolution.width() / res_grid.tile_size,
-                    window.resolution.height() / res_grid.tile_size
+                    window.resolution.height() / res_grid.tile_size,
                 );
 
                 let size = res_grid.tile_size.clone();
@@ -45,7 +44,7 @@ pub fn grid_resize_system(
 
                 let new_tile_amount = Vec2::new(
                     window.resolution.width() / res_grid.tile_size,
-                    window.resolution.height() / res_grid.tile_size
+                    window.resolution.height() / res_grid.tile_size,
                 );
 
                 let pixels_shifted = original_tile_amount - new_tile_amount;

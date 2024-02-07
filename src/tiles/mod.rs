@@ -25,6 +25,6 @@ impl Plugin for TilePlugin {
 pub struct Tile {
     pub x: i32,
     pub y: i32,
-    pub character: char
+    pub character: char,
 }
 

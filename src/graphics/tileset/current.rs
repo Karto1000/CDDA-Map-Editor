@@ -1,4 +1,3 @@
-
 #[derive(Debug)]
 pub struct CurrentTileset {
     pub name: String,

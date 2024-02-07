@@ -2,17 +2,15 @@ use std::fmt::Formatter;
 use std::sync::Arc;
 
 use bevy::app::{App, Plugin, Update};
-use bevy::prelude::{Commands, default, Entity, Event, EventReader, EventWriter, Image, Query, Res, Resource, SpriteBundle, Transform, Vec3, With};
+use bevy::prelude::{Commands, default, Entity, Event, EventReader, EventWriter, Query, Res, Resource, SpriteBundle, Transform, Vec3, With};
 use bevy::reflect::TypeData;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::Visitor;
-use crate::common::TileId;
 
+use crate::{EditorData, GraphicsResource};
 use crate::grid::resources::Grid;
 use crate::map::map_entity::MapEntity;
 use crate::map::systems::{map_save_system, save_directory_picked};
-use crate::{EditorData, GraphicsResource};
-use crate::project::Project;
 use crate::tiles::Tile;
 
 pub(crate) mod systems;

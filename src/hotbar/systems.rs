@@ -4,10 +4,9 @@ use bevy::prelude::{AlignItems, BackgroundColor, BuildChildren, Bundle, Button, 
 use bevy::text::{Text, TextStyle};
 use bevy::ui::{Display, Interaction, JustifyContent, Node, Style, UiImage, UiRect, Val};
 use bevy::window::PrimaryWindow;
+
 use crate::common::{PRIMARY_COLOR, PRIMARY_COLOR_FADED};
-
 use crate::IsCursorCaptured;
-
 
 #[derive(Component)]
 pub struct OriginalColor(pub Color);

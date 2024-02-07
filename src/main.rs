@@ -25,6 +25,7 @@ use serde_json::{Map, Value};
 use winit::window::Icon;
 
 use crate::graphics::GraphicsResource;
+use crate::graphics::tileset::legacy::LegacyTilesetLoader;
 use crate::grid::{GridMarker, GridMaterial, GridPlugin};
 use crate::grid::resources::Grid;
 use crate::hotbar::HotbarPlugin;
@@ -37,8 +38,6 @@ use crate::project::loader::{Load, LoadError};
 use crate::project::saver::{ProjectSaver, Save, SaveError};
 use crate::tile_selector::TileSelectorPlugin;
 use crate::tiles::{Tile, TilePlugin};
-use crate::graphics::tileset::{Tileset};
-use crate::graphics::tileset::legacy::LegacyTilesetLoader;
 
 mod grid;
 mod tiles;
