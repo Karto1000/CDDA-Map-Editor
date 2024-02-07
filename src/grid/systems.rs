@@ -12,17 +12,12 @@ use crate::tiles::Tile;
 pub fn window_grid_resize_system(
     mut resize_reader: EventReader<WindowResized>,
     mut grid: Query<&mut Transform, With<GridMarker>>,
-    mut grid_material: ResMut<Assets<GridMaterial>>,
 ) {
     for e in resize_reader.read() {
         let mut grid = grid.iter_mut().next().unwrap();
-        let grid_material = grid_material.iter_mut().next().unwrap();
 
         grid.scale.x = e.width;
         grid.scale.y = e.height;
-
-        grid_material.1.viewport_width = e.width / 2.;
-        grid_material.1.viewport_height = e.height;
     }
 }
 
@@ -105,8 +100,10 @@ pub fn drag_system(
     mut res_drag: ResMut<DragInfo>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
 ) {
+    let window = q_windows.single();
+
     if buttons.just_pressed(MouseButton::Middle) {
-        let xy = q_windows.single().cursor_position().unwrap_or(Vec2::default()).xy();
+        let xy = window.cursor_position().unwrap_or(Vec2::default()).xy();
         commands.insert_resource(DragInfo {
             drag_started: Some(xy),
             last_position: Some(xy),

@@ -255,15 +255,13 @@ fn setup(
     asset_server: Res<AssetServer>,
     mut materials: ResMut<Assets<GridMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
-    query_windows: Query<&Window, With<PrimaryWindow>>,
     win_windows: NonSend<WinitWindows>,
     res_grid: Res<Grid>,
     mut e_spawn_map_entity: EventWriter<SpawnMapEntity>,
     mut e_spawn_tab: EventWriter<SpawnTab>,
-    mut r_images: ResMut<Assets<Image>>,
+    r_images: ResMut<Assets<Image>>,
 ) {
     commands.spawn(Camera2dBundle::default());
-    let window = query_windows.single();
 
     let texture_resource = GraphicsResource::load(r_images);
 
@@ -272,7 +270,7 @@ fn setup(
     let mut default_project = Project::default();
     let project: &mut Project = editor_data.get_current_project_mut().unwrap_or(&mut default_project);
 
-    let palette_loader = PaletteLoader { path: PathBuf::from_str(r"C:\CDDA\testing\data\json\mapgen_palettes\building.json").unwrap() };
+    let palette_loader = PaletteLoader { path: PathBuf::from_str(r"saves\palettes\building.json").unwrap() };
     let palettes = palette_loader.load().unwrap();
 
     project.map_entity.palettes = palettes;
@@ -284,9 +282,6 @@ fn setup(
     for (i, project) in editor_data.projects.iter().enumerate() {
         e_spawn_tab.send(SpawnTab { name: project.map_entity.om_terrain.clone(), index: i as u32 });
     }
-
-    let window_width = window.physical_width();
-    let window_height = window.physical_height();
 
     let (icon_rgba, icon_width, icon_height) = {
         let image = image::open("./assets/grass.png")
@@ -305,13 +300,12 @@ fn setup(
             mesh: meshes.add(shape::Box::new(1., 1., 0.0).into()).into(),
             transform: Transform::from_xyz(0.0, 0.0, 1.0),
             material: materials.add(GridMaterial {
-                viewport_width: window_width as f32,
-                viewport_height: window_height as f32,
                 tile_size: res_grid.tile_size,
                 offset: Vec2::default(),
                 mouse_pos: Default::default(),
                 is_cursor_captured: 0,
                 map_size: res_grid.map_size,
+                scale_factor: 1.
             }),
             ..default()
         },
@@ -360,6 +354,7 @@ fn update(
         true => 1,
         false => 0
     };
+    grid_material.1.scale_factor = window.resolution.scale_factor() as f32;
 
     for (tile, mut transform) in tiles.iter_mut() {
         //                                              < CENTER TO TOP LEFT >                                  < ALIGN ON GRID >

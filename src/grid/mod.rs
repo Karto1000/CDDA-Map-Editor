@@ -49,20 +49,18 @@ impl Plugin for GridPlugin {
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 pub struct GridMaterial {
     #[uniform(0)]
-    pub viewport_width: f32,
-    #[uniform(1)]
-    pub viewport_height: f32,
-    #[uniform(2)]
     pub tile_size: f32,
-    #[uniform(3)]
+    #[uniform(1)]
     pub offset: Vec2,
-    #[uniform(4)]
+    #[uniform(2)]
     pub mouse_pos: Vec2,
-    #[uniform(5)]
+    #[uniform(3)]
     pub map_size: Vec2,
-    #[uniform(6)]
+    #[uniform(4)]
     // This is an i32 because bevy won't let me pass a bool as a uniform
-    pub is_cursor_captured: i32
+    pub is_cursor_captured: i32,
+    #[uniform(5)]
+    pub scale_factor: f32
 }
 
 
