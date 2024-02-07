@@ -267,7 +267,7 @@ fn setup(
 
     let tileset_loader = LegacyTilesetLoader::new(&PathBuf::from("saves/tileset/TILESETS/gfx/MSX++UnDeadPeopleEdition"));
     let palette_loader = PaletteLoader { path: PathBuf::from_str(r"saves\palettes\building.json").unwrap() };
-    let mut editor_data_saver = EditorDataSaver {};
+    let editor_data_saver = EditorDataSaver {};
 
     let texture_resource = GraphicsResource::load(tileset_loader, r_images);
 

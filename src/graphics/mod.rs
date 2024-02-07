@@ -14,25 +14,10 @@ pub struct GraphicsResource {
 }
 
 impl GraphicsResource {
-    pub fn load(tileset_loader: impl TilesetLoader, mut image_resource: ResMut<Assets<Image>>) -> Self {
+    pub fn load<T>(tileset_loader: impl TilesetLoader<T>, mut image_resource: ResMut<Assets<Image>>) -> Self {
         // Use the grass texture as a placeholder
         // let mut textures: HashMap<TileId, Handle<Image>> = HashMap::new();
         let tileset = tileset_loader.get_textures(&mut image_resource).unwrap();
-
-        // let grass = Reader::open("assets/grass.png").unwrap().decode().unwrap().as_bytes().to_vec();
-        //
-        // let texture = Image::new(
-        //     Extent3d {
-        //         width: 32,
-        //         height: 32,
-        //         depth_or_array_layers: 1,
-        //     },
-        //     TextureDimension::D2,
-        //     grass,
-        //     TextureFormat::Rgba8UnormSrgb,
-        // );
-        //
-        // textures.insert(TileId { 0: "t_grass".into() }, image_resource.add(texture));
 
         return Self {
             textures: tileset

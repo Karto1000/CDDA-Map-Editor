@@ -86,8 +86,8 @@ impl LegacyTilesetLoader {
     }
 }
 
-impl Load<Tileset> for LegacyTilesetLoader {
-    fn load(&self) -> Result<Tileset, LoadError> {
+impl Load<LegacyTileset> for LegacyTilesetLoader {
+    fn load(&self) -> Result<LegacyTileset, LoadError> {
         let info_file = File::open(self.path.join(PathBuf::from_str(TILESET_INFO_NAME).unwrap())).unwrap();
 
         let mut buf_reader = BufReader::new(info_file);
@@ -158,21 +158,18 @@ impl Load<Tileset> for LegacyTilesetLoader {
             tiles.push(serde_json::from_value::<TileGroup>(tile_group.clone()).unwrap());
         }
 
-        return Ok(Tileset::Legacy(LegacyTileset {
+        return Ok(LegacyTileset {
             name: tileset_name.to_string(),
             config_file_name: config_file_name.to_string(),
             info: tileset_info,
             tiles,
-        }));
+        });
     }
 }
 
-impl TilesetLoader for LegacyTilesetLoader {
+impl TilesetLoader<LegacyTileset> for LegacyTilesetLoader {
     fn get_textures(&self, image_resource: &mut ResMut<Assets<Image>>) -> Result<HashMap<TileId, Handle<Image>>, anyhow::Error> {
-        let tileset = match self.load().unwrap() {
-            Tileset::Legacy(t) => t,
-            _ => { panic!("LegacyTilesetLoader must return LegacyTileSet") }
-        };
+        let tileset = self.load().unwrap();
 
         let mut textures = HashMap::new();
 

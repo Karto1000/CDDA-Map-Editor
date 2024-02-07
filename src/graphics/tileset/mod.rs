@@ -14,7 +14,7 @@ use crate::project::loader::Load;
 pub(crate) mod current;
 pub(crate) mod legacy;
 
-pub trait TilesetLoader: Load<Tileset> {
+pub trait TilesetLoader<T>: Load<T> {
     fn get_textures(&self, image_resource: &mut ResMut<Assets<Image>>) -> Result<HashMap<TileId, Handle<Image>>, anyhow::Error>;
 }
 
