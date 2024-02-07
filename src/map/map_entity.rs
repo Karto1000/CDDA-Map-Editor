@@ -4,8 +4,9 @@ use bevy::math::Vec2;
 use bevy::prelude::{EventWriter, Resource};
 use serde::{Deserialize, Serialize};
 
+use crate::common::{MeabyWeighted, TileId};
 use crate::map::{Coordinates, TilePlaceEvent};
-use crate::palettes::Palette;
+use crate::palettes::{MapObjectId, Palette};
 use crate::tiles::Tile;
 
 #[derive(Serialize, Deserialize, Debug, Resource, Clone)]
@@ -65,5 +66,26 @@ impl MapEntity {
             coordinates,
             tile,
         );
+    }
+
+    pub fn get_tile_id_from_character(&self, character: &char) -> TileId {
+        for palette in self.palettes.iter() {
+            if let Some(id) = palette.terrain.get(character) {
+                match id {
+                    MapObjectId::Single(v) => {
+                        match v {
+                            MeabyWeighted::NotWeighted(v) => {
+                                return v.clone();
+                            }
+                            MeabyWeighted::Weighted(_) => { panic!("Not Implemented") }
+                        }
+                    }
+                    MapObjectId::Grouped(_) => { panic!("Not Implemented") }
+                    MapObjectId::Nested(_) => { panic!("Not Implemented") }
+                }
+            }
+        }
+
+        return TileId {0: "TODO_IMPLEMENT_DEFAULT".into()};
     }
 }

@@ -6,11 +6,13 @@ use bevy::prelude::{Commands, default, Entity, Event, EventReader, EventWriter, 
 use bevy::reflect::TypeData;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::Visitor;
+use crate::common::TileId;
 
 use crate::grid::resources::Grid;
 use crate::map::map_entity::MapEntity;
 use crate::map::systems::{map_save_system, save_directory_picked};
-use crate::GraphicsResource;
+use crate::{EditorData, GraphicsResource};
+use crate::project::Project;
 use crate::tiles::Tile;
 
 pub(crate) mod systems;
@@ -79,12 +81,18 @@ pub fn tile_spawn_reader(
     mut e_tile_place: EventReader<TilePlaceEvent>,
     res_grid: Res<Grid>,
     res_textures: Res<GraphicsResource>,
+    res_editor_data: Res<EditorData>,
 ) {
+    let project = match res_editor_data.get_current_project() {
+        None => { return; }
+        Some(p) => { p }
+    };
+
     for e in e_tile_place.read() {
         commands.spawn((
             e.tile,
             SpriteBundle {
-                texture: res_textures.get_texture(&e.tile.character).clone(),
+                texture: res_textures.get_texture(&project.map_entity.get_tile_id_from_character(&e.tile.character)).clone(),
                 transform: Transform {
                     translation: Vec3 {
                         // Spawn off screen

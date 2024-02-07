@@ -37,6 +37,8 @@ use crate::project::loader::{Load, LoadError};
 use crate::project::saver::{ProjectSaver, Save, SaveError};
 use crate::tile_selector::TileSelectorPlugin;
 use crate::tiles::{Tile, TilePlugin};
+use crate::graphics::tileset::{Tileset};
+use crate::graphics::tileset::legacy::LegacyTilesetLoader;
 
 mod grid;
 mod tiles;
@@ -263,14 +265,16 @@ fn setup(
 ) {
     commands.spawn(Camera2dBundle::default());
 
-    let texture_resource = GraphicsResource::load(r_images);
+    let tileset_loader = LegacyTilesetLoader::new(&PathBuf::from("saves/tileset/TILESETS/gfx/MSX++UnDeadPeopleEdition"));
+    let palette_loader = PaletteLoader { path: PathBuf::from_str(r"saves\palettes\building.json").unwrap() };
+    let mut editor_data_saver = EditorDataSaver {};
 
-    let mut editor_data = EditorDataSaver {}.load().unwrap();
+    let texture_resource = GraphicsResource::load(tileset_loader, r_images);
 
     let mut default_project = Project::default();
+    let mut editor_data = editor_data_saver.load().unwrap();
     let project: &mut Project = editor_data.get_current_project_mut().unwrap_or(&mut default_project);
 
-    let palette_loader = PaletteLoader { path: PathBuf::from_str(r"saves\palettes\building.json").unwrap() };
     let palettes = palette_loader.load().unwrap();
 
     project.map_entity.palettes = palettes;
@@ -305,7 +309,7 @@ fn setup(
                 mouse_pos: Default::default(),
                 is_cursor_captured: 0,
                 map_size: res_grid.map_size,
-                scale_factor: 1.
+                scale_factor: 1.,
             }),
             ..default()
         },

@@ -1,26 +1,14 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
+use crate::common::{MeabyWeighted, TileId};
 
 pub(crate) mod loader;
 
 #[derive(Serialize, Clone, Deserialize, Debug)]
-pub struct Weighted<T> {
-    value: T,
-    weight: u32,
-}
-
-#[derive(Serialize, Clone, Deserialize, Debug)]
-#[serde(untagged)]
-pub enum MeabyWeighted<T> {
-    NotWeighted(T),
-    Weighted(Weighted<T>),
-}
-
-#[derive(Serialize, Clone, Deserialize, Debug)]
 pub struct Switch {
-    param: String,
-    fallback: Option<String>,
+    pub param: String,
+    pub fallback: Option<String>,
 }
 
 #[derive(Serialize, Clone, Deserialize, Debug)]
@@ -36,21 +24,21 @@ pub enum MapGenValue {
 #[derive(Deserialize, Clone, Serialize, Debug)]
 pub struct Parameter {
     #[serde(rename = "type")]
-    parameter_type: String,
-    default: MapGenValue,
+    pub parameter_type: String,
+    pub default: MapGenValue,
 }
 
 #[derive(Deserialize, Clone, Serialize, Debug)]
 #[serde(untagged)]
 pub enum MapObjectId {
-    Single(MeabyWeighted<String>),
-    Grouped(Vec<MeabyWeighted<String>>),
-    Nested(Vec<Vec<MeabyWeighted<String>>>),
+    Single(MeabyWeighted<TileId>),
+    Grouped(Vec<MeabyWeighted<TileId>>),
+    Nested(Vec<Vec<MeabyWeighted<TileId>>>),
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Palette {
-    id: String,
-    terrain: HashMap<char, MapObjectId>,
-    furniture: HashMap<char, MapObjectId>,
+    pub id: String,
+    pub terrain: HashMap<char, MapObjectId>,
+    pub furniture: HashMap<char, MapObjectId>,
 }

@@ -1,0 +1,27 @@
+use std::collections::HashMap;
+use std::io::BufRead;
+use std::str::FromStr;
+
+use bevy::asset::{Assets, Handle};
+use bevy::prelude::{Image, ResMut};
+use serde::{Deserialize, Serialize};
+use crate::common::TileId;
+
+use crate::graphics::tileset::current::CurrentTileset;
+use crate::graphics::tileset::legacy::LegacyTileset;
+use crate::project::loader::Load;
+
+pub(crate) mod current;
+pub(crate) mod legacy;
+
+pub trait TilesetLoader: Load<Tileset> {
+    fn get_textures(&self, image_resource: &mut ResMut<Assets<Image>>) -> Result<HashMap<TileId, Handle<Image>>, anyhow::Error>;
+}
+
+#[derive(Debug)]
+pub enum Tileset {
+    Legacy(LegacyTileset),
+    Current(CurrentTileset),
+}
+
+
