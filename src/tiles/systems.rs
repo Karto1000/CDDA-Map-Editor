@@ -70,7 +70,7 @@ pub fn tile_place_system(
         }
 
         // TODO - REPLACE
-        let tile_to_place: char = 'g';
+        let tile_to_place: char = 'b';
 
         let tile_cords = Vec2::new(
             ((xy.x + res_grid.offset.x) / res_grid.tile_size).floor(),

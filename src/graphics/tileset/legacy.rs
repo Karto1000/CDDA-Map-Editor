@@ -8,12 +8,13 @@ use std::str::FromStr;
 use bevy::asset::{Assets, Handle};
 use bevy::prelude::{Image, ResMut, Vec2};
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-use image::GenericImageView;
+use image::{DynamicImage, GenericImageView};
 use image::io::Reader;
 use serde::Deserialize;
 use serde_json::Value;
 
 use crate::common::{MeabyWeighted, TileId};
+use crate::graphics::{Corner, Edge, FullCardinal, SpriteType};
 use crate::graphics::tileset::TilesetLoader;
 use crate::project::loader::{Load, LoadError};
 
@@ -35,20 +36,16 @@ pub struct TileGroup {
 
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
-pub enum Multiline {
-    No,
-    Yes {
-        #[serde(rename = "multiline")]
-        is_multiline: Option<bool>,
-        additional_tiles: Option<Vec<Box<TilesetTileDescriptor>>>,
-    },
+pub enum MeabyMulti<T> {
+    Multi(Vec<T>),
+    Single(T),
 }
 
-#[derive(Deserialize, Debug)]
-#[serde(untagged)]
-pub enum MeabyMulti<T> {
-    Single(T),
-    Multi(Vec<T>),
+#[derive(Debug, Deserialize)]
+pub struct AdditionalTile {
+    id: String,
+    fg: Option<MeabyMulti<MeabyWeighted<i32>>>,
+    bg: Option<MeabyMulti<MeabyWeighted<i32>>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -64,7 +61,10 @@ pub struct TilesetTileDescriptor {
 
     #[serde(rename = "rotates")]
     pub is_rotate_allowed: Option<bool>,
-    pub multiline: Option<Multiline>,
+
+    #[serde(rename = "multitile")]
+    is_multitile: Option<bool>,
+    additional_tiles: Option<Vec<AdditionalTile>>,
 }
 
 #[derive(Debug)]
@@ -80,11 +80,42 @@ pub struct LegacyTilesetLoader {
 }
 
 impl LegacyTilesetLoader {
-    pub fn new(path: &PathBuf) -> Self {
+    pub fn new(path: PathBuf) -> Self {
         return Self {
-            path: path.clone()
+            path
         };
     }
+}
+
+fn get_image_from_tileset(image: &DynamicImage, x: u32, y: u32, width: u32, height: u32) -> Image {
+    let tile_sprite = image.view(
+        x,
+        y,
+        width,
+        height,
+    );
+
+    let image = Image::new(
+        Extent3d {
+            width: width,
+            height: height,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        tile_sprite.to_image().to_vec(),
+        TextureFormat::Rgba8UnormSrgb,
+    );
+
+    return image;
+}
+
+fn get_xy_from_fg(fg: &i32, last_group_index: i32) -> Vec2 {
+    let local_tile_index: u32 = (fg - last_group_index) as u32;
+
+    return Vec2::new(
+        (local_tile_index % AMOUNT_OF_SPRITES_PER_ROW) as f32,
+        ((local_tile_index / AMOUNT_OF_SPRITES_PER_ROW) as f32).floor(),
+    );
 }
 
 impl Load<LegacyTileset> for LegacyTilesetLoader {
@@ -169,14 +200,13 @@ impl Load<LegacyTileset> for LegacyTilesetLoader {
 }
 
 impl TilesetLoader<LegacyTileset> for LegacyTilesetLoader {
-    fn get_textures(&self, image_resource: &mut ResMut<Assets<Image>>) -> Result<HashMap<TileId, Handle<Image>>, anyhow::Error> {
+    fn get_textures(&self, image_resource: &mut ResMut<Assets<Image>>) -> Result<HashMap<TileId, SpriteType>, anyhow::Error> {
         let tileset = self.load().unwrap();
-        let mut textures = HashMap::new();
+        let mut textures: HashMap<TileId, SpriteType> = HashMap::new();
 
-        let mut last_group_index = 13215;
+        let mut last_group_index = 13327;
         // TODO REPLACE
         for group in tileset.tiles.get(6) {
-            println!("New Group");
             let image = Reader::open(self.path.join(PathBuf::from_str(group.file.as_str()).unwrap()))
                 .unwrap()
                 .decode()
@@ -185,65 +215,375 @@ impl TilesetLoader<LegacyTileset> for LegacyTilesetLoader {
             let mut amount_of_tiles = 0;
 
             for tile in group.tiles.iter() {
-                let xy: Vec2 = match tile.fg.as_ref().unwrap() {
-                    MeabyMulti::Single(v) => {
-                        match v {
-                            MeabyWeighted::NotWeighted(v) => {
-                                let local_tile_index: u32 = (v - last_group_index) as u32;
+                let fg = match &tile.fg.as_ref().unwrap() {
+                    MeabyMulti::Single(fg) => fg,
+                    // TODO, Just here for testing, implement this later
+                    MeabyMulti::Multi(multi) => multi.first().unwrap()
+                };
 
-                                Vec2::new(
-                                    (local_tile_index % AMOUNT_OF_SPRITES_PER_ROW) as f32,
-                                    ((local_tile_index / AMOUNT_OF_SPRITES_PER_ROW) as f32).floor(),
-                                )
-                            }
-                            MeabyWeighted::Weighted(_) => {
-                                // TODO Actually Implement this
-                                panic!("Not Implemented")
-                            }
+                let xy = match fg {
+                    MeabyWeighted::NotWeighted(fg) => {
+                        // TODO: Figure out what to do if the tile is inside another file
+                        if fg < &last_group_index {
+                            continue;
                         }
+                        get_xy_from_fg(fg, last_group_index)
                     }
-                    MeabyMulti::Multi(v) => {
-                        // TODO Actually Implement this
-                        return Ok(textures);
+                    // TODO Figure out how weights work here
+                    MeabyWeighted::Weighted(weight) => {
+                        // TODO: Figure out what to do if the tile is inside another file
+                        if weight.value < last_group_index {
+                            continue;
+                        }
+                        get_xy_from_fg(&weight.value, last_group_index)
                     }
                 };
 
-                let tile_sprite = image.view(
+                let main_image = get_image_from_tileset(
+                    &image,
                     xy.x as u32 * tileset.info.tile_width,
                     xy.y as u32 * tileset.info.tile_height,
                     tileset.info.tile_width,
                     tileset.info.tile_height,
                 );
 
-                let image = Image::new(
-                    Extent3d {
-                        width: tileset.info.tile_width,
-                        height: tileset.info.tile_height,
-                        depth_or_array_layers: 1,
-                    },
-                    TextureDimension::D2,
-                    tile_sprite.to_image().to_vec(),
-                    TextureFormat::Rgba8UnormSrgb,
-                );
-
-                match &tile.id {
-                    MeabyMulti::Single(v) => {
-                        textures.insert(TileId { 0: v.clone() }, image_resource.add(image));
+                match &tile.additional_tiles {
+                    None => {
+                        match &tile.id {
+                            MeabyMulti::Single(v) => {
+                                textures.insert(TileId { 0: v.clone() }, SpriteType::Single(image_resource.add(main_image)));
+                                amount_of_tiles += 1;
+                            }
+                            MeabyMulti::Multi(v) => {
+                                // TODO Actually Implement this
+                                for value in v.iter() {
+                                    textures.insert(TileId { 0: value.clone() }, SpriteType::Single(image_resource.add(main_image.clone())));
+                                    amount_of_tiles += 1;
+                                }
+                            }
+                        };
                     }
-                    MeabyMulti::Multi(v) => {
-                        // TODO Actually Implement this
-                        for value in v.iter() {
-                            textures.insert(TileId { 0: value.clone() }, image_resource.add(image.clone()));
+                    Some(additional_tiles) => {
+                        let ids = match &tile.id {
+                            MeabyMulti::Multi(multi) => multi.clone(),
+                            MeabyMulti::Single(id) => vec![id.clone()]
+                        };
+
+                        for id in ids {
+                            let mut center: Option<Handle<Image>> = None;
+                            let mut corner: Option<Corner> = None;
+                            let mut t_connection: Option<FullCardinal> = None;
+                            let mut edge: Option<Edge> = None;
+                            let mut end_piece: Option<FullCardinal> = None;
+                            let mut unconnected: Option<Handle<Image>> = None;
+
+                            for additional_tile in additional_tiles.iter() {
+                                match additional_tile.fg.as_ref() {
+                                    Some(fg) => {
+                                        match additional_tile.id.as_str() {
+                                            "center" => {
+                                                let fg = match fg {
+                                                    // TODO: Figure out how weights work here
+                                                    MeabyMulti::Multi(multi) => multi.first().unwrap(),
+                                                    MeabyMulti::Single(fg) => fg
+                                                };
+
+                                                let xy = match fg {
+                                                    MeabyWeighted::NotWeighted(fg) => get_xy_from_fg(fg, last_group_index),
+                                                    MeabyWeighted::Weighted(weight) => get_xy_from_fg(&weight.value, last_group_index)
+                                                };
+
+                                                let image = get_image_from_tileset(
+                                                    &image,
+                                                    xy.x as u32 * tileset.info.tile_width,
+                                                    xy.y as u32 * tileset.info.tile_height,
+                                                    tileset.info.tile_width,
+                                                    tileset.info.tile_height,
+                                                );
+
+                                                center = Some(image_resource.add(image));
+                                            }
+                                            "corner" => {
+                                                match fg {
+                                                    MeabyMulti::Single(fg) => {
+                                                        // Seriously? Why would you not just put the same id in the list four times?
+
+                                                        let xy = match fg {
+                                                            MeabyWeighted::NotWeighted(fg) => get_xy_from_fg(fg, last_group_index),
+                                                            MeabyWeighted::Weighted(weight) => get_xy_from_fg(&weight.value, last_group_index)
+                                                        };
+
+                                                        let image = get_image_from_tileset(
+                                                            &image,
+                                                            xy.x as u32 * tileset.info.tile_width,
+                                                            xy.y as u32 * tileset.info.tile_height,
+                                                            tileset.info.tile_width,
+                                                            tileset.info.tile_height,
+                                                        );
+
+                                                        corner = Some(Corner {
+                                                            north_west: image_resource.add(image.clone()),
+                                                            south_west: image_resource.add(image.clone()),
+                                                            south_east: image_resource.add(image.clone()),
+                                                            north_east: image_resource.add(image.clone()),
+                                                        })
+                                                    }
+                                                    MeabyMulti::Multi(v) => {
+                                                        // Direction is NW, SW, SE, NE
+                                                        let mut images = Vec::new();
+
+                                                        for fg in v.iter() {
+                                                            let xy = match fg {
+                                                                MeabyWeighted::NotWeighted(fg) => get_xy_from_fg(fg, last_group_index),
+                                                                MeabyWeighted::Weighted(weight) => get_xy_from_fg(&weight.value, last_group_index)
+                                                            };
+
+                                                            let image = get_image_from_tileset(
+                                                                &image,
+                                                                xy.x as u32 * tileset.info.tile_width,
+                                                                xy.y as u32 * tileset.info.tile_height,
+                                                                tileset.info.tile_width,
+                                                                tileset.info.tile_height,
+                                                            );
+
+                                                            images.push(image);
+                                                        }
+
+                                                        // I assume that the ordering of the fg values is always the same
+                                                        corner = Some(Corner {
+                                                            north_west: image_resource.add(images.get(0).unwrap().clone()),
+                                                            south_west: image_resource.add(images.get(1).unwrap().clone()),
+                                                            south_east: image_resource.add(images.get(2).unwrap().clone()),
+                                                            north_east: image_resource.add(images.get(3).unwrap().clone()),
+                                                        })
+                                                    }
+                                                }
+                                            }
+                                            "t_connection" => {
+                                                match fg {
+                                                    MeabyMulti::Single(fg) => {
+                                                        let xy = match fg {
+                                                            MeabyWeighted::NotWeighted(fg) => get_xy_from_fg(fg, last_group_index),
+                                                            MeabyWeighted::Weighted(weight) => get_xy_from_fg(&weight.value, last_group_index)
+                                                        };
+
+                                                        let image = get_image_from_tileset(
+                                                            &image,
+                                                            xy.x as u32 * tileset.info.tile_width,
+                                                            xy.y as u32 * tileset.info.tile_height,
+                                                            tileset.info.tile_width,
+                                                            tileset.info.tile_height,
+                                                        );
+
+                                                        t_connection = Some(FullCardinal {
+                                                            north: image_resource.add(image.clone()),
+                                                            west: image_resource.add(image.clone()),
+                                                            south: image_resource.add(image.clone()),
+                                                            east: image_resource.add(image.clone()),
+                                                        })
+                                                    }
+                                                    MeabyMulti::Multi(v) => {
+                                                        // Direction is N, W, S, E
+                                                        let mut images = Vec::new();
+
+                                                        for fg in v.iter() {
+                                                            let xy = match fg {
+                                                                MeabyWeighted::NotWeighted(fg) => get_xy_from_fg(fg, last_group_index),
+                                                                MeabyWeighted::Weighted(weight) => get_xy_from_fg(&weight.value, last_group_index)
+                                                            };
+
+                                                            let image = get_image_from_tileset(
+                                                                &image,
+                                                                xy.x as u32 * tileset.info.tile_width,
+                                                                xy.y as u32 * tileset.info.tile_height,
+                                                                tileset.info.tile_width,
+                                                                tileset.info.tile_height,
+                                                            );
+
+                                                            images.push(image);
+                                                        }
+
+                                                        // I assume that the ordering of the fg values is always the same
+                                                        t_connection = Some(FullCardinal {
+                                                            north: image_resource.add(images.get(0).unwrap().clone()),
+                                                            west: image_resource.add(images.get(1).unwrap().clone()),
+                                                            south: image_resource.add(images.get(2).unwrap().clone()),
+                                                            east: image_resource.add(images.get(3).unwrap().clone()),
+                                                        })
+                                                    }
+                                                }
+                                            }
+                                            "edge" => {
+                                                match fg {
+                                                    MeabyMulti::Single(fg) => {
+                                                        let xy = match fg {
+                                                            MeabyWeighted::NotWeighted(fg) => get_xy_from_fg(fg, last_group_index),
+                                                            MeabyWeighted::Weighted(weight) => get_xy_from_fg(&weight.value, last_group_index)
+                                                        };
+
+                                                        let image = get_image_from_tileset(
+                                                            &image,
+                                                            xy.x as u32 * tileset.info.tile_width,
+                                                            xy.y as u32 * tileset.info.tile_height,
+                                                            tileset.info.tile_width,
+                                                            tileset.info.tile_height,
+                                                        );
+
+                                                        edge = Some(Edge {
+                                                            north_south: image_resource.add(image.clone()),
+                                                            east_west: image_resource.add(image.clone()),
+                                                        })
+                                                    }
+                                                    MeabyMulti::Multi(v) => {
+                                                        // Direction is NS, EW
+                                                        let mut images = Vec::new();
+
+                                                        for fg in v.iter() {
+                                                            let xy = match fg {
+                                                                MeabyWeighted::NotWeighted(fg) => get_xy_from_fg(fg, last_group_index),
+                                                                MeabyWeighted::Weighted(weight) => get_xy_from_fg(&weight.value, last_group_index)
+                                                            };
+
+                                                            let image = get_image_from_tileset(
+                                                                &image,
+                                                                xy.x as u32 * tileset.info.tile_width,
+                                                                xy.y as u32 * tileset.info.tile_height,
+                                                                tileset.info.tile_width,
+                                                                tileset.info.tile_height,
+                                                            );
+
+                                                            images.push(image);
+                                                        }
+
+                                                        // I assume that the ordering of the fg values is always the same
+                                                        edge = Some(Edge {
+                                                            north_south: image_resource.add(images.get(0).unwrap().clone()),
+                                                            east_west: image_resource.add(images.get(1).unwrap().clone()),
+                                                        })
+                                                    }
+                                                }
+                                            }
+                                            "end_piece" => {
+                                                match fg {
+                                                    MeabyMulti::Single(fg) => {
+                                                        let xy = match fg {
+                                                            MeabyWeighted::NotWeighted(fg) => get_xy_from_fg(fg, last_group_index),
+                                                            MeabyWeighted::Weighted(weight) => get_xy_from_fg(&weight.value, last_group_index)
+                                                        };
+
+                                                        let image = get_image_from_tileset(
+                                                            &image,
+                                                            xy.x as u32 * tileset.info.tile_width,
+                                                            xy.y as u32 * tileset.info.tile_height,
+                                                            tileset.info.tile_width,
+                                                            tileset.info.tile_height,
+                                                        );
+
+                                                        end_piece = Some(FullCardinal {
+                                                            north: image_resource.add(image.clone()),
+                                                            west: image_resource.add(image.clone()),
+                                                            south: image_resource.add(image.clone()),
+                                                            east: image_resource.add(image.clone()),
+                                                        })
+                                                    }
+                                                    MeabyMulti::Multi(v) => {
+                                                        // Direction is N, W, S, E
+                                                        let mut images = Vec::new();
+
+                                                        for fg in v.iter() {
+                                                            let xy = match fg {
+                                                                MeabyWeighted::NotWeighted(fg) => get_xy_from_fg(fg, last_group_index),
+                                                                MeabyWeighted::Weighted(weight) => get_xy_from_fg(&weight.value, last_group_index)
+                                                            };
+
+                                                            let image = get_image_from_tileset(
+                                                                &image,
+                                                                xy.x as u32 * tileset.info.tile_width,
+                                                                xy.y as u32 * tileset.info.tile_height,
+                                                                tileset.info.tile_width,
+                                                                tileset.info.tile_height,
+                                                            );
+
+                                                            images.push(image);
+                                                        }
+
+                                                        // I assume that the ordering of the fg values is always the same
+                                                        end_piece = Some(FullCardinal {
+                                                            north: image_resource.add(images.get(0).unwrap().clone()),
+                                                            west: image_resource.add(images.get(1).unwrap().clone()),
+                                                            south: image_resource.add(images.get(2).unwrap().clone()),
+                                                            east: image_resource.add(images.get(3).unwrap().clone()),
+                                                        })
+                                                    }
+                                                }
+                                            }
+                                            "unconnected" => {
+                                                let fg = match fg {
+                                                    // TODO: Figure out how weights work here
+                                                    MeabyMulti::Multi(multi) => multi.first().unwrap(),
+                                                    MeabyMulti::Single(fg) => fg
+                                                };
+
+                                                let xy = match fg {
+                                                    MeabyWeighted::NotWeighted(fg) => get_xy_from_fg(fg, last_group_index),
+                                                    MeabyWeighted::Weighted(weight) => get_xy_from_fg(&weight.value, last_group_index)
+                                                };
+
+                                                let image = get_image_from_tileset(
+                                                    &image,
+                                                    xy.x as u32 * tileset.info.tile_width,
+                                                    xy.y as u32 * tileset.info.tile_height,
+                                                    tileset.info.tile_width,
+                                                    tileset.info.tile_height,
+                                                );
+
+                                                unconnected = Some(image_resource.add(image));
+                                            }
+
+                                            _ => { panic!("Go Unexpected id {}", additional_tile.id) }
+                                        }
+                                    }
+                                    None => {}
+                                }
+                            }
+
+                            textures.insert(
+                                TileId { 0: id.clone() },
+                                SpriteType::Multitile {
+                                    center: center.unwrap_or(image_resource.add(main_image.clone())),
+                                    corner: corner.unwrap_or(Corner {
+                                        north_west: image_resource.add(main_image.clone()),
+                                        south_west: image_resource.add(main_image.clone()),
+                                        south_east: image_resource.add(main_image.clone()),
+                                        north_east: image_resource.add(main_image.clone()),
+                                    }),
+                                    t_connection: t_connection.unwrap_or(FullCardinal {
+                                        north: image_resource.add(main_image.clone()),
+                                        east: image_resource.add(main_image.clone()),
+                                        south: image_resource.add(main_image.clone()),
+                                        west: image_resource.add(main_image.clone()),
+                                    }),
+                                    edge: edge.unwrap_or(Edge {
+                                        north_south: image_resource.add(main_image.clone()),
+                                        east_west: image_resource.add(main_image.clone()),
+                                    }),
+                                    end_piece: end_piece.unwrap_or(FullCardinal {
+                                        north: image_resource.add(main_image.clone()),
+                                        east: image_resource.add(main_image.clone()),
+                                        south: image_resource.add(main_image.clone()),
+                                        west: image_resource.add(main_image.clone()),
+                                    }),
+                                    unconnected: unconnected.unwrap_or(image_resource.add(main_image.clone())),
+                                },
+                            );
+                            amount_of_tiles += 1;
                         }
                     }
-                };
-
-                amount_of_tiles += 1;
-            };
-
-            last_group_index = amount_of_tiles;
+                }
+            }
         };
 
         return Ok(textures);
     }
 }
+
