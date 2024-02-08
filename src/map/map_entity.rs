@@ -42,13 +42,6 @@ impl MapEntity {
         };
     }
 
-    pub fn spawn(&mut self, e_set_tile: &mut EventWriter<TilePlaceEvent>) {
-        for cords in self.tiles.keys().into_iter() {
-            let tile = self.tiles.get(cords).unwrap();
-            e_set_tile.send(TilePlaceEvent { tile: *tile })
-        }
-    }
-
     pub fn set_tile_at(
         &mut self,
         character: char,
@@ -58,9 +51,9 @@ impl MapEntity {
         let coordinates = Coordinates { x: cords.0, y: cords.1 };
         if self.tiles.get(&coordinates).is_some() { return; }
 
-        let tile = Tile { character, x: cords.0, y: cords.1 };
+        let tile = Tile { character, x: cords.0, y: cords.1, entity: None };
 
-        e_set_tile.send(TilePlaceEvent { tile });
+        e_set_tile.send(TilePlaceEvent { tile, update_sprites_around: true });
 
         self.tiles.insert(
             coordinates,
@@ -89,11 +82,11 @@ impl MapEntity {
         return TileId { 0: "TODO_IMPLEMENT_DEFAULT".into() };
     }
 
-    pub fn get_tiles_around(&self, coordinates: &Coordinates) -> (Option<&Tile>, Option<&Tile>, Option<&Tile>, Option<&Tile>) {
+    pub fn get_tiles_around(&self, coordinates: &Coordinates) -> Vec<Option<&Tile>> {
         let tile_ontop = self.tiles.get(&Coordinates { x: coordinates.x, y: coordinates.y - 1 });
         let tile_right = self.tiles.get(&Coordinates { x: coordinates.x + 1, y: coordinates.y });
         let tile_below = self.tiles.get(&Coordinates { x: coordinates.x, y: coordinates.y + 1 });
         let tile_left = self.tiles.get(&Coordinates { x: coordinates.x - 1, y: coordinates.y });
-        return (tile_ontop, tile_right, tile_below, tile_left);
+        return vec![tile_ontop, tile_right, tile_below, tile_left];
     }
 }

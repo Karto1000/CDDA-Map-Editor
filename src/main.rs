@@ -264,8 +264,8 @@ fn setup(
 ) {
     commands.spawn(Camera2dBundle::default());
 
-    let tileset_loader = LegacyTilesetLoader::new(PathBuf::from(r"saves\tileset\TILESETS\gfx\MSX++UnDeadPeopleEdition"));
-    let palette_loader = PaletteLoader::new(PathBuf::from(r"saves\palettes\building.json"));
+    let tileset_loader = LegacyTilesetLoader::new(PathBuf::from(r"C:\CDDA\testing\gfx\MSX++UnDeadPeopleEdition"));
+    let palette_loader = PaletteLoader::new(PathBuf::from(r"C:\CDDA\testing\data\json\mapgen_palettes\testing.json"));
     let editor_data_saver = EditorDataSaver {};
 
     let texture_resource = GraphicsResource::load(tileset_loader, r_images);

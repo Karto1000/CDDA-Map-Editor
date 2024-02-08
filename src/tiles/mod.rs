@@ -1,5 +1,5 @@
 use bevy::app::{App, Plugin, Update};
-use bevy::prelude::{Component, Resource};
+use bevy::prelude::{Component, Entity, Resource};
 use serde::{Deserialize, Serialize};
 
 use crate::tiles::resources::PlaceInfo;
@@ -26,5 +26,6 @@ pub struct Tile {
     pub x: i32,
     pub y: i32,
     pub character: char,
+    pub entity: Option<Entity>
 }
 

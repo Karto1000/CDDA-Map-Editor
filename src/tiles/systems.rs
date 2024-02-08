@@ -6,7 +6,7 @@ use bevy::window::{PrimaryWindow, WindowResized};
 use crate::{EditorData, IsCursorCaptured};
 use crate::grid::GridMarker;
 use crate::grid::resources::Grid;
-use crate::map::{Coordinates, TilePlaceEvent};
+use crate::map::{Coordinates, TilePlaceEvent, UpdateSpriteEvent};
 use crate::tiles::resources::PlaceInfo;
 use crate::tiles::Tile;
 
@@ -70,7 +70,7 @@ pub fn tile_place_system(
         }
 
         // TODO - REPLACE
-        let tile_to_place: char = 'b';
+        let tile_to_place: char = 'g';
 
         let tile_cords = Vec2::new(
             ((xy.x + res_grid.offset.x) / res_grid.tile_size).floor(),
@@ -141,6 +141,7 @@ pub fn tile_delete_system(
     mut commands: Commands,
     mut res_editor_data: ResMut<EditorData>,
     mut tiles: Query<(Entity, &Tile), Without<GridMarker>>,
+    mut e_update_sprite: EventWriter<UpdateSpriteEvent>,
     buttons: Res<Input<MouseButton>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     res_grid: Res<Grid>,
@@ -168,7 +169,21 @@ pub fn tile_delete_system(
 
         for (entity, q_tile) in tiles.iter_mut() {
             if (q_tile.x, q_tile.y) == (tile_cords.x as i32, tile_cords.y as i32) {
-                project.map_entity.tiles.remove(&Coordinates { x: tile_cords.x as i32, y: tile_cords.y as i32 });
+                let coords = &Coordinates { x: tile_cords.x as i32, y: tile_cords.y as i32 };
+                project.map_entity.tiles.remove(coords);
+
+                let tiles_around = project.map_entity.get_tiles_around(coords);
+
+                for tile in tiles_around {
+                    if let Some(tile) = tile {
+                        e_update_sprite.send(
+                            UpdateSpriteEvent {
+                                tile: *tile,
+                            }
+                        );
+                    }
+                }
+
                 commands.get_entity(entity).unwrap().despawn();
             }
         };
