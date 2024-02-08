@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io::BufRead;
 use std::str::FromStr;
 
-use bevy::asset::{Assets, Handle};
+use bevy::asset::Assets;
 use bevy::prelude::{Image, ResMut};
 use serde::{Deserialize, Serialize};
 

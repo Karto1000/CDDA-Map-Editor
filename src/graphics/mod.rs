@@ -19,7 +19,7 @@ pub struct Corner {
     pub north_west: Handle<Image>,
     pub south_west: Handle<Image>,
     pub south_east: Handle<Image>,
-    pub north_east: Handle<Image>
+    pub north_east: Handle<Image>,
 }
 
 pub struct Edge {

@@ -3,10 +3,10 @@ use bevy::prelude::{Changed, Commands, EventReader, EventWriter, Interaction, Qu
 use bevy_file_dialog::{DialogFileLoaded, FileDialogExt};
 
 use crate::EditorData;
-use crate::hotbar::systems::{CloseIconMarker, ImportIconMarker, OpenIconMarker, SaveIconMarker};
-use crate::hotbar::tabs::SpawnTab;
-use crate::map::map_entity::MapEntity;
-use crate::project::{Project, ProjectSaveState};
+use crate::map::resources::MapEntity;
+use crate::project::resources::{Project, ProjectSaveState};
+use crate::ui::hotbar::components::{CloseIconMarker, ImportIconMarker, OpenIconMarker, SaveIconMarker};
+use crate::ui::tabs::events::SpawnTab;
 
 pub fn close_button_interaction(
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<CloseIconMarker>)>,
@@ -22,10 +22,10 @@ pub fn close_button_interaction(
 
 pub fn save_button_interaction(
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<SaveIconMarker>)>,
-    res_editor_data: Res<EditorData>,
+    r_editor_data: Res<EditorData>,
     mut commands: Commands,
 ) {
-    let project = match res_editor_data.get_current_project() {
+    let project = match r_editor_data.get_current_project() {
         None => return,
         Some(p) => p
     };

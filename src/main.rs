@@ -24,25 +24,30 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use winit::window::Icon;
 
+use crate::common::Coordinates;
 use crate::graphics::GraphicsResource;
 use crate::graphics::tileset::legacy::LegacyTilesetLoader;
 use crate::grid::{GridMarker, GridMaterial, GridPlugin};
 use crate::grid::resources::Grid;
-use crate::hotbar::HotbarPlugin;
-use crate::hotbar::tabs::SpawnTab;
-use crate::map::{ClearTiles, MapPlugin, SpawnMapEntity};
-use crate::map::map_entity::MapEntity;
+use crate::map::{tile_despawn_reader, tile_spawn_reader};
+use crate::map::events::{ClearTiles, SpawnMapEntity};
+use crate::map::MapPlugin;
+use crate::map::resources::MapEntity;
+use crate::map::systems::{set_tile_reader, tile_remove_reader};
 use crate::palettes::loader::PaletteLoader;
-use crate::project::{Project, ProjectSaveState};
 use crate::project::loader::{Load, LoadError};
+use crate::project::resources::{Project, ProjectSaveState};
 use crate::project::saver::{ProjectSaver, Save, SaveError};
 use crate::tile_selector::TileSelectorPlugin;
-use crate::tiles::{Tile, TilePlugin};
+use crate::tiles::components::Tile;
+use crate::tiles::TilePlugin;
+use crate::ui::tabs::events::SpawnTab;
+use crate::ui::UiPlugin;
 
 mod grid;
 mod tiles;
 mod map;
-mod hotbar;
+mod ui;
 mod project;
 mod graphics;
 mod palettes;
@@ -246,8 +251,19 @@ fn main() {
             .with_load_file::<Project>()
         )
         .add_plugins(Material2dPlugin::<GridMaterial>::default())
-        .add_plugins((GridPlugin {}, MapPlugin {}, TilePlugin {}, HotbarPlugin {}))
-        .add_systems(Update, (update, update_mouse_location, app_exit, switch_project))
+        .add_plugins((GridPlugin {}, MapPlugin {}, TilePlugin {}, UiPlugin {}))
+        .add_systems(Update, (
+            update,
+            update_mouse_location,
+            app_exit,
+            switch_project,
+            tile_despawn_reader,
+            apply_deferred,
+            tile_remove_reader,
+            set_tile_reader,
+            apply_deferred,
+            tile_spawn_reader
+        ).chain())
         .run();
 }
 
@@ -341,7 +357,7 @@ fn setup(
 fn update(
     res_grid: Res<Grid>,
     res_cursor: Res<IsCursorCaptured>,
-    mut tiles: Query<(&mut Tile, &mut Transform), Without<GridMarker>>,
+    mut tiles: Query<(&mut Tile, &mut Transform, &Coordinates), Without<GridMarker>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     mut grid_material: ResMut<Assets<GridMaterial>>,
 ) {
@@ -359,10 +375,10 @@ fn update(
     };
     grid_material.1.scale_factor = window.resolution.scale_factor() as f32;
 
-    for (tile, mut transform) in tiles.iter_mut() {
+    for (tile, mut transform, coordinates) in tiles.iter_mut() {
         //                                              < CENTER TO TOP LEFT >                                  < ALIGN ON GRID >
-        transform.translation.x = (-window.resolution.width() / 2. + res_grid.tile_size / 2.) - (res_grid.offset.x - tile.x as f32 * res_grid.tile_size);
-        transform.translation.y = (window.resolution.height() / 2. - res_grid.tile_size / 2.) + (res_grid.offset.y - tile.y as f32 * res_grid.tile_size);
+        transform.translation.x = (-window.resolution.width() / 2. + res_grid.tile_size / 2.) - (res_grid.offset.x - coordinates.x as f32 * res_grid.tile_size);
+        transform.translation.y = (window.resolution.height() / 2. - res_grid.tile_size / 2.) + (res_grid.offset.y - coordinates.y as f32 * res_grid.tile_size);
     }
 }
 

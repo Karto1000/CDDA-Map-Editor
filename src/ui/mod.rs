@@ -1,17 +1,21 @@
 use bevy::app::{App, Plugin, Startup, Update};
 use bevy::prelude::{apply_deferred, IntoSystemConfigs};
 
-use crate::hotbar::interaction::{close_button_interaction, file_loaded_reader, import_button_interaction, open_button_interaction, save_button_interaction};
-use crate::hotbar::systems::{button_hover_system, button_toggle_system, check_ui_interaction, reset_toggle_reader, ResetToggle, spawn_hotbar};
-use crate::hotbar::tabs::{on_add_tab_button_click, setup, spawn_tab_reader, SpawnTab, tab_clicked};
+use crate::ui::hotbar::spawn_hotbar;
+use crate::ui::interaction::{close_button_interaction, file_loaded_reader, import_button_interaction, open_button_interaction, save_button_interaction};
+use crate::ui::systems::{button_hover_system, button_toggle_system, check_ui_interaction, reset_toggle_reader, ResetToggle};
+use crate::ui::tabs::{on_add_tab_button_click, setup, spawn_tab_reader, tab_clicked};
+use crate::ui::tabs::events::SpawnTab;
 
 mod systems;
-mod interaction;
+pub(crate) mod interaction;
+pub(crate) mod components;
+pub(crate) mod hotbar;
 pub(crate) mod tabs;
 
-pub struct HotbarPlugin;
+pub struct UiPlugin;
 
-impl Plugin for HotbarPlugin {
+impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, (spawn_hotbar, apply_deferred, setup).chain());
 

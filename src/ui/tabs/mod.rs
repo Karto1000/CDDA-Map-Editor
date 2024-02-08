@@ -4,19 +4,14 @@ use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Changed, Color,
 
 use crate::{EditorData, SwitchProject};
 use crate::common::{PRIMARY_COLOR, PRIMARY_COLOR_FADED, PRIMARY_COLOR_SELECTED};
-use crate::hotbar::systems::{AddTabButtonMarker, HoverEffect, TabContainerMarker, ToggleEffect, TopHotbarMarker};
-use crate::project::{Project, ProjectSaveState};
+use crate::project::resources::{Project, ProjectSaveState};
+use crate::ui::components::{HoverEffect, ToggleEffect};
+use crate::ui::hotbar::components::TopHotbarMarker;
+use crate::ui::tabs::components::{AddTabButtonMarker, Tab, TabContainerMarker};
+use crate::ui::tabs::events::SpawnTab;
 
-#[derive(Event)]
-pub struct SpawnTab {
-    pub name: String,
-    pub index: u32,
-}
-
-#[derive(Component, Debug)]
-pub struct Tab {
-    pub index: u32,
-}
+pub(crate) mod events;
+pub(crate) mod components;
 
 pub fn setup(
     r_asset_server: Res<AssetServer>,

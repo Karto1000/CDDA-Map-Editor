@@ -1,24 +1,25 @@
 use bevy::input::Input;
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
-use bevy::prelude::{Commands, Entity, EventReader, EventWriter, MouseButton, Query, Res, ResMut, Transform, Vec2, Vec2Swizzles, Window, With, Without};
+use bevy::prelude::{EventReader, EventWriter, MouseButton, Query, Res, ResMut, Transform, Vec2Swizzles, Window, With, Without};
 use bevy::window::{PrimaryWindow, WindowResized};
 
 use crate::{EditorData, IsCursorCaptured};
+use crate::common::Coordinates;
 use crate::grid::GridMarker;
 use crate::grid::resources::Grid;
-use crate::map::{Coordinates, TilePlaceEvent, UpdateSpriteEvent};
+use crate::map::events::{TileDeleteEvent, TilePlaceEvent};
+use crate::tiles::components::Tile;
 use crate::tiles::resources::PlaceInfo;
-use crate::tiles::Tile;
 
 pub fn window_tile_resize_system(
     mut resize_reader: EventReader<WindowResized>,
-    mut tiles: Query<(&mut Tile, &mut Transform), Without<GridMarker>>,
+    mut tiles: Query<(&mut Tile, &mut Transform, &Coordinates), Without<GridMarker>>,
     res_grid: Res<Grid>,
 ) {
     for e in resize_reader.read() {
-        for (tile, mut transform) in tiles.iter_mut() {
-            transform.translation.x = -e.width / 2. + res_grid.tile_size / 2. + res_grid.tile_size * tile.x as f32;
-            transform.translation.y = e.height / 2. - res_grid.tile_size / 2. - res_grid.tile_size * tile.y as f32;
+        for (tile, mut transform, coordinates) in tiles.iter_mut() {
+            transform.translation.x = -e.width / 2. + res_grid.tile_size / 2. + res_grid.tile_size * coordinates.x as f32;
+            transform.translation.y = e.height / 2. - res_grid.tile_size / 2. - res_grid.tile_size * coordinates.y as f32;
         };
     }
 }
@@ -42,112 +43,64 @@ pub fn tile_resize_system(
 }
 
 pub fn tile_place_system(
-    mut res_editor_data: ResMut<EditorData>,
+    mut e_set_tile: EventWriter<TilePlaceEvent>,
+    mut r_place_info: ResMut<PlaceInfo>,
     buttons: Res<Input<MouseButton>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
-    res_grid: Res<Grid>,
-    mut e_set_tile: EventWriter<TilePlaceEvent>,
-    res_captured: Res<IsCursorCaptured>,
-    mut res_place_info: ResMut<PlaceInfo>,
+    r_grid: Res<Grid>,
+    r_editor_data: Res<EditorData>,
+    r_captured: Res<IsCursorCaptured>,
 ) {
-    let mut project = match res_editor_data.get_current_project_mut() {
-        None => return,
-        Some(p) => p
-    };
-
     if buttons.just_released(MouseButton::Left) {
-        res_place_info.last_place_position = None
+        r_place_info.last_place_position = None
     }
 
     if buttons.pressed(MouseButton::Left) {
+        let project = match r_editor_data.get_current_project() {
+            None => return,
+            Some(p) => p
+        };
+
         let xy = match q_windows.single().cursor_position() {
             None => return,
             Some(p) => p.xy()
         };
 
-        if res_captured.0 {
+        if r_captured.0 {
             return;
         }
 
         // TODO - REPLACE
         let tile_to_place: char = 'g';
 
-        let tile_cords = Vec2::new(
-            ((xy.x + res_grid.offset.x) / res_grid.tile_size).floor(),
-            ((xy.y + res_grid.offset.y) / res_grid.tile_size).floor(),
+        let tile_cords = Coordinates::new(
+            ((xy.x + r_grid.offset.x) / r_grid.tile_size).floor() as i32,
+            ((xy.y + r_grid.offset.y) / r_grid.tile_size).floor() as i32,
         );
 
-        if tile_cords.x >= res_grid.map_size.x ||
-            tile_cords.y >= res_grid.map_size.y ||
-            tile_cords.x <= 0. ||
-            tile_cords.y <= 0. {
+        if tile_cords.x >= r_grid.map_size.x as i32 ||
+            tile_cords.y >= r_grid.map_size.y as i32 ||
+            tile_cords.x <= 0 ||
+            tile_cords.y <= 0 {
             return;
         }
 
-        project.map_entity.set_tile_at(
-            tile_to_place,
-            (tile_cords.x as i32, tile_cords.y as i32),
-            &mut e_set_tile,
-        );
+        if project.map_entity.tiles.get(&tile_cords).is_some() { return; }
 
-        // let dist = (xy + res_grid.offset) - (res_place_info.last_place_position.unwrap_or(xy) + res_grid.offset);
-        // let grid_dist = (dist / res_grid.tile_size).round().abs();
-        // let dir = dist.clamp(Vec2::new(-1., -1.), Vec2::new(1., 1.));
-        //
-        // res_place_info.last_place_position = Some(xy);
-        //
-        // match grid_dist.y.abs() > grid_dist.x.abs() {
-        //     true => {
-        //         // Y in greater
-        //         let slope = grid_dist.x / grid_dist.y;
-        //
-        //         for y in 0..grid_dist.y as i32 {
-        //             let tile_cords = Vec2::new(
-        //                 ((xy.x + res_grid.offset.x) / res_grid.tile_size + slope * dir.x).floor(),
-        //                 ((xy.y + res_grid.offset.y) / res_grid.tile_size + y as f32 * dir.y).floor(),
-        //             );
-        //
-        //             res_map.map.set_tile_at(
-        //                 &mut commands,
-        //                 (tile_cords.x as i32, tile_cords.y as i32),
-        //                 tile_to_place,
-        //                 &res_grid,
-        //             );
-        //         };
-        //     }
-        //     false => {
-        //         // X in greater
-        //         let slope = grid_dist.y / grid_dist.x;
-        //
-        //         for x in 0..grid_dist.x as i32 {
-        //             let tile_cords = Vec2::new(
-        //                 ((xy.x + res_grid.offset.x) / res_grid.tile_size + x as f32 * dir.x).floor(),
-        //                 ((xy.y + res_grid.offset.y) / res_grid.tile_size + slope * dir.y).floor(),
-        //             );
-        //
-        //             res_map.map.set_tile_at(
-        //                 &mut commands,
-        //                 (tile_cords.x as i32, tile_cords.y as i32),
-        //                 tile_to_place,
-        //                 &res_grid,
-        //             );
-        //         };
-        //     }
-        // };
+        let tile = Tile { character: tile_to_place, entity: None };
+        e_set_tile.send(TilePlaceEvent { tile, coordinates: tile_cords, should_update_sprites: true });
     }
 }
 
 pub fn tile_delete_system(
-    mut commands: Commands,
     mut res_editor_data: ResMut<EditorData>,
-    mut tiles: Query<(Entity, &Tile), Without<GridMarker>>,
-    mut e_update_sprite: EventWriter<UpdateSpriteEvent>,
+    mut e_delete_tile: EventWriter<TileDeleteEvent>,
     buttons: Res<Input<MouseButton>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
-    res_grid: Res<Grid>,
+    r_grid: Res<Grid>,
     res_captured: Res<IsCursorCaptured>,
 ) {
-    let mut project = match res_editor_data.get_current_project_mut() {
+    let project = match res_editor_data.get_current_project_mut() {
         None => return,
         Some(p) => p
     };
@@ -162,30 +115,19 @@ pub fn tile_delete_system(
             return;
         }
 
-        let tile_cords = Vec2::new(
-            ((xy.x + res_grid.offset.x) / res_grid.tile_size).floor(),
-            ((xy.y + res_grid.offset.y) / res_grid.tile_size).floor(),
+        let tile_cords = Coordinates::new(
+            ((xy.x + r_grid.offset.x) / r_grid.tile_size).floor() as i32,
+            ((xy.y + r_grid.offset.y) / r_grid.tile_size).floor() as i32,
         );
 
-        for (entity, q_tile) in tiles.iter_mut() {
-            if (q_tile.x, q_tile.y) == (tile_cords.x as i32, tile_cords.y as i32) {
-                let coords = &Coordinates { x: tile_cords.x as i32, y: tile_cords.y as i32 };
-                project.map_entity.tiles.remove(coords);
-
-                let tiles_around = project.map_entity.get_tiles_around(coords);
-
-                for tile in tiles_around {
-                    if let Some(tile) = tile {
-                        e_update_sprite.send(
-                            UpdateSpriteEvent {
-                                tile: *tile,
-                            }
-                        );
-                    }
-                }
-
-                commands.get_entity(entity).unwrap().despawn();
-            }
+        let tile = match project.map_entity.tiles.get(&tile_cords) {
+            None => { return; }
+            Some(t) => t
         };
+
+        e_delete_tile.send(TileDeleteEvent {
+            tile: *tile,
+            coordinates: tile_cords,
+        });
     }
 }

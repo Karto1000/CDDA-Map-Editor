@@ -7,18 +7,17 @@ use bevy::text::TextSection;
 use bevy_file_dialog::{DialogFileSaved, FileDialogExt};
 
 use crate::EditorData;
-use crate::hotbar::tabs::Tab;
-use crate::project::{Project, ProjectSaveState};
-
-pub struct NoData;
+use crate::map::{TileDeleteEvent, TilePlaceEvent};
+use crate::project::resources::{Project, ProjectSaveState};
+use crate::ui::tabs::components::Tab;
 
 pub fn map_save_system(
     keys: Res<Input<KeyCode>>,
-    res_editor_data: ResMut<EditorData>,
+    r_editor_data: ResMut<EditorData>,
     mut commands: Commands,
 ) {
     if keys.pressed(KeyCode::ControlLeft) && keys.just_pressed(KeyCode::S) {
-        let current_project = res_editor_data.get_current_project().unwrap();
+        let current_project = r_editor_data.get_current_project().unwrap();
 
         match &current_project.save_state {
             ProjectSaveState::Saved(p) => {
@@ -100,5 +99,36 @@ pub fn save_directory_picked(
         // Remove the original file and Save it back and overwrite the original file
         fs::remove_file(&event.path).unwrap();
         fs::write(&event.path, serde_json::to_string(&entity).unwrap().into_bytes()).unwrap();
+    }
+}
+
+pub fn set_tile_reader(
+    mut e_set_tile: EventReader<TilePlaceEvent>,
+    mut r_editor_data: ResMut<EditorData>,
+) {
+    let project = match r_editor_data.get_current_project_mut() {
+        None => { return; }
+        Some(p) => { p }
+    };
+
+    for e in e_set_tile.read() {
+        project.map_entity.tiles.insert(
+            e.coordinates.clone(),
+            e.tile,
+        );
+    }
+}
+
+pub fn tile_remove_reader(
+    mut e_delete_tile: EventReader<TileDeleteEvent>,
+    mut r_editor_data: ResMut<EditorData>,
+) {
+    let project = match r_editor_data.get_current_project_mut() {
+        None => { return; }
+        Some(p) => { p }
+    };
+
+    for e in e_delete_tile.read() {
+        project.map_entity.tiles.remove(&e.coordinates);
     }
 }

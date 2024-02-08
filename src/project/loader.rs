@@ -6,7 +6,7 @@ use std::path::Path;
 use directories::ProjectDirs;
 
 use crate::project::loader::LoadError::NoAutoSave;
-use crate::project::Project;
+use crate::project::resources::Project;
 
 #[derive(Debug)]
 pub enum LoadError {

@@ -1,24 +1,24 @@
-use std::fmt::Formatter;
-use std::sync::Arc;
-
 use bevy::app::{App, Plugin, Update};
 use bevy::asset::Handle;
-use bevy::prelude::{apply_deferred, Commands, default, Entity, Event, EventReader, EventWriter, Image, Query, Res, ResMut, Resource, SpriteBundle, Transform, Vec3, With};
+use bevy::prelude::{Commands, Component, default, Entity, Event, EventReader, EventWriter, Image, Query, Res, ResMut, Resource, SpriteBundle, Transform, Vec3, With};
 use bevy::prelude::IntoSystemConfigs;
 use bevy::reflect::TypeData;
+use bevy::utils::tracing::Instrument;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::Visitor;
 
 use crate::{EditorData, GraphicsResource};
+use crate::common::Coordinates;
 use crate::graphics::SpriteType;
 use crate::grid::resources::Grid;
-use crate::map::map_entity::MapEntity;
+use crate::map::events::{ClearTiles, SpawnMapEntity, TileDeleteEvent, TilePlaceEvent, UpdateSpriteEvent};
 use crate::map::systems::{map_save_system, save_directory_picked};
-use crate::project::Project;
-use crate::tiles::Tile;
+use crate::project::resources::Project;
+use crate::tiles::components::Tile;
 
 pub(crate) mod systems;
-pub(crate) mod map_entity;
+pub(crate) mod resources;
+pub(crate) mod events;
 
 pub struct MapPlugin;
 
@@ -28,111 +28,48 @@ impl Plugin for MapPlugin {
         app.add_systems(Update, save_directory_picked);
         app.add_systems(Update, spawn_map_entity_reader);
         app.add_systems(Update, clear_tiles_reader);
-        app.add_systems(Update, (tile_spawn_reader, apply_deferred, update_sprite_reader).chain());
+        app.add_systems(Update, update_sprite_reader);
 
         app.add_event::<TilePlaceEvent>();
+        app.add_event::<TileDeleteEvent>();
         app.add_event::<UpdateSpriteEvent>();
         app.add_event::<SpawnMapEntity>();
         app.add_event::<ClearTiles>();
     }
 }
 
-pub struct CoordinatesVisitor;
 
-impl<'de> Visitor<'de> for CoordinatesVisitor {
-    type Value = Coordinates;
-
-    fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
-        formatter.write_str("an string of two numbers separated by a semicolon (example: 10;10)")
-    }
-
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E> where E: serde::de::Error {
-        let split: Vec<&str> = v.split(";").collect::<Vec<&str>>();
-
-        return Ok(Coordinates {
-            x: split.get(0).expect("Value before ';'").parse().expect("Valid i32"),
-            y: split.get(1).expect("Value after ';'").parse().expect("Valid i32"),
-        });
-    }
-}
-
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Default)]
-pub struct Coordinates {
-    pub x: i32,
-    pub y: i32,
-}
-
-impl Serialize for Coordinates {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        return Ok(serializer.serialize_str(&format!("{};{}", self.x, self.y))?);
-    }
-}
-
-impl<'de> Deserialize<'de> for Coordinates {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
-        return Ok(deserializer.deserialize_str(CoordinatesVisitor)?);
-    }
-}
-
-#[derive(Event, Debug)]
-pub struct UpdateSpriteEvent {
-    pub tile: Tile,
-}
-
-#[derive(Event, Debug)]
-pub struct TilePlaceEvent {
-    tile: Tile,
-    update_sprites_around: bool,
-}
-
-pub fn update_sprite_reader(
-    mut e_update_sprite: EventReader<UpdateSpriteEvent>,
-    mut q_sprite: Query<&mut Handle<Image>, With<Tile>>,
-    r_textures: Res<GraphicsResource>,
-    r_editor_data: Res<EditorData>,
-) {
-    let project = match r_editor_data.get_current_project() {
-        None => { return; }
-        Some(p) => { p }
-    };
-
-    for e in e_update_sprite.read() {
-        let sprite = get_fitting_sprite(&e.tile, &project, &r_textures);
-
-        let mut image = match q_sprite.get_mut(e.tile.entity.unwrap()) {
-            Ok(i) => { i }
-            Err(_) => { return; }
-        };
-        *image = sprite.clone();
-    }
-}
-
-fn get_fitting_sprite<'a>(tile: &'a Tile, project: &'a Project, res_textures: &'a Res<GraphicsResource>) -> &'a Handle<Image> {
-    let sprite_type = res_textures.get_texture(&project.map_entity.get_tile_id_from_character(&tile.character));
+fn get_fitting_sprite<'a>(
+    coordinates: &Coordinates,
+    character: &char,
+    project: &'a Project,
+    r_textures: &'a Res<GraphicsResource>,
+) -> &'a Handle<Image> {
+    let sprite_type = r_textures.get_texture(&project.map_entity.get_tile_id_from_character(character));
 
     return match sprite_type {
         SpriteType::Single(s) => s,
         SpriteType::Multitile { center, corner, t_connection, edge, end_piece, unconnected } => {
-            let tiles_around = project.map_entity.get_tiles_around(&Coordinates { x: tile.x, y: tile.y });
+            let tiles_around = project.map_entity.get_tiles_around(coordinates);
 
-            let is_tile_ontop_same_type = match tiles_around.get(0).unwrap() {
+            let is_tile_ontop_same_type = match tiles_around.get(0).unwrap().0 {
                 None => false,
-                Some(top) => top.character == tile.character
+                Some(top) => top.character == *character
             };
 
-            let is_tile_right_same_type = match tiles_around.get(1).unwrap() {
+            let is_tile_right_same_type = match tiles_around.get(1).unwrap().0 {
                 None => false,
-                Some(right) => right.character == tile.character
+                Some(right) => right.character == *character
             };
 
-            let is_tile_below_same_type = match tiles_around.get(2).unwrap() {
+            let is_tile_below_same_type = match tiles_around.get(2).unwrap().0 {
                 None => false,
-                Some(below) => below.character == tile.character
+                Some(below) => below.character == *character
             };
 
-            let is_tile_left_same_type = match tiles_around.get(3).unwrap() {
+            let is_tile_left_same_type = match tiles_around.get(3).unwrap().0 {
                 None => false,
-                Some(left) => left.character == tile.character
+                Some(left) => left.character == *character
             };
 
             return match (is_tile_ontop_same_type, is_tile_right_same_type, is_tile_below_same_type, is_tile_left_same_type) {
@@ -158,21 +95,43 @@ fn get_fitting_sprite<'a>(tile: &'a Tile, project: &'a Project, res_textures: &'
     };
 }
 
+pub fn update_sprite_reader(
+    mut e_update_sprite: EventReader<UpdateSpriteEvent>,
+    mut q_sprite: Query<&mut Handle<Image>, With<Tile>>,
+    r_textures: Res<GraphicsResource>,
+    r_editor_data: Res<EditorData>,
+) {
+    let project = match r_editor_data.get_current_project() {
+        None => { return; }
+        Some(p) => { p }
+    };
+
+    for e in e_update_sprite.read() {
+        let sprite = get_fitting_sprite(&e.coordinates, &e.tile.character, &project, &r_textures);
+
+        let mut image = match q_sprite.get_mut(e.tile.entity.unwrap()) {
+            Ok(i) => { i }
+            Err(_) => { return; }
+        };
+        *image = sprite.clone();
+    }
+}
+
 pub fn tile_spawn_reader(
     mut commands: Commands,
     mut e_tile_place: EventReader<TilePlaceEvent>,
     mut e_update_sprite: EventWriter<UpdateSpriteEvent>,
-    res_grid: Res<Grid>,
-    res_textures: Res<GraphicsResource>,
-    mut res_editor_data: ResMut<EditorData>,
+    r_grid: Res<Grid>,
+    r_textures: Res<GraphicsResource>,
+    mut r_editor_data: ResMut<EditorData>,
 ) {
-    let project = match res_editor_data.get_current_project_mut() {
+    let project = match r_editor_data.get_current_project_mut() {
         None => { return; }
         Some(p) => { p }
     };
 
     for e in e_tile_place.read() {
-        let sprite = get_fitting_sprite(&e.tile, &project, &res_textures);
+        let sprite = get_fitting_sprite(&e.coordinates, &e.tile.character, &project, &r_textures);
 
         let entity_commands = commands.spawn((
             e.tile,
@@ -186,28 +145,31 @@ pub fn tile_spawn_reader(
                         z: 1.0,
                     },
                     scale: Vec3 {
-                        x: res_grid.tile_size / res_grid.default_tile_size,
-                        y: res_grid.tile_size / res_grid.default_tile_size,
+                        x: r_grid.tile_size / r_grid.default_tile_size,
+                        y: r_grid.tile_size / r_grid.default_tile_size,
                         z: 0.,
                     },
                     ..default()
                 },
                 ..default()
             },
+            e.coordinates.clone()
         ));
 
-        project.map_entity.tiles.get_mut(&Coordinates { x: e.tile.x, y: e.tile.y }).unwrap().entity = Some(entity_commands.id());
+        project.map_entity.tiles.get_mut(&e.coordinates).unwrap().entity = Some(entity_commands.id());
 
-        if e.update_sprites_around {
-            let tiles_around = project.map_entity.get_tiles_around(&Coordinates { x: e.tile.x, y: e.tile.y });
+        // Check here because i couldn't figure out why the sprites were not correct when spawning a saved map
+        if e.should_update_sprites {
+            let tiles_around = project.map_entity.get_tiles_around(&e.coordinates);
 
-            for tile in tiles_around {
+            for (tile, coordinates) in tiles_around {
                 match tile {
                     None => {}
                     Some(t) => {
                         e_update_sprite.send(
                             UpdateSpriteEvent {
                                 tile: *t,
+                                coordinates,
                             }
                         )
                     }
@@ -217,9 +179,41 @@ pub fn tile_spawn_reader(
     }
 }
 
-#[derive(Event)]
-pub struct SpawnMapEntity {
-    pub map_entity: Arc<MapEntity>,
+pub fn tile_despawn_reader(
+    mut commands: Commands,
+    mut e_tile_delete: EventReader<TileDeleteEvent>,
+    mut e_update_sprite: EventWriter<UpdateSpriteEvent>,
+    r_editor_data: Res<EditorData>,
+) {
+    let project = match r_editor_data.get_current_project() {
+        None => { return; }
+        Some(p) => { p }
+    };
+
+    for event in e_tile_delete.read() {
+        match event.tile.entity {
+            None => {}
+            Some(e) => {
+                let tiles_around = project.map_entity.get_tiles_around(&event.coordinates);
+
+                for (tile, coordinates) in tiles_around {
+                    match tile {
+                        None => {}
+                        Some(t) => {
+                            e_update_sprite.send(
+                                UpdateSpriteEvent {
+                                    tile: *t,
+                                    coordinates,
+                                }
+                            )
+                        }
+                    }
+                }
+
+                commands.get_entity(e).unwrap().despawn()
+            }
+        }
+    }
 }
 
 pub fn spawn_map_entity_reader(
@@ -227,19 +221,17 @@ pub fn spawn_map_entity_reader(
     mut e_tile_place: EventWriter<TilePlaceEvent>,
 ) {
     for event in e_spawn_map_entity.read() {
-        for (_, tile) in event.map_entity.tiles.iter() {
+        for (coords, tile) in event.map_entity.tiles.iter() {
             e_tile_place.send(
                 TilePlaceEvent {
                     tile: tile.clone(),
-                    update_sprites_around: false
+                    coordinates: coords.clone(),
+                    should_update_sprites: false,
                 }
             )
         }
     }
 }
-
-#[derive(Event)]
-pub struct ClearTiles;
 
 pub fn clear_tiles_reader(
     mut q_tiles: Query<Entity, With<Tile>>,

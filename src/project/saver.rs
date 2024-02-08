@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 
-use crate::project::Project;
+use crate::project::resources::Project;
 
 #[derive(Debug)]
 pub enum SaveError {

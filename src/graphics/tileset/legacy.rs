@@ -539,7 +539,6 @@ impl TilesetLoader<LegacyTileset> for LegacyTilesetLoader {
 
                                                 unconnected = Some(image_resource.add(image));
                                             }
-
                                             _ => { panic!("Go Unexpected id {}", additional_tile.id) }
                                         }
                                     }

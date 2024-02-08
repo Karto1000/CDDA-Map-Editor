@@ -6,7 +6,7 @@ use bevy::window::{PrimaryWindow, WindowResized};
 
 use crate::EditorData;
 use crate::grid::{DragInfo, Grid, GridMarker};
-use crate::tiles::Tile;
+use crate::tiles::components::Tile;
 
 pub fn window_grid_resize_system(
     mut resize_reader: EventReader<WindowResized>,
@@ -22,39 +22,39 @@ pub fn window_grid_resize_system(
 
 pub fn grid_resize_system(
     mut scroll_event: EventReader<MouseWheel>,
-    mut res_grid: ResMut<Grid>,
+    mut r_grid: ResMut<Grid>,
     mut tiles: Query<(&mut Tile, &mut Transform), Without<GridMarker>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
 ) {
     for event in scroll_event.read() {
         match event.unit {
             MouseScrollUnit::Line => {
-                if res_grid.tile_size <= res_grid.min_zoom && event.y <= -1. { return; }
-                if res_grid.tile_size >= res_grid.max_zoom && event.y >= 1. { return; }
+                if r_grid.tile_size <= r_grid.min_zoom && event.y <= -1. { return; }
+                if r_grid.tile_size >= r_grid.max_zoom && event.y >= 1. { return; }
 
                 let window = q_windows.single();
 
                 let original_tile_amount = Vec2::new(
-                    window.resolution.width() / res_grid.tile_size,
-                    window.resolution.height() / res_grid.tile_size,
+                    window.resolution.width() / r_grid.tile_size,
+                    window.resolution.height() / r_grid.tile_size,
                 );
 
-                let size = res_grid.tile_size.clone();
-                res_grid.tile_size = size + event.y * 2.;
+                let size = r_grid.tile_size.clone();
+                r_grid.tile_size = size + event.y * 2.;
 
                 let new_tile_amount = Vec2::new(
-                    window.resolution.width() / res_grid.tile_size,
-                    window.resolution.height() / res_grid.tile_size,
+                    window.resolution.width() / r_grid.tile_size,
+                    window.resolution.height() / r_grid.tile_size,
                 );
 
                 let pixels_shifted = original_tile_amount - new_tile_amount;
-                let offset = res_grid.offset.clone();
+                let offset = r_grid.offset.clone();
 
-                res_grid.offset += (((window.cursor_position().unwrap() - pixels_shifted) + offset) / size) * event.y;
+                r_grid.offset += (((window.cursor_position().unwrap() - pixels_shifted) + offset) / size) * event.y;
 
                 for (_, mut transform) in tiles.iter_mut() {
-                    transform.scale.x = res_grid.tile_size / res_grid.default_tile_size;
-                    transform.scale.y = res_grid.tile_size / res_grid.default_tile_size;
+                    transform.scale.x = r_grid.tile_size / r_grid.default_tile_size;
+                    transform.scale.y = r_grid.tile_size / r_grid.default_tile_size;
                 }
             }
             MouseScrollUnit::Pixel => panic!("Not Implemented")

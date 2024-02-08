@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 
 use bevy::math::Vec2;
-use bevy::prelude::{EventWriter, Resource};
+use bevy::prelude::Resource;
 use serde::{Deserialize, Serialize};
 
-use crate::common::{MeabyWeighted, TileId};
-use crate::map::{Coordinates, TilePlaceEvent};
+use crate::common::{Coordinates, MeabyWeighted, TileId};
 use crate::palettes::{MapObjectId, Palette};
-use crate::tiles::Tile;
+use crate::tiles::components::Tile;
 
 #[derive(Serialize, Deserialize, Debug, Resource, Clone)]
 pub struct MapEntity {
@@ -42,25 +41,6 @@ impl MapEntity {
         };
     }
 
-    pub fn set_tile_at(
-        &mut self,
-        character: char,
-        cords: (i32, i32),
-        e_set_tile: &mut EventWriter<TilePlaceEvent>,
-    ) {
-        let coordinates = Coordinates { x: cords.0, y: cords.1 };
-        if self.tiles.get(&coordinates).is_some() { return; }
-
-        let tile = Tile { character, x: cords.0, y: cords.1, entity: None };
-
-        e_set_tile.send(TilePlaceEvent { tile, update_sprites_around: true });
-
-        self.tiles.insert(
-            coordinates,
-            tile,
-        );
-    }
-
     pub fn get_tile_id_from_character(&self, character: &char) -> TileId {
         for palette in self.palettes.iter() {
             if let Some(id) = palette.terrain.get(character) {
@@ -82,11 +62,22 @@ impl MapEntity {
         return TileId { 0: "TODO_IMPLEMENT_DEFAULT".into() };
     }
 
-    pub fn get_tiles_around(&self, coordinates: &Coordinates) -> Vec<Option<&Tile>> {
-        let tile_ontop = self.tiles.get(&Coordinates { x: coordinates.x, y: coordinates.y - 1 });
-        let tile_right = self.tiles.get(&Coordinates { x: coordinates.x + 1, y: coordinates.y });
-        let tile_below = self.tiles.get(&Coordinates { x: coordinates.x, y: coordinates.y + 1 });
-        let tile_left = self.tiles.get(&Coordinates { x: coordinates.x - 1, y: coordinates.y });
-        return vec![tile_ontop, tile_right, tile_below, tile_left];
+    pub fn get_tiles_around(&self, coordinates: &Coordinates) -> Vec<(Option<&Tile>, Coordinates)> {
+        let top_coordinates = Coordinates { x: coordinates.x, y: coordinates.y - 1 };
+        let right_coordinates = Coordinates { x: coordinates.x + 1, y: coordinates.y };
+        let below_coordinates = Coordinates { x: coordinates.x, y: coordinates.y + 1 };
+        let left_coordinates = Coordinates { x: coordinates.x - 1, y: coordinates.y };
+
+        let tile_ontop = self.tiles.get(&top_coordinates);
+        let tile_right = self.tiles.get(&right_coordinates);
+        let tile_below = self.tiles.get(&below_coordinates);
+        let tile_left = self.tiles.get(&left_coordinates);
+
+        return vec![
+            (tile_ontop, top_coordinates),
+            (tile_right, right_coordinates),
+            (tile_below, below_coordinates),
+            (tile_left, left_coordinates),
+        ];
     }
 }
