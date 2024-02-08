@@ -110,7 +110,7 @@ fn get_image_from_tileset(image: &DynamicImage, x: u32, y: u32, width: u32, heig
 }
 
 fn get_xy_from_fg(fg: &i32, last_group_index: i32) -> Vec2 {
-    let local_tile_index: u32 = (fg - last_group_index) as u32;
+    let local_tile_index: u32 = (fg - last_group_index) as u32 - 1;
 
     return Vec2::new(
         (local_tile_index % AMOUNT_OF_SPRITES_PER_ROW) as f32,

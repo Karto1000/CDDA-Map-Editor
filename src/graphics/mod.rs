@@ -9,22 +9,22 @@ use crate::project::loader::Load;
 pub(crate) mod tileset;
 
 pub struct FullCardinal {
-    north: Handle<Image>,
-    east: Handle<Image>,
-    south: Handle<Image>,
-    west: Handle<Image>,
+    pub north: Handle<Image>,
+    pub east: Handle<Image>,
+    pub south: Handle<Image>,
+    pub west: Handle<Image>,
 }
 
 pub struct Corner {
-    north_west: Handle<Image>,
-    south_west: Handle<Image>,
-    south_east: Handle<Image>,
-    north_east: Handle<Image>
+    pub north_west: Handle<Image>,
+    pub south_west: Handle<Image>,
+    pub south_east: Handle<Image>,
+    pub north_east: Handle<Image>
 }
 
 pub struct Edge {
-    north_south: Handle<Image>,
-    east_west: Handle<Image>,
+    pub north_south: Handle<Image>,
+    pub east_west: Handle<Image>,
 }
 
 pub enum SpriteType {
@@ -53,12 +53,8 @@ impl GraphicsResource {
         };
     }
 
-    pub fn get_texture(&self, tile_id: &TileId) -> &Handle<Image> {
+    pub fn get_texture(&self, tile_id: &TileId) -> &SpriteType {
         // TODO Add actual sensible default
-        // return self.textures.get(tile_id).unwrap_or(self.textures.get(&TileId { 0: "t_bridge".into() }).unwrap());
-        return match self.textures.get(tile_id).unwrap() {
-            SpriteType::Single(h) => { h }
-            SpriteType::Multitile { center, .. } => { center }
-        };
+        return self.textures.get(tile_id).unwrap();
     }
 }

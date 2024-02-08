@@ -88,4 +88,12 @@ impl MapEntity {
 
         return TileId { 0: "TODO_IMPLEMENT_DEFAULT".into() };
     }
+
+    pub fn get_tiles_around(&self, coordinates: &Coordinates) -> (Option<&Tile>, Option<&Tile>, Option<&Tile>, Option<&Tile>) {
+        let tile_ontop = self.tiles.get(&Coordinates { x: coordinates.x, y: coordinates.y - 1 });
+        let tile_right = self.tiles.get(&Coordinates { x: coordinates.x + 1, y: coordinates.y });
+        let tile_below = self.tiles.get(&Coordinates { x: coordinates.x, y: coordinates.y + 1 });
+        let tile_left = self.tiles.get(&Coordinates { x: coordinates.x - 1, y: coordinates.y });
+        return (tile_ontop, tile_right, tile_below, tile_left);
+    }
 }
