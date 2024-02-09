@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use anyhow::Error;
 use bevy::asset::{Assets, Handle};
 use bevy::prelude::{Image, ResMut, Vec2};
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
@@ -34,6 +35,8 @@ pub struct TilesetInfo {
 #[derive(Debug, Deserialize)]
 pub struct TileGroup {
     pub file: String,
+    #[serde(rename = "//")]
+    pub range: Option<String>,
     pub tiles: Vec<TilesetTileDescriptor>,
 }
 
@@ -56,7 +59,6 @@ pub struct TilesetTileDescriptor {
     pub id: MeabyMulti<String>,
 
     // a sprite root name that will be put on foreground
-    // TODO: Figure out why UndeadPeopleTileset uses numbers instead of Strings
     pub fg: Option<MeabyMulti<MeabyWeighted<i32>>>,
 
     // another sprite root name that will be the background; can be empty for no background
@@ -76,18 +78,6 @@ pub struct LegacyTileset {
     pub config_file_name: String,
     pub info: TilesetInfo,
     pub tiles: Vec<TileGroup>,
-}
-
-pub struct LegacyTilesetLoader {
-    pub path: PathBuf,
-}
-
-impl LegacyTilesetLoader {
-    pub fn new(path: PathBuf) -> Self {
-        return Self {
-            path
-        };
-    }
 }
 
 fn get_image_from_tileset(image: &DynamicImage, x: u32, y: u32, width: u32, height: u32) -> Image {
@@ -112,13 +102,233 @@ fn get_image_from_tileset(image: &DynamicImage, x: u32, y: u32, width: u32, heig
     return image;
 }
 
-fn get_xy_from_index(fg: &i32, last_group_index: i32) -> Vec2 {
-    let local_tile_index: u32 = (fg - last_group_index) as u32;
+fn get_xy_from_index(index: &i32, last_group_index: i32) -> Vec2 {
+    let local_tile_index: u32 = (index - last_group_index) as u32;
 
     return Vec2::new(
         (local_tile_index % AMOUNT_OF_SPRITES_PER_ROW) as f32,
         ((local_tile_index / AMOUNT_OF_SPRITES_PER_ROW) as f32).floor(),
     );
+}
+
+fn get_sprite_trait_from_single_fg(
+    fg: &MeabyWeighted<i32>,
+    loaded_sprites: &HashMap<i32, Handle<Image>>,
+) -> Option<Arc<dyn GetForeground>> {
+    let handle = match fg {
+        MeabyWeighted::NotWeighted(fg) => {
+            // fg 9519 doesnt even fucking exist yet it is used, ...
+            match loaded_sprites.get(fg) {
+                // TODO REVISIT
+                None => return None,
+                Some(h) => h
+            }
+        }
+        MeabyWeighted::Weighted(w) => {
+            match loaded_sprites.get(&w.value) {
+                None => return None,
+                Some(h) => h
+            }
+        }
+    };
+
+    return Some(Arc::new(SingleForeground { sprite: handle.clone() }));
+}
+
+fn get_sprite_trait_from_multi_fg(
+    fg: &Vec<MeabyWeighted<i32>>,
+    loaded_sprites: &HashMap<i32, Handle<Image>>,
+) -> Option<Arc<dyn GetForeground>> {
+    let mut textures: Vec<Weighted<Handle<Image>>> = Vec::new();
+
+    for meaby_weighted in fg.iter() {
+        match meaby_weighted {
+            MeabyWeighted::NotWeighted(v) => {
+                // TODO: Figure out what to do here
+                warn!("Elements with fg {:?} should be weighted", fg)
+            }
+            MeabyWeighted::Weighted(w) => {
+                // TODO Revisit
+                match loaded_sprites.get(&w.value) {
+                    None => {}
+                    Some(sprite) => textures.push(Weighted::new(sprite.clone(), w.weight))
+                };
+            }
+        }
+    }
+
+    return Some(Arc::new(WeightedForeground { weighted_sprites: textures }));
+}
+
+fn get_sprite_trait_from_single_bg(
+    bg: &MeabyWeighted<i32>,
+    loaded_sprites: &HashMap<i32, Handle<Image>>,
+) -> Option<Arc<dyn GetBackground>> {
+    let handle = match bg {
+        MeabyWeighted::NotWeighted(bg) => {
+            match loaded_sprites.get(bg) {
+                None => return None,
+                Some(sprite) => sprite
+            }
+        }
+        MeabyWeighted::Weighted(w) => {
+            match loaded_sprites.get(&w.value) {
+                None => return None,
+                Some(sprite) => sprite
+            }
+        }
+    };
+
+    return Some(Arc::new(SingleBackground { sprite: handle.clone() }));
+}
+
+fn get_sprite_trait_from_multi_bg(
+    bg: &Vec<MeabyWeighted<i32>>,
+    loaded_sprites: &HashMap<i32, Handle<Image>>,
+) -> Option<Arc<dyn GetBackground>> {
+    let mut textures: Vec<Weighted<Handle<Image>>> = Vec::new();
+
+    for meaby_weighted in bg.iter() {
+        match meaby_weighted {
+            MeabyWeighted::NotWeighted(v) => {
+                // TODO: Figure out what to do here
+                warn!("Elements with bg {:?} should be weighted", bg)
+            }
+            MeabyWeighted::Weighted(w) => {
+                match loaded_sprites.get(&w.value) {
+                    None => return None,
+                    Some(sprite) => {
+                        textures.push(Weighted {
+                            value: sprite.clone(),
+                            weight: w.weight,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    return Some(Arc::new(WeightedBackground { weighted_sprites: textures }));
+}
+
+fn get_single_fg_and_bg(
+    loaded_sprites: &HashMap<i32, Handle<Image>>,
+    fg: &MeabyMulti<MeabyWeighted<i32>>,
+    bg: &Option<MeabyMulti<MeabyWeighted<i32>>>,
+) -> (Option<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>) {
+    let get_fg = match fg {
+        MeabyMulti::Multi(multi) => {
+            get_sprite_trait_from_multi_fg(
+                multi,
+                loaded_sprites,
+            )
+        }
+        MeabyMulti::Single(fg) => {
+            get_sprite_trait_from_single_fg(
+                &fg,
+                loaded_sprites,
+            )
+        }
+    };
+
+    let get_bg = match bg {
+        Some(bg) => {
+            match bg {
+                MeabyMulti::Multi(multi) => {
+                    get_sprite_trait_from_multi_bg(
+                        multi,
+                        loaded_sprites,
+                    )
+                }
+                MeabyMulti::Single(bg) => {
+                    get_sprite_trait_from_single_bg(
+                        &bg,
+                        loaded_sprites,
+                    )
+                }
+            }
+        }
+        None => None
+    };
+
+    return (get_fg, get_bg);
+}
+
+fn get_multi_fg_and_bg(
+    loaded_sprites: &HashMap<i32, Handle<Image>>,
+    fg: &MeabyMulti<MeabyWeighted<i32>>,
+    bg: &Option<MeabyMulti<MeabyWeighted<i32>>>,
+) -> (Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>) {
+    let get_fg = match fg {
+        MeabyMulti::Single(fg) => {
+            // Seriously? Why would you not just put the same id in the list four times?
+            let get_fg = get_sprite_trait_from_single_fg(
+                &fg,
+                loaded_sprites,
+            );
+
+            // TODO REVISIT
+            match get_fg {
+                None => vec![],
+                Some(get_fg) => vec![get_fg.clone(), get_fg.clone(), get_fg.clone(), get_fg.clone()]
+            }
+        }
+        MeabyMulti::Multi(v) => {
+            // Direction is NW, SW, SE, NE
+            let mut getters = Vec::new();
+
+            for fg in v.iter() {
+                let arc = get_sprite_trait_from_single_fg(
+                    &fg,
+                    loaded_sprites,
+                );
+
+                // TODO REVISIT
+                if arc.is_none() {
+                    continue;
+                }
+
+                getters.push(arc.unwrap());
+            }
+
+            getters
+        }
+    };
+
+    let get_bg = match bg {
+        Some(bg) => {
+            match bg {
+                MeabyMulti::Multi(multi) => {
+                    get_sprite_trait_from_multi_bg(
+                        multi,
+                        loaded_sprites,
+                    )
+                }
+                MeabyMulti::Single(bg) => {
+                    get_sprite_trait_from_single_bg(
+                        bg,
+                        loaded_sprites,
+                    )
+                }
+            }
+        }
+        None => None
+    };
+
+    return (get_fg, get_bg);
+}
+
+
+pub struct LegacyTilesetLoader {
+    pub path: PathBuf,
+}
+
+impl LegacyTilesetLoader {
+    pub fn new(path: PathBuf) -> Self {
+        return Self {
+            path
+        };
+    }
 }
 
 pub trait GetForeground: Send + Sync {
@@ -159,7 +369,11 @@ pub struct WeightedBackground {
 
 impl GetBackground for WeightedBackground {
     fn get_sprite(&self) -> &Handle<Image> {
-        todo!()
+        let mut rng = rand::thread_rng();
+        let random_index: usize = rng.gen_range(0..self.weighted_sprites.len());
+        // TODO Take weights into account
+        let random_sprite = self.weighted_sprites.get(random_index).unwrap();
+        return &random_sprite.value;
     }
 }
 
@@ -169,10 +383,9 @@ pub struct SingleBackground {
 
 impl GetBackground for SingleBackground {
     fn get_sprite(&self) -> &Handle<Image> {
-        todo!()
+        return &self.sprite;
     }
 }
-
 
 impl Load<LegacyTileset> for LegacyTilesetLoader {
     fn load(&self) -> Result<LegacyTileset, LoadError> {
@@ -255,356 +468,170 @@ impl Load<LegacyTileset> for LegacyTilesetLoader {
     }
 }
 
-
-fn get_sprite_trait_from_single_fg(
-    fg: &MeabyWeighted<i32>,
-    last_group_index: i32,
-    image: &DynamicImage,
-    image_resource: &mut ResMut<Assets<Image>>,
-    tileset: &LegacyTileset,
-) -> Option<Arc<dyn GetForeground>> {
-    let handle = match fg {
-        MeabyWeighted::NotWeighted(fg) => {
-            let xy = get_xy_from_index(fg, last_group_index);
-
-            // TODO: Figure out what to do if the sprite is inside another file
-            if fg < &last_group_index {
-                return None;
-            }
-
-            let image = get_image_from_tileset(
-                &image,
-                xy.x as u32 * tileset.info.tile_width,
-                xy.y as u32 * tileset.info.tile_height,
-                tileset.info.tile_width,
-                tileset.info.tile_height,
-            );
-
-            image_resource.add(image)
-        }
-        MeabyWeighted::Weighted(w) => {
-            let xy = get_xy_from_index(&w.value, last_group_index);
-
-            // TODO: Figure out what to do if the sprite is inside another file
-            if &w.value < &last_group_index {
-                return None;
-            }
-
-            let image = get_image_from_tileset(
-                &image,
-                xy.x as u32 * tileset.info.tile_width,
-                xy.y as u32 * tileset.info.tile_height,
-                tileset.info.tile_width,
-                tileset.info.tile_height,
-            );
-
-            image_resource.add(image)
-        }
-    };
-
-    return Some(Arc::new(SingleForeground { sprite: handle }));
-}
-
-fn get_sprite_trait_from_multi_fg(
-    fg: &Vec<MeabyWeighted<i32>>,
-    last_group_index: i32,
-    image: &DynamicImage,
-    image_resource: &mut ResMut<Assets<Image>>,
-    tileset: &LegacyTileset,
-) -> Option<Arc<dyn GetForeground>> {
-    let mut textures: Vec<Weighted<Handle<Image>>> = Vec::new();
-
-    for meaby_weighted in fg.iter() {
-        match meaby_weighted {
-            MeabyWeighted::NotWeighted(v) => {
-                // TODO: Figure out what to do here
-                warn!("Elements with fg {:?} should be weighted", fg)
-            }
-            MeabyWeighted::Weighted(w) => {
-                let xy = get_xy_from_index(&w.value, last_group_index);
-
-                // TODO: Figure out what to do if the sprite is inside another file
-                if w.value < last_group_index {
-                    return None;
-                }
-
-                let image = get_image_from_tileset(
-                    &image,
-                    xy.x as u32 * tileset.info.tile_width,
-                    xy.y as u32 * tileset.info.tile_height,
-                    tileset.info.tile_width,
-                    tileset.info.tile_height,
-                );
-
-                textures.push(Weighted { value: image_resource.add(image), weight: w.weight });
-            }
-        }
-    }
-
-    return Some(Arc::new(WeightedForeground { weighted_sprites: textures }));
-}
-
-fn get_sprite_trait_from_single_bg(
-    bg: &MeabyWeighted<i32>,
-    last_group_index: i32,
-    image: &DynamicImage,
-    image_resource: &mut ResMut<Assets<Image>>,
-    tileset: &LegacyTileset,
-) -> Option<Arc<dyn GetBackground>> {
-    let handle = match bg {
-        MeabyWeighted::NotWeighted(bg) => {
-            let xy = get_xy_from_index(bg, last_group_index);
-
-            // TODO: Figure out what to do if the sprite is inside another file
-            if bg < &last_group_index {
-                return None;
-            }
-
-            let image = get_image_from_tileset(
-                &image,
-                xy.x as u32 * tileset.info.tile_width,
-                xy.y as u32 * tileset.info.tile_height,
-                tileset.info.tile_width,
-                tileset.info.tile_height,
-            );
-
-            image_resource.add(image)
-        }
-        MeabyWeighted::Weighted(w) => {
-            let xy = get_xy_from_index(&w.value, last_group_index);
-
-            // TODO: Figure out what to do if the sprite is inside another file
-            if &w.value < &last_group_index {
-                return None;
-            }
-
-            let image = get_image_from_tileset(
-                &image,
-                xy.x as u32 * tileset.info.tile_width,
-                xy.y as u32 * tileset.info.tile_height,
-                tileset.info.tile_width,
-                tileset.info.tile_height,
-            );
-
-            image_resource.add(image)
-        }
-    };
-
-    return Some(Arc::new(SingleBackground { sprite: handle }));
-}
-
-fn get_sprite_trait_from_multi_bg(
-    bg: &Vec<MeabyWeighted<i32>>,
-    last_group_index: i32,
-    image: &DynamicImage,
-    image_resource: &mut ResMut<Assets<Image>>,
-    tileset: &LegacyTileset,
-) -> Option<Arc<dyn GetBackground>> {
-    let mut textures: Vec<Weighted<Handle<Image>>> = Vec::new();
-
-    for meaby_weighted in bg.iter() {
-        match meaby_weighted {
-            MeabyWeighted::NotWeighted(v) => {
-                // TODO: Figure out what to do here
-                warn!("Elements with bg {:?} should be weighted", bg)
-            }
-            MeabyWeighted::Weighted(w) => {
-                let xy = get_xy_from_index(&w.value, last_group_index);
-
-                // TODO: Figure out what to do if the sprite is inside another file
-                if w.value < last_group_index {
-                    return None;
-                }
-
-                let image = get_image_from_tileset(
-                    &image,
-                    xy.x as u32 * tileset.info.tile_width,
-                    xy.y as u32 * tileset.info.tile_height,
-                    tileset.info.tile_width,
-                    tileset.info.tile_height,
-                );
-
-                textures.push(Weighted { value: image_resource.add(image), weight: w.weight });
-            }
-        }
-    }
-
-    return Some(Arc::new(WeightedBackground { weighted_sprites: textures }));
-}
-
-fn get_single_fg_and_bg(
-    image_resource: &mut ResMut<Assets<Image>>,
-    fg: &MeabyMulti<MeabyWeighted<i32>>,
-    bg: &Option<MeabyMulti<MeabyWeighted<i32>>>,
-    last_group_index: i32,
-    image: &DynamicImage,
-    tileset: &LegacyTileset,
-) -> (Option<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>) {
-    let get_fg = match fg {
-        MeabyMulti::Multi(multi) => {
-            get_sprite_trait_from_multi_fg(
-                multi,
-                last_group_index,
-                &image,
-                image_resource,
-                &tileset,
-            )
-        }
-        MeabyMulti::Single(fg) => {
-            get_sprite_trait_from_single_fg(
-                &fg,
-                last_group_index,
-                &image,
-                image_resource,
-                &tileset,
-            )
-        }
-    };
-
-    let get_bg = match bg {
-        Some(bg) => {
-            match bg {
-                MeabyMulti::Multi(multi) => {
-                    get_sprite_trait_from_multi_bg(
-                        multi,
-                        last_group_index,
-                        &image,
-                        image_resource,
-                        &tileset,
-                    )
-                }
-                MeabyMulti::Single(bg) => {
-                    get_sprite_trait_from_single_bg(
-                        &bg,
-                        last_group_index,
-                        &image,
-                        image_resource,
-                        &tileset,
-                    )
-                }
-            }
-        }
-        None => None
-    };
-
-    return (get_fg, get_bg);
-}
-
-fn get_multi_fg_and_bg(
-    image_resource: &mut ResMut<Assets<Image>>,
-    fg: &MeabyMulti<MeabyWeighted<i32>>,
-    bg: &Option<MeabyMulti<MeabyWeighted<i32>>>,
-    last_group_index: i32,
-    image: &DynamicImage,
-    tileset: &LegacyTileset,
-) -> (Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>) {
-    let get_fg = match fg {
-        MeabyMulti::Single(fg) => {
-            // Seriously? Why would you not just put the same id in the list four times?
-            let get_fg = get_sprite_trait_from_single_fg(
-                &fg,
-                last_group_index,
-                &image,
-                image_resource,
-                &tileset,
-            ).unwrap();
-
-            vec![get_fg.clone(), get_fg.clone(), get_fg.clone(), get_fg.clone()]
-        }
-        MeabyMulti::Multi(v) => {
-            // Direction is NW, SW, SE, NE
-            let mut getters = Vec::new();
-
-            for fg in v.iter() {
-                let arc = get_sprite_trait_from_single_fg(
-                    &fg,
-                    last_group_index,
-                    &image,
-                    image_resource,
-                    &tileset,
-                );
-
-                getters.push(arc.unwrap());
-            }
-
-            getters
-        }
-    };
-
-    let get_bg = match bg {
-        Some(bg) => {
-            match bg {
-                MeabyMulti::Multi(multi) => {
-                    get_sprite_trait_from_multi_bg(
-                        multi,
-                        last_group_index,
-                        &image,
-                        image_resource,
-                        &tileset,
-                    )
-                }
-                MeabyMulti::Single(bg) => {
-                    get_sprite_trait_from_single_bg(
-                        bg,
-                        last_group_index,
-                        &image,
-                        image_resource,
-                        &tileset,
-                    )
-                }
-            }
-        }
-        None => None
-    };
-
-    return (get_fg, get_bg);
-}
-
-impl TilesetLoader<LegacyTileset> for LegacyTilesetLoader {
-    fn get_textures(&self, image_resource: &mut ResMut<Assets<Image>>) -> Result<HashMap<TileId, SpriteType>, anyhow::Error> {
+impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
+    fn load_textures(&self, image_resource: &mut ResMut<Assets<Image>>) -> Result<HashMap<i32, Handle<Image>>, Error> {
         let tileset = self.load().unwrap();
-        let mut textures: HashMap<TileId, SpriteType> = HashMap::new();
+        let mut textures: HashMap<i32, Handle<Image>> = HashMap::new();
 
-        let mut last_group_index = 13328;
-        // TODO REPLACE
-        for group in tileset.tiles.get(6) {
+        for group in tileset.tiles.iter() {
             let image = Reader::open(self.path.join(PathBuf::from_str(group.file.as_str()).unwrap()))
                 .unwrap()
                 .decode()
                 .unwrap();
 
-            let mut amount_of_tiles = 0;
+            // TODO Revisit
+            // Only happens for the 'fallback.png' group because it does not have a comment with a range
+            if group.range.is_none() {
+                continue;
+            }
+
+            // TODO Revisit
+            // Not a good way to do this, but i just couldn't for the life of me figure out how to get the range
+            // Of the fg values of a tileset group without reading the comment
+            let range_vec = group.range.as_ref().unwrap().split(" to ").collect::<Vec<&str>>();
+            let start: u32 = range_vec.first().unwrap().split("range ").collect::<Vec<&str>>().last().unwrap().parse().unwrap();
+            let end: u32 = range_vec.last().unwrap().parse().unwrap();
 
             for tile in group.tiles.iter() {
-                let get_main_fg: Arc<dyn GetForeground> = match &tile.fg.as_ref().unwrap() {
-                    MeabyMulti::Single(fg) => {
-                        match get_sprite_trait_from_single_fg(
-                            &fg,
-                            last_group_index,
-                            &image,
-                            image_resource,
-                            &tileset,
-                        ) {
-                            None => {
-                                warn!("Could not load sprite {:?} (out of range min fg value: {:?} actual fg value: {:?})", tile.id, last_group_index, fg);
-                                continue;
+                match &tile.fg {
+                    None => {}
+                    Some(fg) => {
+                        match fg {
+                            MeabyMulti::Multi(multi) => {
+                                for fg in multi.iter() {
+                                    match fg {
+                                        MeabyWeighted::NotWeighted(fg) => {
+                                            let xy = get_xy_from_index(fg, (start - 1) as i32);
+
+                                            let image = get_image_from_tileset(
+                                                &image,
+                                                xy.x as u32 * tileset.info.tile_width,
+                                                xy.y as u32 * tileset.info.tile_height,
+                                                tileset.info.tile_width,
+                                                tileset.info.tile_height,
+                                            );
+
+                                            textures.insert(*fg, image_resource.add(image));
+                                        }
+                                        MeabyWeighted::Weighted(w) => {
+                                            let xy = get_xy_from_index(&w.value, (start - 1) as i32);
+
+                                            let image = get_image_from_tileset(
+                                                &image,
+                                                xy.x as u32 * tileset.info.tile_width,
+                                                xy.y as u32 * tileset.info.tile_height,
+                                                tileset.info.tile_width,
+                                                tileset.info.tile_height,
+                                            );
+
+                                            textures.insert(w.value, image_resource.add(image));
+                                        }
+                                    }
+                                }
                             }
-                            Some(a) => a
+                            MeabyMulti::Single(fg) => {
+                                match fg {
+                                    MeabyWeighted::NotWeighted(fg) => {
+                                        let xy = get_xy_from_index(fg, (start - 1) as i32);
+
+                                        // For some fucking reason the
+                                        // Grass tiles in the UndeadPeopleTileset specify a fg id which isn't
+                                        // even available in the file
+                                        // TODO FIX
+
+                                        if fg < &(start as i32) || fg > &(end as i32) {
+                                            continue;
+                                        }
+
+                                        let image = get_image_from_tileset(
+                                            &image,
+                                            xy.x as u32 * tileset.info.tile_width,
+                                            xy.y as u32 * tileset.info.tile_height,
+                                            tileset.info.tile_width,
+                                            tileset.info.tile_height,
+                                        );
+
+                                        textures.insert(*fg, image_resource.add(image));
+                                    }
+                                    MeabyWeighted::Weighted(w) => {
+                                        let xy = get_xy_from_index(&w.value, (start - 1) as i32);
+
+                                        if w.value < start as i32 || w.value > end as i32 {
+                                            continue;
+                                        }
+
+                                        let image = get_image_from_tileset(
+                                            &image,
+                                            xy.x as u32 * tileset.info.tile_width,
+                                            xy.y as u32 * tileset.info.tile_height,
+                                            tileset.info.tile_width,
+                                            tileset.info.tile_height,
+                                        );
+
+                                        textures.insert(w.value, image_resource.add(image));
+                                    }
+                                }
+                            }
                         }
                     }
-                    MeabyMulti::Multi(fg) => {
-                        match get_sprite_trait_from_multi_fg(
-                            &fg,
-                            last_group_index,
-                            &image,
-                            image_resource,
-                            &tileset,
-                        ) {
-                            None => {
-                                warn!("Could not load sprite {:?} (out of range min fg value: {:?} actual fg value: {:?})", tile.id, last_group_index, fg);
-                                continue;
+                }
+            }
+        }
+
+        return Ok(textures);
+    }
+    fn assign_textures(&self, image_resource: &mut ResMut<Assets<Image>>) -> Result<HashMap<TileId, SpriteType>, Error> {
+        let tileset = self.load().unwrap();
+        let loaded_sprites = self.load_textures(image_resource).unwrap();
+        let mut assigned_textures: HashMap<TileId, SpriteType> = HashMap::new();
+
+        for group in tileset.tiles.iter() {
+            for tile in group.tiles.iter() {
+                // TODO: Revisit
+                // Figure out what to do here
+                let get_main_fg: Option<Arc<dyn GetForeground>> = match &tile.fg {
+                    None => { continue; }
+                    Some(fg) => {
+                        match fg {
+                            MeabyMulti::Single(fg) => {
+                                match fg {
+                                    MeabyWeighted::NotWeighted(fg) => {
+                                        match loaded_sprites.get(fg) {
+                                            None => None,
+                                            Some(sprite) => Some(Arc::new(SingleForeground { sprite: sprite.clone() }))
+                                        }
+                                    }
+                                    MeabyWeighted::Weighted(w) => {
+                                        match loaded_sprites.get(&w.value) {
+                                            None => None,
+                                            Some(sprite) => Some(Arc::new(SingleForeground { sprite: sprite.clone() }))
+                                        }
+                                    }
+                                }
                             }
-                            Some(a) => a
+                            MeabyMulti::Multi(fg) => {
+                                let mut sprites: Vec<Weighted<Handle<Image>>> = Vec::new();
+
+                                for fg in fg.iter() {
+                                    match fg {
+                                        MeabyWeighted::NotWeighted(fg) => {
+                                            match loaded_sprites.get(fg) {
+                                                None => {}
+                                                // TODO Revisit
+                                                Some(sprite) => sprites.push(Weighted::new(sprite.clone(), 0))
+                                            };
+                                        }
+                                        MeabyWeighted::Weighted(w) => {
+                                            match loaded_sprites.get(&w.value) {
+                                                None => {}
+                                                Some(sprite) => sprites.push(Weighted::new(sprite.clone(), w.weight))
+                                            };
+                                        }
+                                    }
+                                }
+
+                                Some(Arc::new(WeightedForeground { weighted_sprites: sprites }))
+                            }
                         }
                     }
                 };
@@ -614,65 +641,74 @@ impl TilesetLoader<LegacyTileset> for LegacyTilesetLoader {
                     Some(bg) => {
                         match bg {
                             MeabyMulti::Single(bg) => {
-                                match get_sprite_trait_from_single_bg(
-                                    &bg,
-                                    last_group_index,
-                                    &image,
-                                    image_resource,
-                                    &tileset,
-                                ) {
-                                    None => {
-                                        warn!("Could not load sprite {:?} (out of range min bg value: {:?} actual bg value: {:?})", tile.id, last_group_index, bg);
-                                        None
+                                match bg {
+                                    MeabyWeighted::NotWeighted(bg) => {
+                                        match loaded_sprites.get(bg) {
+                                            None => None,
+                                            Some(sprite) => Some(Arc::new(SingleBackground { sprite: sprite.clone() }))
+                                        }
                                     }
-                                    Some(a) => Some(a)
+                                    MeabyWeighted::Weighted(w) => {
+                                        // TODO: Revisit
+                                        // Not sure what to do here
+                                        match loaded_sprites.get(&w.value) {
+                                            None => None,
+                                            Some(sprite) => Some(Arc::new(SingleBackground { sprite: sprite.clone() }))
+                                        }
+                                    }
                                 }
                             }
                             MeabyMulti::Multi(bg) => {
-                                match get_sprite_trait_from_multi_bg(
-                                    &bg,
-                                    last_group_index,
-                                    &image,
-                                    image_resource,
-                                    &tileset,
-                                ) {
-                                    None => {
-                                        warn!("Could not load sprite {:?} (out of range min bg value: {:?} actual bg value: {:?})", tile.id, last_group_index, bg);
-                                        None
+                                let mut sprites: Vec<Weighted<Handle<Image>>> = Vec::new();
+
+                                for bg in bg.iter() {
+                                    match bg {
+                                        MeabyWeighted::NotWeighted(bg) => {
+                                            // TODO: Revisit
+                                            // Not sure what to do here
+                                            match loaded_sprites.get(bg) {
+                                                None => {}
+                                                Some(sprite) => sprites.push(Weighted::new(sprite.clone(), 0))
+                                            };
+                                        }
+                                        MeabyWeighted::Weighted(w) => {
+                                            match loaded_sprites.get(&w.value) {
+                                                None => {}
+                                                Some(sprite) => sprites.push(Weighted::new(sprite.clone(), w.weight))
+                                            };
+                                        }
                                     }
-                                    Some(a) => Some(a)
                                 }
+
+                                Some(Arc::new(WeightedBackground { weighted_sprites: sprites }))
                             }
                         }
                     }
                 };
-
 
                 match &tile.additional_tiles {
                     None => {
                         match &tile.id {
                             MeabyMulti::Single(v) => {
                                 debug!("Loaded tile {:?}", v);
-                                textures.insert(
+                                assigned_textures.insert(
                                     TileId { 0: v.clone() },
                                     SpriteType::Single(Sprite {
                                         fg: get_main_fg.clone(),
                                         bg: get_main_bg.clone(),
                                     }),
                                 );
-                                amount_of_tiles += 1;
                             }
                             MeabyMulti::Multi(v) => {
                                 for value in v.iter() {
                                     debug!("Loaded tile {:?}", value);
-                                    textures.insert(
+                                    assigned_textures.insert(
                                         TileId { 0: value.clone() },
                                         SpriteType::Single(Sprite {
                                             fg: get_main_fg.clone(),
                                             bg: get_main_bg.clone(),
                                         }),
                                     );
-                                    amount_of_tiles += 1;
                                 }
                             }
                         };
@@ -702,78 +738,67 @@ impl TilesetLoader<LegacyTileset> for LegacyTilesetLoader {
 
                                 match additional_tile.id.as_str() {
                                     "center" => {
-                                        let (get_fg, get_bg) = get_single_fg_and_bg(
-                                            image_resource,
+                                        let v = get_single_fg_and_bg(
+                                            &loaded_sprites,
                                             fg,
                                             bg,
-                                            last_group_index,
-                                            &image,
-                                            &tileset,
                                         );
+
+                                        // TODO REVISIT
+                                        // Can't be bothered to fix this right now
+                                        if v.0.is_none() {
+                                            continue;
+                                        }
+
                                         center = Some(Sprite {
-                                            fg: get_fg.unwrap(),
-                                            bg: get_bg,
+                                            fg: v.0,
+                                            bg: v.1,
                                         })
                                     }
                                     "corner" => {
                                         let v = get_multi_fg_and_bg(
-                                            image_resource,
+                                            &loaded_sprites,
                                             fg,
                                             bg,
-                                            last_group_index,
-                                            &image,
-                                            &tileset,
                                         );
                                         corner = Some(Corner::from(v))
                                     }
                                     "t_connection" => {
                                         let v = get_multi_fg_and_bg(
-                                            image_resource,
+                                            &loaded_sprites,
                                             fg,
                                             bg,
-                                            last_group_index,
-                                            &image,
-                                            &tileset,
                                         );
                                         t_connection = Some(FullCardinal::from(v));
                                     }
                                     "edge" => {
                                         let v = get_multi_fg_and_bg(
-                                            image_resource,
+                                            &loaded_sprites,
                                             fg,
                                             bg,
-                                            last_group_index,
-                                            &image,
-                                            &tileset,
                                         );
                                         edge = Some(Edge::from(v));
                                     }
                                     "end_piece" => {
                                         let v = get_multi_fg_and_bg(
-                                            image_resource,
+                                            &loaded_sprites,
                                             fg,
                                             bg,
-                                            last_group_index,
-                                            &image,
-                                            &tileset,
                                         );
                                         end_piece = Some(FullCardinal::from(v));
                                     }
                                     "unconnected" => {
                                         let (get_fg, get_bg) = get_single_fg_and_bg(
-                                            image_resource,
+                                            &loaded_sprites,
                                             fg,
                                             bg,
-                                            last_group_index,
-                                            &image,
-                                            &tileset,
                                         );
                                         unconnected = Some(Sprite {
-                                            fg: get_fg.unwrap(),
+                                            fg: get_fg,
                                             bg: get_bg,
                                         });
                                     }
-                                    _ => { panic!("Go Unexpected id {}", additional_tile.id) }
+                                    _ => { warn!("Go Unexpected id {}", additional_tile.id) }
                                 }
                             }
 
@@ -782,7 +807,7 @@ impl TilesetLoader<LegacyTileset> for LegacyTilesetLoader {
                                 bg: get_main_bg.clone(),
                             };
 
-                            textures.insert(
+                            assigned_textures.insert(
                                 TileId { 0: id.clone() },
                                 SpriteType::Multitile {
                                     center: center.unwrap_or(default_sprite.clone()),
@@ -811,14 +836,13 @@ impl TilesetLoader<LegacyTileset> for LegacyTilesetLoader {
                                     unconnected: unconnected.unwrap_or(default_sprite.clone()),
                                 },
                             );
-                            amount_of_tiles += 1;
                         }
                     }
                 }
             }
         };
 
-        return Ok(textures);
+        return Ok(assigned_textures);
     }
 }
 

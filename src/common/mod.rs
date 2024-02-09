@@ -20,6 +20,15 @@ pub struct Weighted<T> {
     pub weight: u32,
 }
 
+impl<T> Weighted<T> {
+    pub fn new(value: T, weight: u32) -> Self {
+        return Self {
+            value,
+            weight
+        }
+    }
+}
+
 #[derive(Serialize, Clone, Deserialize, Debug)]
 #[serde(untagged)]
 pub enum MeabyWeighted<T> {

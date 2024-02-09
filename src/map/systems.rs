@@ -153,12 +153,17 @@ pub fn update_sprite_reader(
     for e in e_update_sprite.read() {
         let sprite = r_textures.textures.get_texture(&project, &e.tile.character, &e.coordinates);
 
-        match q_sprite.get_mut(e.tile.fg_entity.unwrap()) {
-            Ok(mut i) => {
-                *i = sprite.fg.get_sprite().clone();
+        match e.tile.fg_entity {
+            None => {}
+            Some(i) => {
+                match q_sprite.get_mut(i) {
+                    Ok(mut i) => {
+                        *i = sprite.fg.as_ref().unwrap().get_sprite().clone();
+                    }
+                    Err(_) => {}
+                };
             }
-            Err(_) => {}
-        };
+        }
 
         match e.tile.bg_entity {
             None => {}
@@ -188,30 +193,59 @@ pub fn tile_spawn_reader(
     for e in e_tile_place.read() {
         let sprite = r_textures.textures.get_texture(&project, &e.tile.character, &e.coordinates);
 
-        let entity_commands = commands.spawn((
-            e.tile,
-            SpriteBundle {
-                texture: sprite.fg.get_sprite().clone(),
-                transform: Transform {
-                    translation: Vec3 {
-                        // Spawn off screen
-                        x: -1000.0,
-                        y: -1000.0,
-                        z: 1.0,
-                    },
-                    scale: Vec3 {
-                        x: r_grid.tile_size / r_grid.default_tile_size,
-                        y: r_grid.tile_size / r_grid.default_tile_size,
-                        z: 0.,
+        if sprite.fg.is_some() {
+            let fg_entity_commands = commands.spawn((
+                e.tile,
+                SpriteBundle {
+                    texture: sprite.fg.as_ref().unwrap().get_sprite().clone(),
+                    transform: Transform {
+                        translation: Vec3 {
+                            // Spawn off screen
+                            x: -1000.0,
+                            y: -1000.0,
+                            z: 2.0,
+                        },
+                        scale: Vec3 {
+                            x: r_grid.tile_size / r_grid.default_tile_size,
+                            y: r_grid.tile_size / r_grid.default_tile_size,
+                            z: 0.,
+                        },
+                        ..default()
                     },
                     ..default()
                 },
-                ..default()
-            },
-            e.coordinates.clone()
-        ));
+                e.coordinates.clone()
+            ));
 
-        project.map_entity.tiles.get_mut(&e.coordinates).unwrap().fg_entity = Some(entity_commands.id());
+            project.map_entity.tiles.get_mut(&e.coordinates).unwrap().fg_entity = Some(fg_entity_commands.id());
+        }
+
+        if sprite.bg.is_some() {
+            let bg_entity_commands = commands.spawn((
+                e.tile,
+                SpriteBundle {
+                    texture: sprite.bg.as_ref().unwrap().get_sprite().clone(),
+                    transform: Transform {
+                        translation: Vec3 {
+                            // Spawn off screen
+                            x: -1000.0,
+                            y: -1000.0,
+                            z: 1.0,
+                        },
+                        scale: Vec3 {
+                            x: r_grid.tile_size / r_grid.default_tile_size,
+                            y: r_grid.tile_size / r_grid.default_tile_size,
+                            z: 0.,
+                        },
+                        ..default()
+                    },
+                    ..default()
+                },
+                e.coordinates.clone()
+            ));
+
+            project.map_entity.tiles.get_mut(&e.coordinates).unwrap().bg_entity = Some(bg_entity_commands.id());
+        }
 
         // Check here because i couldn't figure out why the sprites were not correct when spawning a saved map
         if e.should_update_sprites {

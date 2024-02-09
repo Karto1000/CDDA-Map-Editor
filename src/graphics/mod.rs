@@ -15,7 +15,7 @@ pub(crate) mod tileset;
 // Not sure if this is the best way to do this
 #[derive(Clone)]
 pub struct Sprite {
-    pub fg: Arc<dyn GetForeground>,
+    pub fg: Option<Arc<dyn GetForeground>>,
     pub bg: Option<Arc<dyn GetBackground>>,
 }
 
@@ -30,19 +30,19 @@ impl From<(Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>)> for Ful
     fn from(value: (Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>)) -> Self {
         return FullCardinal {
             north: Sprite {
-                fg: value.0.get(0).unwrap().clone(),
+                fg: value.0.get(0).cloned(),
                 bg: value.1.clone(),
             },
             west: Sprite {
-                fg: value.0.get(1).unwrap().clone(),
+                fg: value.0.get(1).cloned(),
                 bg: value.1.clone(),
             },
             south: Sprite {
-                fg: value.0.get(2).unwrap().clone(),
+                fg: value.0.get(2).cloned(),
                 bg: value.1.clone(),
             },
             east: Sprite {
-                fg: value.0.get(3).unwrap().clone(),
+                fg: value.0.get(3).cloned(),
                 bg: value.1,
             },
         };
@@ -61,19 +61,19 @@ impl From<(Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>)> for Cor
     fn from(value: (Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>)) -> Self {
         return Corner {
             north_west: Sprite {
-                fg: value.0.get(0).unwrap().clone(),
+                fg: value.0.get(0).cloned(),
                 bg: value.1.clone(),
             },
             south_west: Sprite {
-                fg: value.0.get(1).unwrap().clone(),
+                fg: value.0.get(1).cloned(),
                 bg: value.1.clone(),
             },
             south_east: Sprite {
-                fg: value.0.get(2).unwrap().clone(),
+                fg: value.0.get(2).cloned(),
                 bg: value.1.clone(),
             },
             north_east: Sprite {
-                fg: value.0.get(3).unwrap().clone(),
+                fg: value.0.get(3).cloned(),
                 bg: value.1.clone(),
             },
         };
@@ -88,8 +88,8 @@ pub struct Edge {
 impl From<(Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>)> for Edge {
     fn from(value: (Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>)) -> Self {
         return Self {
-            north_south: Sprite {fg: value.0.get(0).unwrap().clone(), bg: value.1.clone()},
-            east_west: Sprite {fg: value.0.get(1).unwrap().clone(), bg: value.1.clone()}
+            north_south: Sprite {fg: value.0.get(0).cloned(), bg: value.1.clone()},
+            east_west: Sprite {fg: value.0.get(1).cloned(), bg: value.1.clone()}
         }
     }
 }
@@ -115,8 +115,8 @@ pub struct LegacyTextures {
 }
 
 impl LegacyTextures {
-    pub fn new(loader: impl TilesetLoader<LegacyTileset>, image_resource: &mut ResMut<Assets<Image>>) -> Self {
-        let textures = loader.get_textures(image_resource).unwrap();
+    pub fn new(loader: impl TilesetLoader<LegacyTileset, i32>, image_resource: &mut ResMut<Assets<Image>>) -> Self {
+        let textures = loader.assign_textures(image_resource).unwrap();
 
         return Self {
             textures
