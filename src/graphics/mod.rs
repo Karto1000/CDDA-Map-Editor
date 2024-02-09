@@ -1,51 +1,113 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use bevy::prelude::{Assets, Handle, Image, ResMut, Resource};
+use bevy::prelude::{Assets, Image, ResMut, Resource};
 use bevy_egui::egui::load::TextureLoader;
 
-use crate::common::{Coordinates, TileId, Weighted};
-use crate::graphics::tileset::legacy::{GetForeground, LegacyTileset};
+use crate::common::{Coordinates, TileId};
+use crate::graphics::tileset::legacy::{GetBackground, GetForeground, LegacyTileset};
 use crate::graphics::tileset::TilesetLoader;
 use crate::project::loader::Load;
 use crate::project::resources::Project;
 
 pub(crate) mod tileset;
 
-// Not sure if this is a good way to do this, but since every tile can have weights, it makes sense
-pub struct FullCardinal {
-    pub north: Arc<dyn GetForeground>,
-    pub east: Arc<dyn GetForeground>,
-    pub south: Arc<dyn GetForeground>,
-    pub west: Arc<dyn GetForeground>,
+// Not sure if this is the best way to do this
+#[derive(Clone)]
+pub struct Sprite {
+    pub fg: Arc<dyn GetForeground>,
+    pub bg: Option<Arc<dyn GetBackground>>,
 }
 
+pub struct FullCardinal {
+    pub north: Sprite,
+    pub east: Sprite,
+    pub south: Sprite,
+    pub west: Sprite,
+}
+
+impl From<(Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>)> for FullCardinal {
+    fn from(value: (Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>)) -> Self {
+        return FullCardinal {
+            north: Sprite {
+                fg: value.0.get(0).unwrap().clone(),
+                bg: value.1.clone(),
+            },
+            west: Sprite {
+                fg: value.0.get(1).unwrap().clone(),
+                bg: value.1.clone(),
+            },
+            south: Sprite {
+                fg: value.0.get(2).unwrap().clone(),
+                bg: value.1.clone(),
+            },
+            east: Sprite {
+                fg: value.0.get(3).unwrap().clone(),
+                bg: value.1,
+            },
+        };
+    }
+}
+
+
 pub struct Corner {
-    pub north_west: Arc<dyn GetForeground>,
-    pub south_west: Arc<dyn GetForeground>,
-    pub south_east: Arc<dyn GetForeground>,
-    pub north_east: Arc<dyn GetForeground>,
+    pub north_west: Sprite,
+    pub south_west: Sprite,
+    pub south_east: Sprite,
+    pub north_east: Sprite,
+}
+
+impl From<(Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>)> for Corner {
+    fn from(value: (Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>)) -> Self {
+        return Corner {
+            north_west: Sprite {
+                fg: value.0.get(0).unwrap().clone(),
+                bg: value.1.clone(),
+            },
+            south_west: Sprite {
+                fg: value.0.get(1).unwrap().clone(),
+                bg: value.1.clone(),
+            },
+            south_east: Sprite {
+                fg: value.0.get(2).unwrap().clone(),
+                bg: value.1.clone(),
+            },
+            north_east: Sprite {
+                fg: value.0.get(3).unwrap().clone(),
+                bg: value.1.clone(),
+            },
+        };
+    }
 }
 
 pub struct Edge {
-    pub north_south: Arc<dyn GetForeground>,
-    pub east_west: Arc<dyn GetForeground>,
+    pub north_south: Sprite,
+    pub east_west: Sprite,
+}
+
+impl From<(Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>)> for Edge {
+    fn from(value: (Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>)) -> Self {
+        return Self {
+            north_south: Sprite {fg: value.0.get(0).unwrap().clone(), bg: value.1.clone()},
+            east_west: Sprite {fg: value.0.get(1).unwrap().clone(), bg: value.1.clone()}
+        }
+    }
 }
 
 pub enum SpriteType {
-    Single(Arc<dyn GetForeground>),
+    Single(Sprite),
     Multitile {
-        center: Arc<dyn GetForeground>,
+        center: Sprite,
         corner: Corner,
         t_connection: FullCardinal,
         edge: Edge,
         end_piece: FullCardinal,
-        unconnected: Arc<dyn GetForeground>,
+        unconnected: Sprite,
     },
 }
 
 pub trait GetTexture: Send + Sync {
-    fn get_texture(&self, project: &Project, character: &char, coordinates: &Coordinates) -> &Arc<dyn GetForeground>;
+    fn get_texture(&self, project: &Project, character: &char, coordinates: &Coordinates) -> &Sprite;
 }
 
 pub struct LegacyTextures {
@@ -62,9 +124,8 @@ impl LegacyTextures {
     }
 }
 
-
 impl GetTexture for LegacyTextures {
-    fn get_texture(&self, project: &Project, character: &char, coordinates: &Coordinates) -> &Arc<dyn GetForeground> {
+    fn get_texture(&self, project: &Project, character: &char, coordinates: &Coordinates) -> &Sprite {
         let sprite_type = self.textures.get(&project.map_entity.get_tile_id_from_character(character)).unwrap();
 
         return match sprite_type {

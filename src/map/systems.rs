@@ -1,14 +1,20 @@
 use std::fs;
 
+use bevy::asset::Handle;
 use bevy::hierarchy::Children;
 use bevy::input::Input;
-use bevy::prelude::{Commands, Entity, EventReader, KeyCode, Query, Res, ResMut, Text};
+use bevy::math::Vec3;
+use bevy::prelude::{Commands, default, Entity, EventReader, EventWriter, Image, KeyCode, Query, Res, ResMut, SpriteBundle, Text, Transform, With};
 use bevy::text::TextSection;
 use bevy_file_dialog::{DialogFileSaved, FileDialogExt};
 
 use crate::EditorData;
+use crate::graphics::GraphicsResource;
+use crate::grid::resources::Grid;
 use crate::map::{TileDeleteEvent, TilePlaceEvent};
+use crate::map::events::{ClearTiles, SpawnMapEntity, UpdateSpriteEvent};
 use crate::project::resources::{Project, ProjectSaveState};
+use crate::tiles::components::Tile;
 use crate::ui::tabs::components::Tab;
 
 pub fn map_save_system(
@@ -130,5 +136,167 @@ pub fn tile_remove_reader(
 
     for e in e_delete_tile.read() {
         project.map_entity.tiles.remove(&e.coordinates);
+    }
+}
+
+pub fn update_sprite_reader(
+    mut e_update_sprite: EventReader<UpdateSpriteEvent>,
+    mut q_sprite: Query<&mut Handle<Image>, With<Tile>>,
+    r_textures: Res<GraphicsResource>,
+    r_editor_data: Res<EditorData>,
+) {
+    let project = match r_editor_data.get_current_project() {
+        None => { return; }
+        Some(p) => { p }
+    };
+
+    for e in e_update_sprite.read() {
+        let sprite = r_textures.textures.get_texture(&project, &e.tile.character, &e.coordinates);
+
+        match q_sprite.get_mut(e.tile.fg_entity.unwrap()) {
+            Ok(mut i) => {
+                *i = sprite.fg.get_sprite().clone();
+            }
+            Err(_) => {}
+        };
+
+        match e.tile.bg_entity {
+            None => {}
+            Some(i) => match q_sprite.get_mut(i) {
+                Ok(mut i) => {
+                    *i = sprite.bg.as_ref().unwrap().get_sprite().clone();
+                }
+                Err(_) => {}
+            }
+        };
+    }
+}
+
+pub fn tile_spawn_reader(
+    mut commands: Commands,
+    mut e_tile_place: EventReader<TilePlaceEvent>,
+    mut e_update_sprite: EventWriter<UpdateSpriteEvent>,
+    r_grid: Res<Grid>,
+    r_textures: Res<GraphicsResource>,
+    mut r_editor_data: ResMut<EditorData>,
+) {
+    let project = match r_editor_data.get_current_project_mut() {
+        None => { return; }
+        Some(p) => { p }
+    };
+
+    for e in e_tile_place.read() {
+        let sprite = r_textures.textures.get_texture(&project, &e.tile.character, &e.coordinates);
+
+        let entity_commands = commands.spawn((
+            e.tile,
+            SpriteBundle {
+                texture: sprite.fg.get_sprite().clone(),
+                transform: Transform {
+                    translation: Vec3 {
+                        // Spawn off screen
+                        x: -1000.0,
+                        y: -1000.0,
+                        z: 1.0,
+                    },
+                    scale: Vec3 {
+                        x: r_grid.tile_size / r_grid.default_tile_size,
+                        y: r_grid.tile_size / r_grid.default_tile_size,
+                        z: 0.,
+                    },
+                    ..default()
+                },
+                ..default()
+            },
+            e.coordinates.clone()
+        ));
+
+        project.map_entity.tiles.get_mut(&e.coordinates).unwrap().fg_entity = Some(entity_commands.id());
+
+        // Check here because i couldn't figure out why the sprites were not correct when spawning a saved map
+        if e.should_update_sprites {
+            let tiles_around = project.map_entity.get_tiles_around(&e.coordinates);
+
+            for (tile, coordinates) in tiles_around {
+                match tile {
+                    None => {}
+                    Some(t) => {
+                        e_update_sprite.send(
+                            UpdateSpriteEvent {
+                                tile: *t,
+                                coordinates,
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub fn tile_despawn_reader(
+    mut commands: Commands,
+    mut e_tile_delete: EventReader<TileDeleteEvent>,
+    mut e_update_sprite: EventWriter<UpdateSpriteEvent>,
+    r_editor_data: Res<EditorData>,
+) {
+    let project = match r_editor_data.get_current_project() {
+        None => { return; }
+        Some(p) => { p }
+    };
+
+    for event in e_tile_delete.read() {
+        match event.tile.fg_entity {
+            None => {}
+            Some(e) => {
+                let tiles_around = project.map_entity.get_tiles_around(&event.coordinates);
+
+                for (tile, coordinates) in tiles_around {
+                    match tile {
+                        None => {}
+                        Some(t) => {
+                            e_update_sprite.send(
+                                UpdateSpriteEvent {
+                                    tile: *t,
+                                    coordinates,
+                                }
+                            )
+                        }
+                    }
+                }
+
+                commands.get_entity(e).unwrap().despawn()
+            }
+        }
+    }
+}
+
+pub fn spawn_map_entity_reader(
+    mut e_spawn_map_entity: EventReader<SpawnMapEntity>,
+    mut e_tile_place: EventWriter<TilePlaceEvent>,
+) {
+    for event in e_spawn_map_entity.read() {
+        for (coords, tile) in event.map_entity.tiles.iter() {
+            e_tile_place.send(
+                TilePlaceEvent {
+                    tile: tile.clone(),
+                    coordinates: coords.clone(),
+                    should_update_sprites: false,
+                }
+            )
+        }
+    }
+}
+
+pub fn clear_tiles_reader(
+    mut q_tiles: Query<Entity, With<Tile>>,
+    mut e_clear_tiles: EventReader<ClearTiles>,
+    mut commands: Commands,
+) {
+    for _ in e_clear_tiles.read() {
+        for entity in q_tiles.iter_mut() {
+            let mut entity_commands = commands.get_entity(entity).unwrap();
+            entity_commands.despawn();
+        }
     }
 }

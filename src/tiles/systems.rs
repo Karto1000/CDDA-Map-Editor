@@ -87,7 +87,7 @@ pub fn tile_place_system(
 
         if project.map_entity.tiles.get(&tile_cords).is_some() { return; }
 
-        let tile = Tile { character: tile_to_place, entity: None };
+        let tile = Tile { character: tile_to_place, fg_entity: None, bg_entity: None };
         e_set_tile.send(TilePlaceEvent { tile, coordinates: tile_cords, should_update_sprites: true });
     }
 }
