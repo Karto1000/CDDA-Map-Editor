@@ -204,7 +204,7 @@ impl TilesetLoader<LegacyTileset> for LegacyTilesetLoader {
         let tileset = self.load().unwrap();
         let mut textures: HashMap<TileId, SpriteType> = HashMap::new();
 
-        let mut last_group_index = 13216;
+        let mut last_group_index = 13328;
         // TODO REPLACE
         for group in tileset.tiles.get(6) {
             let image = Reader::open(self.path.join(PathBuf::from_str(group.file.as_str()).unwrap()))

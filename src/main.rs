@@ -25,7 +25,7 @@ use serde_json::{Map, Value};
 use winit::window::Icon;
 
 use crate::common::Coordinates;
-use crate::graphics::GraphicsResource;
+use crate::graphics::{GraphicsResource, LegacyTextures};
 use crate::graphics::tileset::legacy::LegacyTilesetLoader;
 use crate::grid::{GridMarker, GridMaterial, GridPlugin};
 use crate::grid::resources::Grid;
@@ -105,6 +105,12 @@ impl Default for EditorData {
 }
 
 pub struct EditorDataSaver;
+
+impl EditorDataSaver {
+    pub fn new() -> Self {
+        return Self {};
+    }
+}
 
 impl Save<EditorData> for EditorDataSaver {
     fn save(&self, value: &EditorData) -> Result<(), SaveError> {
@@ -276,15 +282,15 @@ fn setup(
     res_grid: Res<Grid>,
     mut e_spawn_map_entity: EventWriter<SpawnMapEntity>,
     mut e_spawn_tab: EventWriter<SpawnTab>,
-    r_images: ResMut<Assets<Image>>,
+    mut r_images: ResMut<Assets<Image>>,
 ) {
     commands.spawn(Camera2dBundle::default());
 
-    let tileset_loader = LegacyTilesetLoader::new(PathBuf::from(r"C:\CDDA\testing\gfx\MSX++UnDeadPeopleEdition"));
-    let palette_loader = PaletteLoader::new(PathBuf::from(r"C:\CDDA\testing\data\json\mapgen_palettes\testing.json"));
-    let editor_data_saver = EditorDataSaver {};
-
-    let texture_resource = GraphicsResource::load(tileset_loader, r_images);
+    let tileset_loader = LegacyTilesetLoader::new(PathBuf::from(r"saves\tileset\TILESETS\gfx\MSX++UnDeadPeopleEdition"));
+    let palette_loader = PaletteLoader::new(PathBuf::from(r"saves\palettes\building.json"));
+    let editor_data_saver = EditorDataSaver::new();
+    let legacy_textures = LegacyTextures::new(tileset_loader, &mut r_images);
+    let texture_resource = GraphicsResource::new(Box::new(legacy_textures));
 
     let mut default_project = Project::default();
     let mut editor_data = editor_data_saver.load().unwrap();

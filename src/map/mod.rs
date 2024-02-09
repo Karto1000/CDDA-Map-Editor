@@ -8,12 +8,10 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::Visitor;
 
 use crate::{EditorData, GraphicsResource};
-use crate::common::Coordinates;
-use crate::graphics::SpriteType;
+use crate::graphics::{GetTexture, LegacyTextures};
 use crate::grid::resources::Grid;
 use crate::map::events::{ClearTiles, SpawnMapEntity, TileDeleteEvent, TilePlaceEvent, UpdateSpriteEvent};
 use crate::map::systems::{map_save_system, save_directory_picked};
-use crate::project::resources::Project;
 use crate::tiles::components::Tile;
 
 pub(crate) mod systems;
@@ -39,62 +37,6 @@ impl Plugin for MapPlugin {
 }
 
 
-fn get_fitting_sprite<'a>(
-    coordinates: &Coordinates,
-    character: &char,
-    project: &'a Project,
-    r_textures: &'a Res<GraphicsResource>,
-) -> &'a Handle<Image> {
-    let sprite_type = r_textures.get_texture(&project.map_entity.get_tile_id_from_character(character));
-
-    return match sprite_type {
-        SpriteType::Single(s) => s,
-        SpriteType::Multitile { center, corner, t_connection, edge, end_piece, unconnected } => {
-            let tiles_around = project.map_entity.get_tiles_around(coordinates);
-
-            let is_tile_ontop_same_type = match tiles_around.get(0).unwrap().0 {
-                None => false,
-                Some(top) => top.character == *character
-            };
-
-            let is_tile_right_same_type = match tiles_around.get(1).unwrap().0 {
-                None => false,
-                Some(right) => right.character == *character
-            };
-
-            let is_tile_below_same_type = match tiles_around.get(2).unwrap().0 {
-                None => false,
-                Some(below) => below.character == *character
-            };
-
-            let is_tile_left_same_type = match tiles_around.get(3).unwrap().0 {
-                None => false,
-                Some(left) => left.character == *character
-            };
-
-            return match (is_tile_ontop_same_type, is_tile_right_same_type, is_tile_below_same_type, is_tile_left_same_type) {
-                // Some of the worst code i've ever written lol
-                (true, true, true, true) => &center,
-                (true, true, true, false) => &t_connection.west,
-                (true, true, false, true) => &t_connection.south,
-                (true, false, true, true) => &t_connection.east,
-                (false, true, true, true) => &t_connection.north,
-                (true, true, false, false) => &corner.south_west,
-                (true, false, false, true) => &corner.south_east,
-                (false, true, true, false) => &corner.north_west,
-                (false, false, true, true) => &corner.north_east,
-                (true, false, false, false) => &end_piece.south,
-                (false, true, false, false) => &end_piece.west,
-                (false, false, true, false) => &end_piece.north,
-                (false, false, false, true) => &end_piece.east,
-                (false, true, false, true) => &edge.east_west,
-                (true, false, true, false) => &edge.north_south,
-                (false, false, false, false) => &unconnected
-            };
-        }
-    };
-}
-
 pub fn update_sprite_reader(
     mut e_update_sprite: EventReader<UpdateSpriteEvent>,
     mut q_sprite: Query<&mut Handle<Image>, With<Tile>>,
@@ -107,7 +49,7 @@ pub fn update_sprite_reader(
     };
 
     for e in e_update_sprite.read() {
-        let sprite = get_fitting_sprite(&e.coordinates, &e.tile.character, &project, &r_textures);
+        let sprite = r_textures.textures.get_texture(&project, &e.tile.character, &e.coordinates);
 
         let mut image = match q_sprite.get_mut(e.tile.entity.unwrap()) {
             Ok(i) => { i }
@@ -131,7 +73,7 @@ pub fn tile_spawn_reader(
     };
 
     for e in e_tile_place.read() {
-        let sprite = get_fitting_sprite(&e.coordinates, &e.tile.character, &project, &r_textures);
+        let sprite = r_textures.textures.get_texture(&project, &e.tile.character, &e.coordinates);
 
         let entity_commands = commands.spawn((
             e.tile,
