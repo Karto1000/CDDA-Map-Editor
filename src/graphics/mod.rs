@@ -4,47 +4,48 @@ use std::sync::{Arc, Mutex};
 use bevy::prelude::{Assets, Handle, Image, ResMut, Resource};
 use bevy_egui::egui::load::TextureLoader;
 
-use crate::common::{Coordinates, TileId};
-use crate::graphics::tileset::legacy::LegacyTileset;
+use crate::common::{Coordinates, TileId, Weighted};
+use crate::graphics::tileset::legacy::{GetForeground, LegacyTileset};
 use crate::graphics::tileset::TilesetLoader;
 use crate::project::loader::Load;
 use crate::project::resources::Project;
 
 pub(crate) mod tileset;
 
+// Not sure if this is a good way to do this, but since every tile can have weights, it makes sense
 pub struct FullCardinal {
-    pub north: Handle<Image>,
-    pub east: Handle<Image>,
-    pub south: Handle<Image>,
-    pub west: Handle<Image>,
+    pub north: Arc<dyn GetForeground>,
+    pub east: Arc<dyn GetForeground>,
+    pub south: Arc<dyn GetForeground>,
+    pub west: Arc<dyn GetForeground>,
 }
 
 pub struct Corner {
-    pub north_west: Handle<Image>,
-    pub south_west: Handle<Image>,
-    pub south_east: Handle<Image>,
-    pub north_east: Handle<Image>,
+    pub north_west: Arc<dyn GetForeground>,
+    pub south_west: Arc<dyn GetForeground>,
+    pub south_east: Arc<dyn GetForeground>,
+    pub north_east: Arc<dyn GetForeground>,
 }
 
 pub struct Edge {
-    pub north_south: Handle<Image>,
-    pub east_west: Handle<Image>,
+    pub north_south: Arc<dyn GetForeground>,
+    pub east_west: Arc<dyn GetForeground>,
 }
 
 pub enum SpriteType {
-    Single(Handle<Image>),
+    Single(Arc<dyn GetForeground>),
     Multitile {
-        center: Handle<Image>,
+        center: Arc<dyn GetForeground>,
         corner: Corner,
         t_connection: FullCardinal,
         edge: Edge,
         end_piece: FullCardinal,
-        unconnected: Handle<Image>,
+        unconnected: Arc<dyn GetForeground>,
     },
 }
 
 pub trait GetTexture: Send + Sync {
-    fn get_texture(&self, project: &Project, character: &char, coordinates: &Coordinates) -> &Handle<Image>;
+    fn get_texture(&self, project: &Project, character: &char, coordinates: &Coordinates) -> &Arc<dyn GetForeground>;
 }
 
 pub struct LegacyTextures {
@@ -63,7 +64,7 @@ impl LegacyTextures {
 
 
 impl GetTexture for LegacyTextures {
-    fn get_texture(&self, project: &Project, character: &char, coordinates: &Coordinates) -> &Handle<Image> {
+    fn get_texture(&self, project: &Project, character: &char, coordinates: &Coordinates) -> &Arc<dyn GetForeground> {
         let sprite_type = self.textures.get(&project.map_entity.get_tile_id_from_character(character)).unwrap();
 
         return match sprite_type {

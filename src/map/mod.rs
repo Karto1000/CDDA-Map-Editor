@@ -55,7 +55,7 @@ pub fn update_sprite_reader(
             Ok(i) => { i }
             Err(_) => { return; }
         };
-        *image = sprite.clone();
+        *image = sprite.get_sprite().clone();
     }
 }
 
@@ -78,7 +78,7 @@ pub fn tile_spawn_reader(
         let entity_commands = commands.spawn((
             e.tile,
             SpriteBundle {
-                texture: sprite.clone(),
+                texture: sprite.get_sprite().clone(),
                 transform: Transform {
                     translation: Vec3 {
                         // Spawn off screen

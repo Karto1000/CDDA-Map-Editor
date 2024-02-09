@@ -4,16 +4,18 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use bevy::asset::{Assets, Handle};
 use bevy::prelude::{Image, ResMut, Vec2};
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use image::{DynamicImage, GenericImageView};
 use image::io::Reader;
+use rand::Rng;
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::common::{MeabyWeighted, TileId};
+use crate::common::{MeabyWeighted, TileId, Weighted};
 use crate::graphics::{Corner, Edge, FullCardinal, SpriteType};
 use crate::graphics::tileset::TilesetLoader;
 use crate::project::loader::{Load, LoadError};
@@ -118,6 +120,35 @@ fn get_xy_from_fg(fg: &i32, last_group_index: i32) -> Vec2 {
     );
 }
 
+pub trait GetForeground: Send + Sync {
+    fn get_sprite(&self) -> &Handle<Image>;
+}
+
+pub struct WeightedForeground {
+    weighted_sprites: Vec<Weighted<Handle<Image>>>,
+}
+
+impl GetForeground for WeightedForeground {
+    fn get_sprite(&self) -> &Handle<Image> {
+        let mut rng = rand::thread_rng();
+        let random_index: usize = rng.gen_range(0..self.weighted_sprites.len());
+        println!("{}", random_index);
+        // TODO Take weights into account
+        let random_sprite = self.weighted_sprites.get(random_index).unwrap();
+        return &random_sprite.value;
+    }
+}
+
+pub struct SingleForeground {
+    sprite: Handle<Image>,
+}
+
+impl GetForeground for SingleForeground {
+    fn get_sprite(&self) -> &Handle<Image> {
+        return &self.sprite;
+    }
+}
+
 impl Load<LegacyTileset> for LegacyTilesetLoader {
     fn load(&self) -> Result<LegacyTileset, LoadError> {
         let info_file = File::open(self.path.join(PathBuf::from_str(TILESET_INFO_NAME).unwrap())).unwrap();
@@ -215,49 +246,73 @@ impl TilesetLoader<LegacyTileset> for LegacyTilesetLoader {
             let mut amount_of_tiles = 0;
 
             for tile in group.tiles.iter() {
-                let fg = match &tile.fg.as_ref().unwrap() {
-                    MeabyMulti::Single(fg) => fg,
-                    // TODO, Just here for testing, implement this later
-                    MeabyMulti::Multi(multi) => multi.first().unwrap()
-                };
+                let get_main_fg: Arc<dyn GetForeground> = match &tile.fg.as_ref().unwrap() {
+                    MeabyMulti::Single(fg) => {
+                        let handle = match fg {
+                            MeabyWeighted::NotWeighted(fg) => {
+                                let xy = get_xy_from_fg(fg, last_group_index);
 
-                let xy = match fg {
-                    MeabyWeighted::NotWeighted(fg) => {
-                        // TODO: Figure out what to do if the tile is inside another file
-                        if fg < &last_group_index {
-                            continue;
-                        }
-                        get_xy_from_fg(fg, last_group_index)
+                                // TODO: Figure out what to do if the sprite is inside another file
+                                if fg < &last_group_index {
+                                    continue;
+                                }
+
+                                let image = get_image_from_tileset(
+                                    &image,
+                                    xy.x as u32 * tileset.info.tile_width,
+                                    xy.y as u32 * tileset.info.tile_height,
+                                    tileset.info.tile_width,
+                                    tileset.info.tile_height,
+                                );
+
+                                image_resource.add(image)
+                            }
+                            MeabyWeighted::Weighted(_) => { panic!("Single FG's should not be weighted") }
+                        };
+
+                        Arc::new(SingleForeground { sprite: handle })
                     }
-                    // TODO Figure out how weights work here
-                    MeabyWeighted::Weighted(weight) => {
-                        // TODO: Figure out what to do if the tile is inside another file
-                        if weight.value < last_group_index {
-                            continue;
+                    MeabyMulti::Multi(fg) => {
+                        let mut textures: Vec<Weighted<Handle<Image>>> = Vec::new();
+
+                        for meaby_weighted in fg.iter() {
+                            match meaby_weighted {
+                                MeabyWeighted::NotWeighted(v) => {
+                                    // TODO: Figure out what to do here
+                                    println!("Elements should be weighted")
+                                }
+                                MeabyWeighted::Weighted(w) => {
+                                    let xy = get_xy_from_fg(&w.value, last_group_index);
+
+                                    let image = get_image_from_tileset(
+                                        &image,
+                                        xy.x as u32 * tileset.info.tile_width,
+                                        xy.y as u32 * tileset.info.tile_height,
+                                        tileset.info.tile_width,
+                                        tileset.info.tile_height,
+                                    );
+
+                                    textures.push(Weighted { value: image_resource.add(image), weight: w.weight });
+                                }
+                            }
                         }
-                        get_xy_from_fg(&weight.value, last_group_index)
+
+                        Arc::new(WeightedForeground { weighted_sprites: textures })
                     }
                 };
-
-                let main_image = get_image_from_tileset(
-                    &image,
-                    xy.x as u32 * tileset.info.tile_width,
-                    xy.y as u32 * tileset.info.tile_height,
-                    tileset.info.tile_width,
-                    tileset.info.tile_height,
-                );
 
                 match &tile.additional_tiles {
                     None => {
                         match &tile.id {
                             MeabyMulti::Single(v) => {
-                                textures.insert(TileId { 0: v.clone() }, SpriteType::Single(image_resource.add(main_image)));
+                                // textures.insert(TileId { 0: v.clone() }, SpriteType::Single(image_resource.add(main_image)));
+                                textures.insert(TileId { 0: v.clone() }, SpriteType::Single(get_main_fg.clone()));
                                 amount_of_tiles += 1;
                             }
                             MeabyMulti::Multi(v) => {
-                                // TODO Actually Implement this
                                 for value in v.iter() {
-                                    textures.insert(TileId { 0: value.clone() }, SpriteType::Single(image_resource.add(main_image.clone())));
+                                    // textures.insert(TileId { 0: value.clone() }, SpriteType::Single(image_resource.add(main_image.clone())));
+                                    textures.insert(TileId { 0: value.clone() }, SpriteType::Single(get_main_fg.clone()));
                                     amount_of_tiles += 1;
                                 }
                             }
@@ -270,12 +325,12 @@ impl TilesetLoader<LegacyTileset> for LegacyTilesetLoader {
                         };
 
                         for id in ids {
-                            let mut center: Option<Handle<Image>> = None;
+                            let mut center: Option<Arc<dyn GetForeground>> = None;
                             let mut corner: Option<Corner> = None;
                             let mut t_connection: Option<FullCardinal> = None;
                             let mut edge: Option<Edge> = None;
                             let mut end_piece: Option<FullCardinal> = None;
-                            let mut unconnected: Option<Handle<Image>> = None;
+                            let mut unconnected: Option<Arc<dyn GetForeground>> = None;
 
                             for additional_tile in additional_tiles.iter() {
                                 match additional_tile.fg.as_ref() {
@@ -301,7 +356,7 @@ impl TilesetLoader<LegacyTileset> for LegacyTilesetLoader {
                                                     tileset.info.tile_height,
                                                 );
 
-                                                center = Some(image_resource.add(image));
+                                                center = Some(Arc::new(SingleForeground { sprite: image_resource.add(image) }));
                                             }
                                             "corner" => {
                                                 match fg {
@@ -321,11 +376,13 @@ impl TilesetLoader<LegacyTileset> for LegacyTilesetLoader {
                                                             tileset.info.tile_height,
                                                         );
 
+                                                        let get_fg = Arc::new(SingleForeground { sprite: image_resource.add(image) });
+
                                                         corner = Some(Corner {
-                                                            north_west: image_resource.add(image.clone()),
-                                                            south_west: image_resource.add(image.clone()),
-                                                            south_east: image_resource.add(image.clone()),
-                                                            north_east: image_resource.add(image.clone()),
+                                                            north_west: get_fg.clone(),
+                                                            south_west: get_fg.clone(),
+                                                            south_east: get_fg.clone(),
+                                                            north_east: get_fg.clone(),
                                                         })
                                                     }
                                                     MeabyMulti::Multi(v) => {
@@ -351,10 +408,10 @@ impl TilesetLoader<LegacyTileset> for LegacyTilesetLoader {
 
                                                         // I assume that the ordering of the fg values is always the same
                                                         corner = Some(Corner {
-                                                            north_west: image_resource.add(images.get(0).unwrap().clone()),
-                                                            south_west: image_resource.add(images.get(1).unwrap().clone()),
-                                                            south_east: image_resource.add(images.get(2).unwrap().clone()),
-                                                            north_east: image_resource.add(images.get(3).unwrap().clone()),
+                                                            north_west: Arc::new(SingleForeground { sprite: image_resource.add(images.get(0).unwrap().clone()) }),
+                                                            south_west: Arc::new(SingleForeground { sprite: image_resource.add(images.get(1).unwrap().clone()) }),
+                                                            south_east: Arc::new(SingleForeground { sprite: image_resource.add(images.get(2).unwrap().clone()) }),
+                                                            north_east: Arc::new(SingleForeground { sprite: image_resource.add(images.get(3).unwrap().clone()) }),
                                                         })
                                                     }
                                                 }
@@ -375,11 +432,13 @@ impl TilesetLoader<LegacyTileset> for LegacyTilesetLoader {
                                                             tileset.info.tile_height,
                                                         );
 
+                                                        let get_fg = Arc::new(SingleForeground { sprite: image_resource.add(image) });
+
                                                         t_connection = Some(FullCardinal {
-                                                            north: image_resource.add(image.clone()),
-                                                            west: image_resource.add(image.clone()),
-                                                            south: image_resource.add(image.clone()),
-                                                            east: image_resource.add(image.clone()),
+                                                            north: get_fg.clone(),
+                                                            west: get_fg.clone(),
+                                                            south: get_fg.clone(),
+                                                            east: get_fg.clone(),
                                                         })
                                                     }
                                                     MeabyMulti::Multi(v) => {
@@ -405,10 +464,10 @@ impl TilesetLoader<LegacyTileset> for LegacyTilesetLoader {
 
                                                         // I assume that the ordering of the fg values is always the same
                                                         t_connection = Some(FullCardinal {
-                                                            north: image_resource.add(images.get(0).unwrap().clone()),
-                                                            west: image_resource.add(images.get(1).unwrap().clone()),
-                                                            south: image_resource.add(images.get(2).unwrap().clone()),
-                                                            east: image_resource.add(images.get(3).unwrap().clone()),
+                                                            north: Arc::new(SingleForeground { sprite: image_resource.add(images.get(0).unwrap().clone()) }),
+                                                            west: Arc::new(SingleForeground { sprite: image_resource.add(images.get(1).unwrap().clone()) }),
+                                                            south: Arc::new(SingleForeground { sprite: image_resource.add(images.get(2).unwrap().clone()) }),
+                                                            east: Arc::new(SingleForeground { sprite: image_resource.add(images.get(3).unwrap().clone()) }),
                                                         })
                                                     }
                                                 }
@@ -429,9 +488,11 @@ impl TilesetLoader<LegacyTileset> for LegacyTilesetLoader {
                                                             tileset.info.tile_height,
                                                         );
 
+                                                        let get_fg = Arc::new(SingleForeground { sprite: image_resource.add(image) });
+
                                                         edge = Some(Edge {
-                                                            north_south: image_resource.add(image.clone()),
-                                                            east_west: image_resource.add(image.clone()),
+                                                            north_south: get_fg.clone(),
+                                                            east_west: get_fg.clone(),
                                                         })
                                                     }
                                                     MeabyMulti::Multi(v) => {
@@ -457,8 +518,8 @@ impl TilesetLoader<LegacyTileset> for LegacyTilesetLoader {
 
                                                         // I assume that the ordering of the fg values is always the same
                                                         edge = Some(Edge {
-                                                            north_south: image_resource.add(images.get(0).unwrap().clone()),
-                                                            east_west: image_resource.add(images.get(1).unwrap().clone()),
+                                                            north_south: Arc::new(SingleForeground { sprite: image_resource.add(images.get(0).unwrap().clone()) }),
+                                                            east_west: Arc::new(SingleForeground { sprite: image_resource.add(images.get(1).unwrap().clone()) }),
                                                         })
                                                     }
                                                 }
@@ -479,11 +540,13 @@ impl TilesetLoader<LegacyTileset> for LegacyTilesetLoader {
                                                             tileset.info.tile_height,
                                                         );
 
+                                                        let get_fg = Arc::new(SingleForeground { sprite: image_resource.add(image) });
+
                                                         end_piece = Some(FullCardinal {
-                                                            north: image_resource.add(image.clone()),
-                                                            west: image_resource.add(image.clone()),
-                                                            south: image_resource.add(image.clone()),
-                                                            east: image_resource.add(image.clone()),
+                                                            north: get_fg.clone(),
+                                                            west: get_fg.clone(),
+                                                            south: get_fg.clone(),
+                                                            east: get_fg.clone(),
                                                         })
                                                     }
                                                     MeabyMulti::Multi(v) => {
@@ -509,10 +572,10 @@ impl TilesetLoader<LegacyTileset> for LegacyTilesetLoader {
 
                                                         // I assume that the ordering of the fg values is always the same
                                                         end_piece = Some(FullCardinal {
-                                                            north: image_resource.add(images.get(0).unwrap().clone()),
-                                                            west: image_resource.add(images.get(1).unwrap().clone()),
-                                                            south: image_resource.add(images.get(2).unwrap().clone()),
-                                                            east: image_resource.add(images.get(3).unwrap().clone()),
+                                                            north: Arc::new(SingleForeground { sprite: image_resource.add(images.get(0).unwrap().clone()) }),
+                                                            west: Arc::new(SingleForeground { sprite: image_resource.add(images.get(1).unwrap().clone()) }),
+                                                            south: Arc::new(SingleForeground { sprite: image_resource.add(images.get(2).unwrap().clone()) }),
+                                                            east: Arc::new(SingleForeground { sprite: image_resource.add(images.get(3).unwrap().clone()) }),
                                                         })
                                                     }
                                                 }
@@ -537,7 +600,7 @@ impl TilesetLoader<LegacyTileset> for LegacyTilesetLoader {
                                                     tileset.info.tile_height,
                                                 );
 
-                                                unconnected = Some(image_resource.add(image));
+                                                unconnected = Some(Arc::new(SingleForeground {sprite: image_resource.add(image)}));
                                             }
                                             _ => { panic!("Go Unexpected id {}", additional_tile.id) }
                                         }
@@ -549,30 +612,30 @@ impl TilesetLoader<LegacyTileset> for LegacyTilesetLoader {
                             textures.insert(
                                 TileId { 0: id.clone() },
                                 SpriteType::Multitile {
-                                    center: center.unwrap_or(image_resource.add(main_image.clone())),
+                                    center: center.unwrap_or(get_main_fg.clone()),
                                     corner: corner.unwrap_or(Corner {
-                                        north_west: image_resource.add(main_image.clone()),
-                                        south_west: image_resource.add(main_image.clone()),
-                                        south_east: image_resource.add(main_image.clone()),
-                                        north_east: image_resource.add(main_image.clone()),
+                                        north_west: get_main_fg.clone(),
+                                        south_west: get_main_fg.clone(),
+                                        south_east: get_main_fg.clone(),
+                                        north_east: get_main_fg.clone(),
                                     }),
                                     t_connection: t_connection.unwrap_or(FullCardinal {
-                                        north: image_resource.add(main_image.clone()),
-                                        east: image_resource.add(main_image.clone()),
-                                        south: image_resource.add(main_image.clone()),
-                                        west: image_resource.add(main_image.clone()),
+                                        north: get_main_fg.clone(),
+                                        east: get_main_fg.clone(),
+                                        south: get_main_fg.clone(),
+                                        west: get_main_fg.clone(),
                                     }),
                                     edge: edge.unwrap_or(Edge {
-                                        north_south: image_resource.add(main_image.clone()),
-                                        east_west: image_resource.add(main_image.clone()),
+                                        north_south: get_main_fg.clone(),
+                                        east_west: get_main_fg.clone(),
                                     }),
                                     end_piece: end_piece.unwrap_or(FullCardinal {
-                                        north: image_resource.add(main_image.clone()),
-                                        east: image_resource.add(main_image.clone()),
-                                        south: image_resource.add(main_image.clone()),
-                                        west: image_resource.add(main_image.clone()),
+                                        north: get_main_fg.clone(),
+                                        east: get_main_fg.clone(),
+                                        south: get_main_fg.clone(),
+                                        west: get_main_fg.clone(),
                                     }),
-                                    unconnected: unconnected.unwrap_or(image_resource.add(main_image.clone())),
+                                    unconnected: unconnected.unwrap_or(get_main_fg.clone()),
                                 },
                             );
                             amount_of_tiles += 1;
