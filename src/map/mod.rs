@@ -26,7 +26,6 @@ impl Plugin for MapPlugin {
         app.add_systems(Update, save_directory_picked);
         app.add_systems(Update, spawn_map_entity_reader);
         app.add_systems(Update, clear_tiles_reader);
-        app.add_systems(Update, update_sprite_reader);
 
         app.add_event::<TilePlaceEvent>();
         app.add_event::<TileDeleteEvent>();

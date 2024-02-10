@@ -10,6 +10,7 @@ use bevy_file_dialog::{DialogFileSaved, FileDialogExt};
 
 use crate::EditorData;
 use crate::graphics::GraphicsResource;
+use crate::graphics::tileset::legacy::{GetBackground, GetForeground};
 use crate::grid::resources::Grid;
 use crate::map::{TileDeleteEvent, TilePlaceEvent};
 use crate::map::events::{ClearTiles, SpawnMapEntity, UpdateSpriteEvent};
@@ -142,10 +143,10 @@ pub fn tile_remove_reader(
 pub fn update_sprite_reader(
     mut e_update_sprite: EventReader<UpdateSpriteEvent>,
     mut q_sprite: Query<&mut Handle<Image>, With<Tile>>,
+    mut r_editor_data: ResMut<EditorData>,
     r_textures: Res<GraphicsResource>,
-    r_editor_data: Res<EditorData>,
 ) {
-    let project = match r_editor_data.get_current_project() {
+    let project = match r_editor_data.get_current_project_mut() {
         None => { return; }
         Some(p) => { p }
     };
@@ -158,10 +159,17 @@ pub fn update_sprite_reader(
             Some(i) => {
                 match q_sprite.get_mut(i) {
                     Ok(mut i) => {
-                        *i = sprite.fg.as_ref().unwrap().get_sprite().clone();
+                        match sprite.fg.as_ref() {
+                            None => {
+                                // Sprite was deleted
+                            }
+                            Some(s) => {
+                                *i = s.get_sprite().clone()
+                            }
+                        }
                     }
                     Err(_) => {}
-                };
+                }
             }
         }
 
@@ -169,11 +177,18 @@ pub fn update_sprite_reader(
             None => {}
             Some(i) => match q_sprite.get_mut(i) {
                 Ok(mut i) => {
-                    *i = sprite.bg.as_ref().unwrap().get_sprite().clone();
+                    match sprite.bg.as_ref() {
+                        None => {
+                            // Sprite was deleted
+                        }
+                        Some(s) => {
+                            *i = s.get_sprite().clone();
+                        }
+                    }
                 }
                 Err(_) => {}
             }
-        };
+        }
     }
 }
 
@@ -279,11 +294,11 @@ pub fn tile_despawn_reader(
         Some(p) => { p }
     };
 
-    for event in e_tile_delete.read() {
-        match event.tile.fg_entity {
+    for e in e_tile_delete.read() {
+        match e.tile.fg_entity {
             None => {}
-            Some(e) => {
-                let tiles_around = project.map_entity.get_tiles_around(&event.coordinates);
+            Some(entity) => {
+                let tiles_around = project.map_entity.get_tiles_around(&e.coordinates);
 
                 for (tile, coordinates) in tiles_around {
                     match tile {
@@ -299,7 +314,50 @@ pub fn tile_despawn_reader(
                     }
                 }
 
-                commands.get_entity(e).unwrap().despawn()
+                commands.get_entity(entity).unwrap().despawn()
+            }
+        }
+
+        match e.tile.bg_entity {
+            None => {}
+            Some(entity) => {
+                let tiles_around = project.map_entity.get_tiles_around(&e.coordinates);
+
+                for (tile, coordinates) in tiles_around {
+                    match tile {
+                        None => {}
+                        Some(t) => {
+                            e_update_sprite.send(
+                                UpdateSpriteEvent {
+                                    tile: *t,
+                                    coordinates,
+                                }
+                            )
+                        }
+                    }
+                }
+
+                println!("Despawn BG");
+
+                commands.get_entity(entity).unwrap().despawn()
+            }
+        }
+
+        let tiles_around = project.map_entity.get_tiles_around(&e.coordinates);
+
+        println!("{:?}", tiles_around);
+
+        for (tile, coordinates) in tiles_around {
+            match tile {
+                None => {}
+                Some(t) => {
+                    e_update_sprite.send(
+                        UpdateSpriteEvent {
+                            tile: *t,
+                            coordinates,
+                        }
+                    )
+                }
             }
         }
     }

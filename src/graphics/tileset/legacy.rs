@@ -7,12 +7,14 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use anyhow::Error;
-use bevy::asset::{Assets, Handle};
-use bevy::prelude::{Image, ResMut, Vec2};
+use bevy::asset::{Assets, AssetServer, Handle};
+use bevy::prelude::{Image, Res, ResMut, Vec2};
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-use image::{DynamicImage, GenericImageView};
+use image::{DynamicImage, EncodableLayout, GenericImageView, ImageBuffer, imageops, Rgb, Rgba};
 use image::io::Reader;
-use log::{debug, warn};
+use imageproc::definitions::HasBlack;
+use imageproc::geometric_transformations::{Interpolation, rotate};
+use log::{debug, info, warn};
 use rand::Rng;
 use serde::Deserialize;
 use serde_json::Value;
@@ -103,7 +105,7 @@ fn get_image_from_tileset(image: &DynamicImage, x: u32, y: u32, width: u32, heig
 }
 
 fn get_xy_from_index(index: &i32, last_group_index: i32) -> Vec2 {
-    let local_tile_index: u32 = (index - last_group_index) as u32;
+    let local_tile_index: u32 = (index - last_group_index) as u32 - 1;
 
     return Vec2::new(
         (local_tile_index % AMOUNT_OF_SPRITES_PER_ROW) as f32,
@@ -117,18 +119,10 @@ fn get_sprite_trait_from_single_fg(
 ) -> Option<Arc<dyn GetForeground>> {
     let handle = match fg {
         MeabyWeighted::NotWeighted(fg) => {
-            // fg 9519 doesnt even fucking exist yet it is used, ...
-            match loaded_sprites.get(fg) {
-                // TODO REVISIT
-                None => return None,
-                Some(h) => h
-            }
+            loaded_sprites.get(fg).unwrap()
         }
         MeabyWeighted::Weighted(w) => {
-            match loaded_sprites.get(&w.value) {
-                None => return None,
-                Some(h) => h
-            }
+            loaded_sprites.get(&w.value).unwrap()
         }
     };
 
@@ -148,11 +142,7 @@ fn get_sprite_trait_from_multi_fg(
                 warn!("Elements with fg {:?} should be weighted", fg)
             }
             MeabyWeighted::Weighted(w) => {
-                // TODO Revisit
-                match loaded_sprites.get(&w.value) {
-                    None => {}
-                    Some(sprite) => textures.push(Weighted::new(sprite.clone(), w.weight))
-                };
+                textures.push(Weighted::new(loaded_sprites.get(&w.value).unwrap().clone(), w.weight))
             }
         }
     }
@@ -256,22 +246,67 @@ fn get_single_fg_and_bg(
 
 fn get_multi_fg_and_bg(
     loaded_sprites: &HashMap<i32, Handle<Image>>,
+    assets: &mut ResMut<Assets<Image>>,
     fg: &MeabyMulti<MeabyWeighted<i32>>,
     bg: &Option<MeabyMulti<MeabyWeighted<i32>>>,
 ) -> (Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>) {
     let get_fg = match fg {
         MeabyMulti::Single(fg) => {
             // Seriously? Why would you not just put the same id in the list four times?
-            let get_fg = get_sprite_trait_from_single_fg(
-                &fg,
-                loaded_sprites,
-            );
+            // Ok, I am stupid, I just realized that this means the sprite is rotated
+            let fg = match fg {
+                MeabyWeighted::NotWeighted(fg) => fg.clone(),
+                MeabyWeighted::Weighted(w) => w.value
+            };
 
-            // TODO REVISIT
-            match get_fg {
-                None => vec![],
-                Some(get_fg) => vec![get_fg.clone(), get_fg.clone(), get_fg.clone(), get_fg.clone()]
+            let sprite = loaded_sprites.get(&fg).unwrap();
+
+            let image = assets.get(sprite).unwrap();
+            let mut rotated = Vec::new();
+
+            let image_width = image.width();
+            let image_height = image.height();
+
+            let dyn_image = DynamicImage::from(ImageBuffer::<Rgba<u8>, Vec<u8>>::from_vec(image_width, image_height, image.data.clone()).unwrap());
+
+            for i in 0..4 {
+                let new_image = match i {
+                    0 => {
+                        dyn_image.as_bytes().to_vec()
+                    },
+                    1 => {
+                        imageops::flip_vertical(&dyn_image).to_vec()
+                    },
+                    2 => {
+                        imageops::flip_vertical(&imageops::flip_horizontal(&dyn_image)).to_vec()
+                    }
+                    3 => {
+                        imageops::flip_horizontal(&dyn_image).to_vec()
+                    },
+                    _ => {panic!()}
+                };
+
+                let image = Image::new(
+                    Extent3d {
+                        width: 32,
+                        height: 32,
+                        depth_or_array_layers: 1,
+                    },
+                    TextureDimension::D2,
+                    new_image,
+                    TextureFormat::Rgba8UnormSrgb,
+                );
+
+                let data: Arc<dyn GetForeground> = Arc::new(SingleForeground { sprite: assets.add(image) });
+                rotated.push(data);
             }
+
+            vec![
+                rotated.get(0).unwrap().clone(),
+                rotated.get(1).unwrap().clone(),
+                rotated.get(2).unwrap().clone(),
+                rotated.get(3).unwrap().clone(),
+            ]
         }
         MeabyMulti::Multi(v) => {
             // Direction is NW, SW, SE, NE
@@ -282,11 +317,6 @@ fn get_multi_fg_and_bg(
                     &fg,
                     loaded_sprites,
                 );
-
-                // TODO REVISIT
-                if arc.is_none() {
-                    continue;
-                }
 
                 getters.push(arc.unwrap());
             }
@@ -489,19 +519,28 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
             // Not a good way to do this, but i just couldn't for the life of me figure out how to get the range
             // Of the fg values of a tileset group without reading the comment
             let range_vec = group.range.as_ref().unwrap().split(" to ").collect::<Vec<&str>>();
-            let start: u32 = range_vec.first().unwrap().split("range ").collect::<Vec<&str>>().last().unwrap().parse().unwrap();
+            let mut start: u32 = range_vec.first().unwrap().split("range ").collect::<Vec<&str>>().last().unwrap().parse().unwrap();
+            // -1 because the start is defined as 1
+            start -= 1;
+
             let end: u32 = range_vec.last().unwrap().parse().unwrap();
 
             for tile in group.tiles.iter() {
                 match &tile.fg {
-                    None => {}
+                    None => {
+                        info!("No fg for tile {:?}", tile.id);
+                    }
                     Some(fg) => {
                         match fg {
                             MeabyMulti::Multi(multi) => {
                                 for fg in multi.iter() {
                                     match fg {
                                         MeabyWeighted::NotWeighted(fg) => {
-                                            let xy = get_xy_from_index(fg, (start - 1) as i32);
+                                            if textures.contains_key(fg) {
+                                                continue;
+                                            }
+
+                                            let xy = get_xy_from_index(fg, start as i32);
 
                                             let image = get_image_from_tileset(
                                                 &image,
@@ -514,7 +553,11 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                             textures.insert(*fg, image_resource.add(image));
                                         }
                                         MeabyWeighted::Weighted(w) => {
-                                            let xy = get_xy_from_index(&w.value, (start - 1) as i32);
+                                            if textures.contains_key(&w.value) {
+                                                continue;
+                                            }
+
+                                            let xy = get_xy_from_index(&w.value, start as i32);
 
                                             let image = get_image_from_tileset(
                                                 &image,
@@ -532,7 +575,11 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                             MeabyMulti::Single(fg) => {
                                 match fg {
                                     MeabyWeighted::NotWeighted(fg) => {
-                                        let xy = get_xy_from_index(fg, (start - 1) as i32);
+                                        if textures.contains_key(fg) {
+                                            continue;
+                                        }
+
+                                        let xy = get_xy_from_index(fg, start as i32);
 
                                         // For some fucking reason the
                                         // Grass tiles in the UndeadPeopleTileset specify a fg id which isn't
@@ -554,7 +601,11 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                         textures.insert(*fg, image_resource.add(image));
                                     }
                                     MeabyWeighted::Weighted(w) => {
-                                        let xy = get_xy_from_index(&w.value, (start - 1) as i32);
+                                        if textures.contains_key(&w.value) {
+                                            continue;
+                                        }
+
+                                        let xy = get_xy_from_index(&w.value, start as i32);
 
                                         if w.value < start as i32 || w.value > end as i32 {
                                             continue;
@@ -575,6 +626,124 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                         }
                     }
                 }
+
+                match &tile.additional_tiles {
+                    None => {}
+                    Some(tiles) => {
+                        for additional_tile in tiles {
+                            match &additional_tile.fg {
+                                None => {
+                                    info!("Additional Tile with parent id {:?} has no fg", tile.fg);
+                                }
+                                Some(fg) => {
+                                    match fg {
+                                        MeabyMulti::Multi(multi) => {
+                                            for fg in multi.iter() {
+                                                match fg {
+                                                    MeabyWeighted::NotWeighted(fg) => {
+                                                        if textures.contains_key(fg) {
+                                                            continue;
+                                                        }
+
+                                                        let xy = get_xy_from_index(fg, start as i32);
+
+                                                        let image = get_image_from_tileset(
+                                                            &image,
+                                                            xy.x as u32 * tileset.info.tile_width,
+                                                            xy.y as u32 * tileset.info.tile_height,
+                                                            tileset.info.tile_width,
+                                                            tileset.info.tile_height,
+                                                        );
+
+                                                        textures.insert(*fg, image_resource.add(image));
+                                                    }
+                                                    MeabyWeighted::Weighted(w) => {
+                                                        if textures.contains_key(&w.value) {
+                                                            continue;
+                                                        }
+
+                                                        let xy = get_xy_from_index(&w.value, start as i32);
+
+                                                        let image = get_image_from_tileset(
+                                                            &image,
+                                                            xy.x as u32 * tileset.info.tile_width,
+                                                            xy.y as u32 * tileset.info.tile_height,
+                                                            tileset.info.tile_width,
+                                                            tileset.info.tile_height,
+                                                        );
+
+                                                        textures.insert(w.value, image_resource.add(image));
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        MeabyMulti::Single(fg) => {
+                                            match fg {
+                                                MeabyWeighted::NotWeighted(fg) => {
+                                                    if textures.contains_key(fg) {
+                                                        continue;
+                                                    }
+
+                                                    let xy = get_xy_from_index(fg, start as i32);
+
+                                                    // For some fucking reason the
+                                                    // Grass tiles in the UndeadPeopleTileset specify a fg id which isn't
+                                                    // even available in the file
+                                                    // TODO FIX
+
+                                                    if fg < &(start as i32) || fg > &(end as i32) {
+                                                        continue;
+                                                    }
+
+                                                    let image = get_image_from_tileset(
+                                                        &image,
+                                                        xy.x as u32 * tileset.info.tile_width,
+                                                        xy.y as u32 * tileset.info.tile_height,
+                                                        tileset.info.tile_width,
+                                                        tileset.info.tile_height,
+                                                    );
+
+                                                    textures.insert(*fg, image_resource.add(image));
+                                                }
+                                                MeabyWeighted::Weighted(w) => {
+                                                    if textures.contains_key(&w.value) {
+                                                        continue;
+                                                    }
+
+                                                    let xy = get_xy_from_index(&w.value, start as i32);
+
+                                                    if w.value < start as i32 || w.value > end as i32 {
+                                                        continue;
+                                                    }
+
+                                                    let image = get_image_from_tileset(
+                                                        &image,
+                                                        xy.x as u32 * tileset.info.tile_width,
+                                                        xy.y as u32 * tileset.info.tile_height,
+                                                        tileset.info.tile_width,
+                                                        tileset.info.tile_height,
+                                                    );
+
+                                                    textures.insert(w.value, image_resource.add(image));
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // TODO: Add to test
+        for i in 0..19999 {
+            let texture = textures.get(&i);
+
+            match texture {
+                None => { warn!("No Texture with id {}", i) }
+                Some(_) => {}
             }
         }
 
@@ -615,17 +784,11 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                 for fg in fg.iter() {
                                     match fg {
                                         MeabyWeighted::NotWeighted(fg) => {
-                                            match loaded_sprites.get(fg) {
-                                                None => {}
-                                                // TODO Revisit
-                                                Some(sprite) => sprites.push(Weighted::new(sprite.clone(), 0))
-                                            };
+                                            // TODO: Check how to handle weights
+                                            sprites.push(Weighted::new(loaded_sprites.get(fg).unwrap().clone(), 0));
                                         }
                                         MeabyWeighted::Weighted(w) => {
-                                            match loaded_sprites.get(&w.value) {
-                                                None => {}
-                                                Some(sprite) => sprites.push(Weighted::new(sprite.clone(), w.weight))
-                                            };
+                                            sprites.push(Weighted::new(loaded_sprites.get(&w.value).unwrap().clone(), w.weight));
                                         }
                                     }
                                 }
@@ -736,6 +899,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
 
                                 let bg = &additional_tile.bg;
 
+                                // TODO: Figure out what a id of 'broken' means
                                 match additional_tile.id.as_str() {
                                     "center" => {
                                         let v = get_single_fg_and_bg(
@@ -758,6 +922,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                     "corner" => {
                                         let v = get_multi_fg_and_bg(
                                             &loaded_sprites,
+                                            image_resource,
                                             fg,
                                             bg,
                                         );
@@ -766,6 +931,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                     "t_connection" => {
                                         let v = get_multi_fg_and_bg(
                                             &loaded_sprites,
+                                            image_resource,
                                             fg,
                                             bg,
                                         );
@@ -774,6 +940,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                     "edge" => {
                                         let v = get_multi_fg_and_bg(
                                             &loaded_sprites,
+                                            image_resource,
                                             fg,
                                             bg,
                                         );
@@ -782,6 +949,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                     "end_piece" => {
                                         let v = get_multi_fg_and_bg(
                                             &loaded_sprites,
+                                            image_resource,
                                             fg,
                                             bg,
                                         );
@@ -798,7 +966,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                             bg: get_bg,
                                         });
                                     }
-                                    _ => { warn!("Go Unexpected id {}", additional_tile.id) }
+                                    _ => { warn!("Got Unexpected id {} for fg {:?}", additional_tile.id, fg) }
                                 }
                             }
 

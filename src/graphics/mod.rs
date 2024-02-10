@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use bevy::prelude::{Assets, Image, ResMut, Resource};
-use bevy_egui::egui::load::TextureLoader;
 
 use crate::common::{Coordinates, TileId};
 use crate::graphics::tileset::legacy::{GetBackground, GetForeground, LegacyTileset};
