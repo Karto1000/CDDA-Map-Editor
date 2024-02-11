@@ -138,8 +138,20 @@ fn get_sprite_trait_from_multi_fg(
     for meaby_weighted in fg.iter() {
         match meaby_weighted {
             MeabyWeighted::NotWeighted(v) => {
-                // TODO: Figure out what to do here
-                warn!("Elements with fg {:?} should be weighted", fg)
+                match loaded_sprites.get(v) {
+                    None => {
+                        warn!("Could not find sprite for bg {:?}", v)
+                    }
+                    Some(sprite) => {
+                        textures.push(Weighted {
+                            value: sprite.clone(),
+                            // Give default weight of 1 to all sprites that are not weighted
+                            // TODO: Revisit
+                            // Check if this is actually correct
+                            weight: 1
+                        })
+                    }
+                }
             }
             MeabyWeighted::Weighted(w) => {
                 textures.push(Weighted::new(loaded_sprites.get(&w.value).unwrap().clone(), w.weight))
@@ -181,12 +193,26 @@ fn get_sprite_trait_from_multi_bg(
     for meaby_weighted in bg.iter() {
         match meaby_weighted {
             MeabyWeighted::NotWeighted(v) => {
-                // TODO: Figure out what to do here
-                warn!("Elements with bg {:?} should be weighted", bg)
+                match loaded_sprites.get(v) {
+                    None => {
+                        warn!("Could not find sprite for bg {:?}", v)
+                    }
+                    Some(sprite) => {
+                        textures.push(Weighted {
+                            value: sprite.clone(),
+                            // Give default weight of 1 to all sprites that are not weighted
+                            // TODO: Revisit
+                            // Check if this is actually correct
+                            weight: 1
+                        })
+                    }
+                }
             }
             MeabyWeighted::Weighted(w) => {
                 match loaded_sprites.get(&w.value) {
-                    None => return None,
+                    None => {
+                        warn!("Could not find sprite for bg {:?}", bg);
+                    },
                     Some(sprite) => {
                         textures.push(Weighted {
                             value: sprite.clone(),
@@ -275,13 +301,13 @@ fn get_multi_fg_and_bg(
                         dyn_image.as_bytes().to_vec()
                     },
                     1 => {
-                        imageops::flip_vertical(&dyn_image).to_vec()
+                         imageops::rotate270(&dyn_image).to_vec()
                     },
                     2 => {
-                        imageops::flip_vertical(&imageops::flip_horizontal(&dyn_image)).to_vec()
+                        imageops::rotate180(&dyn_image).to_vec()
                     }
                     3 => {
-                        imageops::flip_horizontal(&dyn_image).to_vec()
+                        imageops::rotate90(&dyn_image).to_vec()
                     },
                     _ => {panic!()}
                 };
@@ -907,12 +933,6 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                             fg,
                                             bg,
                                         );
-
-                                        // TODO REVISIT
-                                        // Can't be bothered to fix this right now
-                                        if v.0.is_none() {
-                                            continue;
-                                        }
 
                                         center = Some(Sprite {
                                             fg: v.0,

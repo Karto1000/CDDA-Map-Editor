@@ -263,7 +263,7 @@ pub fn tile_spawn_reader(
         }
 
         // Check here because i couldn't figure out why the sprites were not correct when spawning a saved map
-        if e.should_update_sprites {
+        // if e.should_update_sprites {
             let tiles_around = project.map_entity.get_tiles_around(&e.coordinates);
 
             for (tile, coordinates) in tiles_around {
@@ -279,7 +279,7 @@ pub fn tile_spawn_reader(
                     }
                 }
             }
-        }
+        // }
     }
 }
 
@@ -337,15 +337,11 @@ pub fn tile_despawn_reader(
                     }
                 }
 
-                println!("Despawn BG");
-
                 commands.get_entity(entity).unwrap().despawn()
             }
         }
 
         let tiles_around = project.map_entity.get_tiles_around(&e.coordinates);
-
-        println!("{:?}", tiles_around);
 
         for (tile, coordinates) in tiles_around {
             match tile {
