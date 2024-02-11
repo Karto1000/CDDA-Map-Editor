@@ -15,6 +15,7 @@ pub(crate) mod legacy;
 
 pub trait TilesetLoader<T, Id>: Load<T> {
     fn load_textures(&self, image_resource: &mut ResMut<Assets<Image>>) -> Result<HashMap<Id, Handle<Image>>, anyhow::Error>;
+    fn load_fallback_textures(&self, image_resource: &mut ResMut<Assets<Image>>) -> Result<HashMap<String, Handle<Image>>, anyhow::Error>;
     fn assign_textures(&self, image_resource: &mut ResMut<Assets<Image>>) -> Result<HashMap<TileId, SpriteType>, anyhow::Error>;
 }
 

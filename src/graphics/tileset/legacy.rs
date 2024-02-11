@@ -27,6 +27,69 @@ use crate::project::loader::{Load, LoadError};
 const TILESET_INFO_NAME: &'static str = "tileset.txt";
 const AMOUNT_OF_SPRITES_PER_ROW: u32 = 16;
 
+const FALLBACK_TILE_MAPPING: &'static [(&'static str, u32)] = &[
+    // Ignore some textures at the start and end of each color
+    ("!", 33),
+    ("#", 35),
+    ("$", 36),
+    ("%", 37),
+    ("&", 38),
+    ("(", 40),
+    (")", 41),
+    ("*", 42),
+    ("+", 43),
+    ("0", 48),
+    ("1", 49),
+    ("2", 50),
+    ("3", 51),
+    ("4", 52),
+    ("5", 53),
+    ("6", 54),
+    ("7", 55),
+    ("8", 56),
+    ("9", 57),
+    (":", 58),
+    (";", 59),
+    ("<", 60),
+    ("=", 61),
+    ("?", 62),
+    ("@", 63),
+    ("A", 64),
+    ("B", 65),
+    ("C", 66),
+    ("D", 67),
+    ("E", 68),
+    ("F", 69),
+    ("G", 70),
+    ("H", 71),
+    ("I", 72),
+    ("J", 73),
+    ("K", 74),
+    ("L", 75),
+    ("M", 76),
+    ("N", 77),
+    ("O", 78),
+    ("P", 79),
+    ("Q", 80),
+    ("R", 81),
+    ("S", 82),
+    ("T", 83),
+    ("U", 84),
+    ("V", 85),
+    ("W", 86),
+    ("X", 87),
+    ("Y", 88),
+    ("Z", 89),
+    ("[", 90),
+    (r"\", 91),
+    ("]", 92),
+    ("^", 93),
+    ("_", 94),
+    ("`", 95),
+    ("{", 122),
+    ("}", 124)
+];
+
 #[derive(Debug)]
 pub struct TilesetInfo {
     pub pixelscale: u32,
@@ -40,6 +103,7 @@ pub struct TileGroup {
     #[serde(rename = "//")]
     pub range: Option<String>,
     pub tiles: Vec<TilesetTileDescriptor>,
+    pub ascii: Option<Vec<AsciiTilesetDescriptor>>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -72,6 +136,13 @@ pub struct TilesetTileDescriptor {
     #[serde(rename = "multitile")]
     is_multitile: Option<bool>,
     additional_tiles: Option<Vec<AdditionalTile>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AsciiTilesetDescriptor {
+    offset: u32,
+    bold: bool,
+    color: String,
 }
 
 #[derive(Debug)]
@@ -148,7 +219,7 @@ fn get_sprite_trait_from_multi_fg(
                             // Give default weight of 1 to all sprites that are not weighted
                             // TODO: Revisit
                             // Check if this is actually correct
-                            weight: 1
+                            weight: 1,
                         })
                     }
                 }
@@ -203,7 +274,7 @@ fn get_sprite_trait_from_multi_bg(
                             // Give default weight of 1 to all sprites that are not weighted
                             // TODO: Revisit
                             // Check if this is actually correct
-                            weight: 1
+                            weight: 1,
                         })
                     }
                 }
@@ -212,7 +283,7 @@ fn get_sprite_trait_from_multi_bg(
                 match loaded_sprites.get(&w.value) {
                     None => {
                         warn!("Could not find sprite for bg {:?}", bg);
-                    },
+                    }
                     Some(sprite) => {
                         textures.push(Weighted {
                             value: sprite.clone(),
@@ -299,17 +370,17 @@ fn get_multi_fg_and_bg(
                 let new_image = match i {
                     0 => {
                         dyn_image.as_bytes().to_vec()
-                    },
+                    }
                     1 => {
-                         imageops::rotate270(&dyn_image).to_vec()
-                    },
+                        imageops::rotate270(&dyn_image).to_vec()
+                    }
                     2 => {
                         imageops::rotate180(&dyn_image).to_vec()
                     }
                     3 => {
                         imageops::rotate90(&dyn_image).to_vec()
-                    },
-                    _ => {panic!()}
+                    }
+                    _ => { panic!() }
                 };
 
                 let image = Image::new(
@@ -407,6 +478,14 @@ impl GetForeground for WeightedForeground {
 
 pub struct SingleForeground {
     sprite: Handle<Image>,
+}
+
+impl SingleForeground {
+    pub fn new(sprite: Handle<Image>) -> Self {
+        return Self {
+            sprite
+        }
+    }
 }
 
 impl GetForeground for SingleForeground {
@@ -530,16 +609,14 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
         let mut textures: HashMap<i32, Handle<Image>> = HashMap::new();
 
         for group in tileset.tiles.iter() {
+            if group.file == "fallback.png".to_string() {
+                continue;
+            }
+
             let image = Reader::open(self.path.join(PathBuf::from_str(group.file.as_str()).unwrap()))
                 .unwrap()
                 .decode()
                 .unwrap();
-
-            // TODO Revisit
-            // Only happens for the 'fallback.png' group because it does not have a comment with a range
-            if group.range.is_none() {
-                continue;
-            }
 
             // TODO Revisit
             // Not a good way to do this, but i just couldn't for the life of me figure out how to get the range
@@ -774,6 +851,38 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
         }
 
         return Ok(textures);
+    }
+    fn load_fallback_textures(&self, image_resource: &mut ResMut<Assets<Image>>) -> Result<HashMap<String, Handle<Image>>, Error> {
+        let tileset = self.load().unwrap();
+        let mut fallback_textures: HashMap<String, Handle<Image>> = HashMap::new();
+
+        for group in tileset.tiles.iter() {
+            if group.file != "fallback.png".to_string() { continue; }
+
+            let image = Reader::open(self.path.join(PathBuf::from_str(group.file.as_str()).unwrap()))
+                .unwrap()
+                .decode()
+                .unwrap();
+
+            for color in group.ascii.as_ref().unwrap().iter() {
+                for (character, index) in FALLBACK_TILE_MAPPING {
+                    let x = (color.offset + 1 + index) % AMOUNT_OF_SPRITES_PER_ROW * tileset.info.tile_width;
+                    let y = (color.offset + 1 + index) / AMOUNT_OF_SPRITES_PER_ROW * tileset.info.tile_height;
+
+                    let fallback_image = get_image_from_tileset(
+                        &image,
+                        x,
+                        y,
+                        tileset.info.tile_width,
+                        tileset.info.tile_height,
+                    );
+
+                    fallback_textures.insert(format!("{}_{}", character, color.color), image_resource.add(fallback_image));
+                }
+            };
+        }
+
+        return Ok(fallback_textures);
     }
     fn assign_textures(&self, image_resource: &mut ResMut<Assets<Image>>) -> Result<HashMap<TileId, SpriteType>, Error> {
         let tileset = self.load().unwrap();
