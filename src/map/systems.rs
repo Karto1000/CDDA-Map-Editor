@@ -141,10 +141,12 @@ pub fn tile_remove_reader(
 }
 
 pub fn update_sprite_reader(
+    mut commands: Commands,
     mut e_update_sprite: EventReader<UpdateSpriteEvent>,
     mut q_sprite: Query<&mut Handle<Image>, With<Tile>>,
     mut r_editor_data: ResMut<EditorData>,
     r_textures: Res<GraphicsResource>,
+    r_grid: Res<Grid>,
 ) {
     let project = match r_editor_data.get_current_project_mut() {
         None => { return; }
@@ -154,39 +156,87 @@ pub fn update_sprite_reader(
     for e in e_update_sprite.read() {
         let sprite = r_textures.textures.get_texture(&project, &e.tile.character, &e.coordinates);
 
-        match e.tile.fg_entity {
-            None => {}
-            Some(i) => {
-                match q_sprite.get_mut(i) {
+        if let Some(fg) = &sprite.fg {
+            match e.tile.fg_entity {
+                None => {
+                    // Spawn the Sprite
+                    let fg_entity_commands = commands.spawn((
+                        e.tile,
+                        SpriteBundle {
+                            texture: fg.get_sprite().clone(),
+                            transform: Transform {
+                                translation: Vec3 {
+                                    // Spawn off screen
+                                    x: -1000.0,
+                                    y: -1000.0,
+                                    z: 2.0,
+                                },
+                                scale: Vec3 {
+                                    x: r_grid.tile_size / r_grid.default_tile_size,
+                                    y: r_grid.tile_size / r_grid.default_tile_size,
+                                    z: 0.,
+                                },
+                                ..default()
+                            },
+                            ..default()
+                        },
+                        e.coordinates.clone()
+                    ));
+
+                    project.map_entity.tiles.get_mut(&e.coordinates).unwrap().fg_entity = Some(fg_entity_commands.id());
+                }
+                Some(i) => {
+                    match q_sprite.get_mut(i) {
+                        Ok(mut i) => {
+                            *i = fg.get_sprite().clone()
+                        }
+                        Err(_) => {}
+                    }
+                }
+            }
+        }
+
+        if let Some(bg) = &sprite.bg {
+            match e.tile.bg_entity {
+                None => {
+                    let bg_entity_commands = commands.spawn((
+                        e.tile,
+                        SpriteBundle {
+                            texture: bg.get_sprite().clone(),
+                            transform: Transform {
+                                translation: Vec3 {
+                                    // Spawn off screen
+                                    x: -1000.0,
+                                    y: -1000.0,
+                                    z: 1.0,
+                                },
+                                scale: Vec3 {
+                                    x: r_grid.tile_size / r_grid.default_tile_size,
+                                    y: r_grid.tile_size / r_grid.default_tile_size,
+                                    z: 0.,
+                                },
+                                ..default()
+                            },
+                            ..default()
+                        },
+                        e.coordinates.clone()
+                    ));
+
+                    project.map_entity.tiles.get_mut(&e.coordinates).unwrap().bg_entity = Some(bg_entity_commands.id());
+                }
+                Some(i) => match q_sprite.get_mut(i) {
                     Ok(mut i) => {
-                        match sprite.fg.as_ref() {
+                        match sprite.bg.as_ref() {
                             None => {
                                 // Sprite was deleted
                             }
                             Some(s) => {
-                                *i = s.get_sprite().clone()
+                                *i = s.get_sprite().clone();
                             }
                         }
                     }
                     Err(_) => {}
                 }
-            }
-        }
-
-        match e.tile.bg_entity {
-            None => {}
-            Some(i) => match q_sprite.get_mut(i) {
-                Ok(mut i) => {
-                    match sprite.bg.as_ref() {
-                        None => {
-                            // Sprite was deleted
-                        }
-                        Some(s) => {
-                            *i = s.get_sprite().clone();
-                        }
-                    }
-                }
-                Err(_) => {}
             }
         }
     }
@@ -263,7 +313,7 @@ pub fn tile_spawn_reader(
         }
 
         // Check here because i couldn't figure out why the sprites were not correct when spawning a saved map
-        // if e.should_update_sprites {
+        if e.should_update_sprites {
             let tiles_around = project.map_entity.get_tiles_around(&e.coordinates);
 
             for (tile, coordinates) in tiles_around {
@@ -279,7 +329,7 @@ pub fn tile_spawn_reader(
                     }
                 }
             }
-        // }
+        }
     }
 }
 
@@ -298,22 +348,6 @@ pub fn tile_despawn_reader(
         match e.tile.fg_entity {
             None => {}
             Some(entity) => {
-                let tiles_around = project.map_entity.get_tiles_around(&e.coordinates);
-
-                for (tile, coordinates) in tiles_around {
-                    match tile {
-                        None => {}
-                        Some(t) => {
-                            e_update_sprite.send(
-                                UpdateSpriteEvent {
-                                    tile: *t,
-                                    coordinates,
-                                }
-                            )
-                        }
-                    }
-                }
-
                 commands.get_entity(entity).unwrap().despawn()
             }
         }
@@ -321,22 +355,6 @@ pub fn tile_despawn_reader(
         match e.tile.bg_entity {
             None => {}
             Some(entity) => {
-                let tiles_around = project.map_entity.get_tiles_around(&e.coordinates);
-
-                for (tile, coordinates) in tiles_around {
-                    match tile {
-                        None => {}
-                        Some(t) => {
-                            e_update_sprite.send(
-                                UpdateSpriteEvent {
-                                    tile: *t,
-                                    coordinates,
-                                }
-                            )
-                        }
-                    }
-                }
-
                 commands.get_entity(entity).unwrap().despawn()
             }
         }
