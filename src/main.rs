@@ -137,7 +137,7 @@ impl Save<EditorData> for EditorDataSaver {
                 ProjectSaveState::AutoSaved(val) => ProjectSaveState::AutoSaved(val.clone()),
                 ProjectSaveState::Saved(val) => ProjectSaveState::Saved(val.clone()),
                 ProjectSaveState::NotSaved => {
-                    println!("autosaving {}", project.map_entity.om_terrain.clone());
+                    info!("autosaving {}", project.map_entity.om_terrain.clone());
                     let project_saver = ProjectSaver { directory: Box::from(data_dir) };
                     project_saver.save(project).unwrap();
                     ProjectSaveState::AutoSaved(data_dir.join(format!("auto_save_{}.map", project.map_entity.om_terrain)))
