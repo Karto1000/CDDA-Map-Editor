@@ -3,7 +3,7 @@ use bevy::prelude::{Changed, Commands, EventReader, EventWriter, Interaction, Qu
 use bevy_file_dialog::{DialogFileLoaded, FileDialogExt};
 
 use crate::EditorData;
-use crate::map::resources::MapEntity;
+use crate::map::resources::{MapEntity, MapEntityType};
 use crate::project::resources::{Project, ProjectSaveState};
 use crate::ui::hotbar::components::{CloseIconMarker, ImportIconMarker, OpenIconMarker, SaveIconMarker};
 use crate::ui::tabs::events::SpawnTab;
@@ -30,12 +30,14 @@ pub fn save_button_interaction(
         Some(p) => p
     };
 
+    let filename = format!("{}.map", project.map_entity.map_type.get_name());
+
     for interaction in interaction_query.iter() {
         match interaction {
             Interaction::Pressed => {
                 let project_json = serde_json::to_string(&project).unwrap();
                 commands.dialog()
-                    .set_file_name(format!("{}.map", project.map_entity.om_terrain))
+                    .set_file_name(filename.clone())
                     .save_file::<Project>(project_json.into_bytes());
             }
             _ => {}
@@ -94,8 +96,15 @@ pub fn file_loaded_reader(
 
         let project = serde_json::from_slice::<Project>(event.contents.as_slice()).unwrap();
 
+        let name = match &project.map_entity.map_type {
+            MapEntityType::Nested { .. } => {panic!("Not Implemented")}
+            MapEntityType::Default { om_terrain, .. } => {
+                om_terrain.clone()
+            }
+        };
+
         e_spawn_tab.send(SpawnTab {
-            name: project.map_entity.om_terrain.clone(),
+            name,
             index: r_editor_data.projects.len() as u32,
         });
 

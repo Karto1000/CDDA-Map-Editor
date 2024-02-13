@@ -25,18 +25,19 @@ use serde_json::{Map, Value};
 use winit::window::Icon;
 
 use crate::common::Coordinates;
+use crate::common::io::{Load, LoadError, Save, SaveError};
 use crate::graphics::{GraphicsResource, LegacyTextures};
 use crate::graphics::tileset::legacy::LegacyTilesetLoader;
 use crate::grid::{GridMarker, GridMaterial, GridPlugin};
 use crate::grid::resources::Grid;
 use crate::map::events::{ClearTiles, SpawnMapEntity};
+use crate::map::loader::MapEntityImporter;
 use crate::map::MapPlugin;
 use crate::map::resources::MapEntity;
 use crate::map::systems::{set_tile_reader, tile_despawn_reader, tile_remove_reader, tile_spawn_reader, update_sprite_reader};
 use crate::palettes::loader::PaletteLoader;
-use crate::project::loader::{Load, LoadError};
 use crate::project::resources::{Project, ProjectSaveState};
-use crate::project::saver::{ProjectSaver, Save, SaveError};
+use crate::project::saver::ProjectSaver;
 use crate::tile_selector::TileSelectorPlugin;
 use crate::tiles::components::Tile;
 use crate::tiles::TilePlugin;
@@ -137,10 +138,10 @@ impl Save<EditorData> for EditorDataSaver {
                 ProjectSaveState::AutoSaved(val) => ProjectSaveState::AutoSaved(val.clone()),
                 ProjectSaveState::Saved(val) => ProjectSaveState::Saved(val.clone()),
                 ProjectSaveState::NotSaved => {
-                    info!("autosaving {}", project.map_entity.om_terrain.clone());
+                    info!("autosaving {}", project.map_entity.map_type.get_name().clone());
                     let project_saver = ProjectSaver { directory: Box::from(data_dir) };
                     project_saver.save(project).unwrap();
-                    ProjectSaveState::AutoSaved(data_dir.join(format!("auto_save_{}.map", project.map_entity.om_terrain)))
+                    ProjectSaveState::AutoSaved(data_dir.join(format!("auto_save_{}.map", project.map_entity.map_type.get_name().clone())))
                 }
             }
         }).collect();
@@ -297,16 +298,22 @@ fn setup(
     let mut editor_data = editor_data_saver.load().unwrap();
     let project: &mut Project = editor_data.get_current_project_mut().unwrap_or(&mut default_project);
 
-    let palettes = palette_loader.load().unwrap();
+    let loader = MapEntityImporter::new(PathBuf::from(r"C:\CDDA\testing\data\json\mapgen\nested\house_nested.json"), "bedroom_4x4_adult_1_N".to_string());
+    project.map_entity = loader.load().unwrap();
 
-    project.map_entity.palettes = palettes;
+    let temp_loader = PaletteLoader::new(PathBuf::from(r"C:\CDDA\testing\data\json\mapgen_palettes\house_w_palette.json"));
+    project.map_entity.palettes.push(temp_loader.load().unwrap().first().unwrap().clone());
+
+    // let palettes = palette_loader.load().unwrap();
+    //
+    // project.map_entity.palettes = palettes;
 
     e_spawn_map_entity.send(SpawnMapEntity {
         map_entity: Arc::new(project.map_entity.clone())
     });
 
     for (i, project) in editor_data.projects.iter().enumerate() {
-        e_spawn_tab.send(SpawnTab { name: project.map_entity.om_terrain.clone(), index: i as u32 });
+        e_spawn_tab.send(SpawnTab { name: project.map_entity.map_type.get_name().clone(), index: i as u32 });
     }
 
     let (icon_rgba, icon_width, icon_height) = {
@@ -330,7 +337,7 @@ fn setup(
                 offset: Vec2::default(),
                 mouse_pos: Default::default(),
                 is_cursor_captured: 0,
-                map_size: res_grid.map_size,
+                map_size: editor_data.get_current_project().unwrap().map_entity.size,
                 scale_factor: 1.,
             }),
             ..default()
@@ -367,14 +374,20 @@ fn update(
     mut tiles: Query<(&mut Tile, &mut Transform, &Coordinates), Without<GridMarker>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     mut grid_material: ResMut<Assets<GridMaterial>>,
+    r_data: Res<EditorData>,
 ) {
+    let project = match r_data.get_current_project() {
+        None => return,
+        Some(p) => p
+    };
+
     let grid_material = grid_material.iter_mut().next().unwrap();
     let window = q_windows.single();
 
     grid_material.1.offset = res_grid.offset;
     grid_material.1.tile_size = res_grid.tile_size;
     grid_material.1.mouse_pos = window.cursor_position().unwrap_or(Vec2::default());
-    grid_material.1.map_size = res_grid.map_size;
+    grid_material.1.map_size = project.map_entity.size;
     // Weird way to do this but bevy does not let me pass a bool as a uniform for some reason
     grid_material.1.is_cursor_captured = match res_cursor.0 {
         true => 1,

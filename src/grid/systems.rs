@@ -62,35 +62,6 @@ pub fn grid_resize_system(
     }
 }
 
-pub fn map_resize_system(
-    mut res_grid: ResMut<Grid>,
-    mut res_editor_data: ResMut<EditorData>,
-    keys: Res<Input<KeyCode>>,
-) {
-    let project = match res_editor_data.get_current_project_mut() {
-        None => return,
-        Some(p) => p
-    };
-
-    if keys.pressed(KeyCode::Right) {
-        res_grid.map_size.x += 1.;
-    }
-
-    if keys.pressed(KeyCode::Down) {
-        res_grid.map_size.y += 1.;
-    }
-
-    if keys.pressed(KeyCode::Left) {
-        res_grid.map_size.x -= 1.;
-    }
-
-    if keys.pressed(KeyCode::Up) {
-        res_grid.map_size.y -= 1.;
-    }
-
-    project.map_entity.size = res_grid.map_size
-}
-
 pub fn drag_system(
     mut commands: Commands,
     buttons: Res<Input<MouseButton>>,

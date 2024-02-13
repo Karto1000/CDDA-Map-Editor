@@ -51,13 +51,13 @@ fn fragment(output: VertexOutput) -> @location(0) vec4<f32> {
          alpha = 0.025;
     }
 
-    let tile_x = i32(output.position.x + offset.x) / i32(tile_size);
-    let tile_y = i32(output.position.y + offset.y) / i32(tile_size);
+    let tile_x = i32(output.position.x + tile_size + offset.x) / i32(tile_size);
+    let tile_y = i32(output.position.y + tile_size + offset.y) / i32(tile_size);
 
     if (
-        i32(abs(tile_x)) >= i32(map_size.x) ||
+        i32(abs(tile_x)) > i32(map_size.x) ||
         i32(tile_x) <= 0 ||
-        i32(abs(tile_y)) >= i32(map_size.y) ||
+        i32(abs(tile_y)) > i32(map_size.y) ||
         i32(tile_y) <= 0
     ) {
         color.x -= 0.8;

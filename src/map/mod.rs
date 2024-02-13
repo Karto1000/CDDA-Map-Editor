@@ -17,6 +17,7 @@ use crate::tiles::components::Tile;
 pub(crate) mod systems;
 pub(crate) mod resources;
 pub(crate) mod events;
+pub(crate) mod loader;
 
 pub struct MapPlugin;
 

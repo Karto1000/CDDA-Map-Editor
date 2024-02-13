@@ -7,7 +7,7 @@ use bevy::sprite::Material2d;
 
 use crate::grid::resources::{DragInfo, Grid};
 use crate::grid::systems::{
-    drag_system, grid_resize_system, map_resize_system, window_grid_resize_system,
+    drag_system, grid_resize_system, window_grid_resize_system,
 };
 
 pub(crate) mod systems;
@@ -19,7 +19,6 @@ impl Plugin for GridPlugin {
     fn build(&self, app: &mut App) {
         let grid: Grid = Grid {
             tile_size: 32.0,
-            map_size: Vec2 { x: 24., y: 24. },
             default_tile_size: 32.0,
             offset: Vec2::new(0., 0.),
             min_zoom: 6.,
@@ -36,7 +35,6 @@ impl Plugin for GridPlugin {
             (
                 window_grid_resize_system,
                 grid_resize_system,
-                map_resize_system,
                 drag_system,
             ),
         );

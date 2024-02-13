@@ -4,20 +4,11 @@ use std::io::Read;
 use std::path::Path;
 
 use directories::ProjectDirs;
+use crate::common::io::{Load, LoadError};
+use crate::common::io::LoadError::NoAutoSave;
 
-use crate::project::loader::LoadError::NoAutoSave;
 use crate::project::resources::Project;
 
-#[derive(Debug)]
-pub enum LoadError {
-    NoAutoSave,
-    DirectoryNotFound,
-    ParseError,
-}
-
-pub trait Load<T> {
-    fn load(&self) -> Result<T, LoadError>;
-}
 
 pub struct ProjectAutoSaveLoader {
     directory: Box<Path>,

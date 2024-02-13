@@ -5,10 +5,10 @@ use std::str::FromStr;
 use bevy::asset::{Assets, Handle};
 use bevy::prelude::{Image, ResMut};
 use serde::{Deserialize, Serialize};
+use crate::common::io::Load;
 
 use crate::common::TileId;
 use crate::graphics::SpriteType;
-use crate::project::loader::Load;
 
 pub(crate) mod current;
 pub(crate) mod legacy;

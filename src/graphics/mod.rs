@@ -6,7 +6,6 @@ use bevy::prelude::{Assets, Image, ResMut, Resource};
 use crate::common::{Coordinates, TileId};
 use crate::graphics::tileset::legacy::{GetBackground, GetForeground, LegacyTileset, SingleForeground};
 use crate::graphics::tileset::TilesetLoader;
-use crate::project::loader::Load;
 use crate::project::resources::Project;
 
 pub(crate) mod tileset;
@@ -140,7 +139,7 @@ impl LegacyTextures {
 
 impl GetTexture for LegacyTextures {
     fn get_texture(&self, project: &Project, character: &char, coordinates: &Coordinates) -> &Sprite {
-        let sprite_type = match self.textures.get(&project.map_entity.get_tile_id_from_character(character)) {
+        let sprite_type = match self.textures.get(&project.map_entity.get_terrain_id_from_character(character)) {
             None => {
                 return self.fallback_textures.get(&format!("{}_WHITE", &character.to_string().to_uppercase())).unwrap_or(
                     self.fallback_textures.get("?_WHITE").unwrap()

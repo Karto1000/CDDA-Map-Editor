@@ -1,8 +1,8 @@
 use std::fs;
 use std::path::PathBuf;
+use crate::common::io::{Load, LoadError};
 
 use crate::palettes::Palette;
-use crate::project::loader::{Load, LoadError};
 
 pub struct PaletteLoader {
     pub path: PathBuf,

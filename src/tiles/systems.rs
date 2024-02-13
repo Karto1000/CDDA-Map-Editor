@@ -78,10 +78,10 @@ pub fn tile_place_system(
             ((xy.y + r_grid.offset.y) / r_grid.tile_size).floor() as i32,
         );
 
-        if tile_cords.x >= r_grid.map_size.x as i32 ||
-            tile_cords.y >= r_grid.map_size.y as i32 ||
-            tile_cords.x <= 0 ||
-            tile_cords.y <= 0 {
+        if tile_cords.x >= project.map_entity.size.x as i32 ||
+            tile_cords.y >= project.map_entity.size.y as i32 ||
+            tile_cords.x < 0 ||
+            tile_cords.y < 0 {
             return;
         }
 

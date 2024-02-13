@@ -1,18 +1,10 @@
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
-
+use crate::common::io::{Save, SaveError};
 use crate::project::resources::Project;
 
-#[derive(Debug)]
-pub enum SaveError {
-    DirectoryNotFound(String),
-    InvalidPath(anyhow::Error),
-}
 
-pub trait Save<T> {
-    fn save(&self, value: &T) -> Result<(), SaveError>;
-}
 
 pub struct ProjectSaver {
     pub directory: Box<Path>,
@@ -30,11 +22,13 @@ impl ProjectSaver {
 
 impl Save<Project> for ProjectSaver {
     fn save(&self, value: &Project) -> Result<(), SaveError> {
+        let filename = format!("auto_save_{}.map", value.map_entity.map_type.get_name());
+
         let mut file = match File::options()
             .create(true)
             .write(true)
             .truncate(true)
-            .open(self.directory.join(format!("auto_save_{}.map", value.map_entity.om_terrain))) {
+            .open(self.directory.join(filename)) {
             Ok(f) => f,
             Err(e) => return Err(SaveError::InvalidPath(e.into()))
         };

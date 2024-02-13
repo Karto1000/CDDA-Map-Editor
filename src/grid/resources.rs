@@ -10,7 +10,6 @@ pub struct DragInfo {
 #[derive(Resource)]
 pub struct Grid {
     pub tile_size: f32,
-    pub map_size: Vec2,
     pub default_tile_size: f32,
     pub offset: Vec2,
 

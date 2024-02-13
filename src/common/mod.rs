@@ -1,7 +1,12 @@
+pub(crate) mod io;
+
 use std::fmt::Formatter;
 
 use bevy::prelude::Color;
 use bevy::prelude::Component;
+use num::{Bounded, Num};
+use rand::{Rng, thread_rng};
+use rand::distributions::uniform::{SampleRange, SampleUniform};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::Visitor;
 
@@ -20,12 +25,31 @@ pub struct Weighted<T> {
     pub weight: u32,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum MeabyNumberRange<T: Num + SampleUniform + PartialOrd + Clone> {
+    Range(T, T),
+    Single(T),
+}
+
+impl<T: Num + SampleUniform + PartialOrd + Clone> MeabyNumberRange<T> {
+    pub fn get_num(&self) -> T {
+        return match self {
+            MeabyNumberRange::Range(start, end) => {
+                let mut rng = thread_rng();
+                return rng.gen_range(start.clone()..end.clone()).clone();
+            }
+            MeabyNumberRange::Single(num) => num.clone()
+        }
+    }
+}
+
 impl<T> Weighted<T> {
     pub fn new(value: T, weight: u32) -> Self {
         return Self {
             value,
-            weight
-        }
+            weight,
+        };
     }
 }
 

@@ -20,9 +20,9 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use crate::common::{MeabyWeighted, TileId, Weighted};
+use crate::common::io::{Load, LoadError};
 use crate::graphics::{Corner, Edge, FullCardinal, Sprite, SpriteType};
 use crate::graphics::tileset::TilesetLoader;
-use crate::project::loader::{Load, LoadError};
 
 const TILESET_INFO_NAME: &'static str = "tileset.txt";
 const AMOUNT_OF_SPRITES_PER_ROW: u32 = 16;

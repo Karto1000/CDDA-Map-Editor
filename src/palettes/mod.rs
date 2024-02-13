@@ -35,6 +35,7 @@ pub enum MapObjectId {
     Single(MeabyWeighted<TileId>),
     Grouped(Vec<MeabyWeighted<TileId>>),
     Nested(Vec<Vec<MeabyWeighted<TileId>>>),
+    Param { param: String },
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -42,4 +43,14 @@ pub struct Palette {
     pub id: String,
     pub terrain: HashMap<char, MapObjectId>,
     pub furniture: HashMap<char, MapObjectId>,
+}
+
+impl Default for Palette {
+    fn default() -> Self {
+        return Self {
+            id: "unnamed".into(),
+            terrain: HashMap::new(),
+            furniture: HashMap::new(),
+        };
+    }
 }

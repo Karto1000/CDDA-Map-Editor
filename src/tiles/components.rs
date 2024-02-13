@@ -12,3 +12,12 @@ pub struct Tile {
     pub bg_entity: Option<Entity>,
 }
 
+impl From<char> for Tile {
+    fn from(value: char) -> Self {
+        return Self {
+            character: value,
+            fg_entity: None,
+            bg_entity: None,
+        };
+    }
+}
