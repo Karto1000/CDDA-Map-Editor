@@ -2,10 +2,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use bevy::prelude::{Assets, Image, ResMut, Resource};
-use bevy_egui::egui::load::TextureLoader;
 
 use crate::common::{Coordinates, TileId};
-use crate::graphics::tileset::legacy::{GetBackground, GetForeground, LegacyTileset};
+use crate::graphics::tileset::legacy::{GetBackground, GetForeground, LegacyTileset, SingleForeground};
 use crate::graphics::tileset::TilesetLoader;
 use crate::project::loader::Load;
 use crate::project::resources::Project;
@@ -15,7 +14,7 @@ pub(crate) mod tileset;
 // Not sure if this is the best way to do this
 #[derive(Clone)]
 pub struct Sprite {
-    pub fg: Arc<dyn GetForeground>,
+    pub fg: Option<Arc<dyn GetForeground>>,
     pub bg: Option<Arc<dyn GetBackground>>,
 }
 
@@ -30,19 +29,19 @@ impl From<(Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>)> for Ful
     fn from(value: (Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>)) -> Self {
         return FullCardinal {
             north: Sprite {
-                fg: value.0.get(0).unwrap().clone(),
+                fg: value.0.get(0).cloned(),
                 bg: value.1.clone(),
             },
             west: Sprite {
-                fg: value.0.get(1).unwrap().clone(),
+                fg: value.0.get(1).cloned(),
                 bg: value.1.clone(),
             },
             south: Sprite {
-                fg: value.0.get(2).unwrap().clone(),
+                fg: value.0.get(2).cloned(),
                 bg: value.1.clone(),
             },
             east: Sprite {
-                fg: value.0.get(3).unwrap().clone(),
+                fg: value.0.get(3).cloned(),
                 bg: value.1,
             },
         };
@@ -61,19 +60,19 @@ impl From<(Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>)> for Cor
     fn from(value: (Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>)) -> Self {
         return Corner {
             north_west: Sprite {
-                fg: value.0.get(0).unwrap().clone(),
+                fg: value.0.get(0).cloned(),
                 bg: value.1.clone(),
             },
             south_west: Sprite {
-                fg: value.0.get(1).unwrap().clone(),
+                fg: value.0.get(1).cloned(),
                 bg: value.1.clone(),
             },
             south_east: Sprite {
-                fg: value.0.get(2).unwrap().clone(),
+                fg: value.0.get(2).cloned(),
                 bg: value.1.clone(),
             },
             north_east: Sprite {
-                fg: value.0.get(3).unwrap().clone(),
+                fg: value.0.get(3).cloned(),
                 bg: value.1.clone(),
             },
         };
@@ -88,9 +87,9 @@ pub struct Edge {
 impl From<(Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>)> for Edge {
     fn from(value: (Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>)) -> Self {
         return Self {
-            north_south: Sprite {fg: value.0.get(0).unwrap().clone(), bg: value.1.clone()},
-            east_west: Sprite {fg: value.0.get(1).unwrap().clone(), bg: value.1.clone()}
-        }
+            north_south: Sprite { fg: value.0.get(0).cloned(), bg: value.1.clone() },
+            east_west: Sprite { fg: value.0.get(1).cloned(), bg: value.1.clone() },
+        };
     }
 }
 
@@ -112,21 +111,43 @@ pub trait GetTexture: Send + Sync {
 
 pub struct LegacyTextures {
     textures: HashMap<TileId, SpriteType>,
+    fallback_textures: HashMap<String, Sprite>,
 }
 
 impl LegacyTextures {
-    pub fn new(loader: impl TilesetLoader<LegacyTileset>, image_resource: &mut ResMut<Assets<Image>>) -> Self {
-        let textures = loader.get_textures(image_resource).unwrap();
+    pub fn new(loader: impl TilesetLoader<LegacyTileset, i32>, image_resource: &mut ResMut<Assets<Image>>) -> Self {
+        let textures = loader.assign_textures(image_resource).unwrap();
+        let fallback_textures = loader.load_fallback_textures(image_resource).unwrap();
+
+        let mut fallback_sprites: HashMap<String, Sprite> = HashMap::new();
+
+        for (key, image) in fallback_textures {
+            fallback_sprites.insert(
+                key,
+                Sprite {
+                    fg: Some(Arc::new(SingleForeground::new(image))),
+                    bg: None,
+                },
+            );
+        };
 
         return Self {
-            textures
+            textures,
+            fallback_textures: fallback_sprites,
         };
     }
 }
 
 impl GetTexture for LegacyTextures {
     fn get_texture(&self, project: &Project, character: &char, coordinates: &Coordinates) -> &Sprite {
-        let sprite_type = self.textures.get(&project.map_entity.get_tile_id_from_character(character)).unwrap();
+        let sprite_type = match self.textures.get(&project.map_entity.get_tile_id_from_character(character)) {
+            None => {
+                return self.fallback_textures.get(&format!("{}_WHITE", &character.to_string().to_uppercase())).unwrap_or(
+                    self.fallback_textures.get("?_WHITE").unwrap()
+                );
+            }
+            Some(s) => s
+        };
 
         return match sprite_type {
             SpriteType::Single(s) => s,

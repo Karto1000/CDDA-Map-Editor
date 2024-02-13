@@ -17,8 +17,8 @@ use bevy::sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle};
 use bevy::utils::default;
 use bevy::window::{CursorMoved, WindowMode, WindowPlugin};
 use bevy::winit::WinitWindows;
-use bevy_egui::EguiPlugin;
 use bevy_file_dialog::FileDialogPlugin;
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -32,7 +32,7 @@ use crate::grid::resources::Grid;
 use crate::map::events::{ClearTiles, SpawnMapEntity};
 use crate::map::MapPlugin;
 use crate::map::resources::MapEntity;
-use crate::map::systems::{set_tile_reader, tile_despawn_reader, tile_remove_reader, tile_spawn_reader};
+use crate::map::systems::{set_tile_reader, tile_despawn_reader, tile_remove_reader, tile_spawn_reader, update_sprite_reader};
 use crate::palettes::loader::PaletteLoader;
 use crate::project::loader::{Load, LoadError};
 use crate::project::resources::{Project, ProjectSaveState};
@@ -137,7 +137,7 @@ impl Save<EditorData> for EditorDataSaver {
                 ProjectSaveState::AutoSaved(val) => ProjectSaveState::AutoSaved(val.clone()),
                 ProjectSaveState::Saved(val) => ProjectSaveState::Saved(val.clone()),
                 ProjectSaveState::NotSaved => {
-                    println!("autosaving {}", project.map_entity.om_terrain.clone());
+                    info!("autosaving {}", project.map_entity.om_terrain.clone());
                     let project_saver = ProjectSaver { directory: Box::from(data_dir) };
                     project_saver.save(project).unwrap();
                     ProjectSaveState::AutoSaved(data_dir.join(format!("auto_save_{}.map", project.map_entity.om_terrain)))
@@ -249,7 +249,7 @@ fn main() {
         .insert_resource(IsCursorCaptured(false))
         .add_systems(Startup, setup)
         .add_event::<SwitchProject>()
-        .add_plugins(EguiPlugin)
+        .add_plugins(WorldInspectorPlugin::new())
         .add_plugins(TileSelectorPlugin)
         .add_plugins(FileDialogPlugin::new()
             .with_save_file::<Project>()
@@ -267,7 +267,9 @@ fn main() {
             tile_remove_reader,
             set_tile_reader,
             apply_deferred,
-            tile_spawn_reader
+            tile_spawn_reader,
+            apply_deferred,
+            update_sprite_reader
         ).chain())
         .run();
 }
@@ -285,8 +287,8 @@ fn setup(
 ) {
     commands.spawn(Camera2dBundle::default());
 
-    let tileset_loader = LegacyTilesetLoader::new(PathBuf::from(r"saves\tileset\TILESETS\gfx\MSX++UnDeadPeopleEdition"));
-    let palette_loader = PaletteLoader::new(PathBuf::from(r"saves\palettes\building.json"));
+    let tileset_loader = LegacyTilesetLoader::new(PathBuf::from(r"C:\CDDA\testing\gfx\MSX++UnDeadPeopleEdition"));
+    let palette_loader = PaletteLoader::new(PathBuf::from(r"C:\CDDA\testing\data\json\mapgen_palettes\testing.json"));
     let editor_data_saver = EditorDataSaver::new();
     let legacy_textures = LegacyTextures::new(tileset_loader, &mut r_images);
     let texture_resource = GraphicsResource::new(Box::new(legacy_textures));
