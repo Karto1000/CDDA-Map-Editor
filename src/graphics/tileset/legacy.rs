@@ -19,7 +19,7 @@ use rand::Rng;
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::common::{MeabyWeighted, TileId, Weighted};
+use crate::common::{MeabyMulti, MeabyWeighted, TileId, Weighted};
 use crate::common::io::{Load, LoadError};
 use crate::graphics::{Corner, Edge, FullCardinal, Sprite, SpriteType};
 use crate::graphics::tileset::TilesetLoader;
@@ -106,12 +106,6 @@ pub struct TileGroup {
     pub ascii: Option<Vec<AsciiTilesetDescriptor>>,
 }
 
-#[derive(Deserialize, Debug)]
-#[serde(untagged)]
-pub enum MeabyMulti<T> {
-    Multi(Vec<T>),
-    Single(T),
-}
 
 #[derive(Debug, Deserialize)]
 pub struct AdditionalTile {
@@ -484,7 +478,7 @@ impl SingleForeground {
     pub fn new(sprite: Handle<Image>) -> Self {
         return Self {
             sprite
-        }
+        };
     }
 }
 
@@ -957,28 +951,33 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                 }
                             }
                             MeabyMulti::Multi(bg) => {
-                                let mut sprites: Vec<Weighted<Handle<Image>>> = Vec::new();
+                                // Handle weird case when bg is an empty array
+                                if bg.len() > 0 {
+                                    let mut sprites: Vec<Weighted<Handle<Image>>> = Vec::new();
 
-                                for bg in bg.iter() {
-                                    match bg {
-                                        MeabyWeighted::NotWeighted(bg) => {
-                                            // TODO: Revisit
-                                            // Not sure what to do here
-                                            match loaded_sprites.get(bg) {
-                                                None => {}
-                                                Some(sprite) => sprites.push(Weighted::new(sprite.clone(), 0))
-                                            };
-                                        }
-                                        MeabyWeighted::Weighted(w) => {
-                                            match loaded_sprites.get(&w.value) {
-                                                None => {}
-                                                Some(sprite) => sprites.push(Weighted::new(sprite.clone(), w.weight))
-                                            };
+                                    for bg in bg.iter() {
+                                        match bg {
+                                            MeabyWeighted::NotWeighted(bg) => {
+                                                // TODO: Revisit
+                                                // Not sure what to do here
+                                                match loaded_sprites.get(bg) {
+                                                    None => {}
+                                                    Some(sprite) => sprites.push(Weighted::new(sprite.clone(), 0))
+                                                };
+                                            }
+                                            MeabyWeighted::Weighted(w) => {
+                                                match loaded_sprites.get(&w.value) {
+                                                    None => {}
+                                                    Some(sprite) => sprites.push(Weighted::new(sprite.clone(), w.weight))
+                                                };
+                                            }
                                         }
                                     }
-                                }
 
-                                Some(Arc::new(WeightedBackground { weighted_sprites: sprites }))
+                                    Some(Arc::new(WeightedBackground { weighted_sprites: sprites }))
+                                } else {
+                                    None
+                                }
                             }
                         }
                     }
@@ -1024,7 +1023,6 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                             let mut edge: Option<Edge> = None;
                             let mut end_piece: Option<FullCardinal> = None;
                             let mut unconnected: Option<Sprite> = None;
-
 
                             for additional_tile in additional_tiles.iter() {
                                 let fg = match additional_tile.fg.as_ref() {

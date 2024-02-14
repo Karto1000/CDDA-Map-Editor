@@ -71,7 +71,7 @@ pub fn tile_place_system(
         }
 
         // TODO - REPLACE
-        let tile_to_place: char = 'm';
+        let tile_to_place: char = 'g';
 
         let tile_cords = Coordinates::new(
             ((xy.x + r_grid.offset.x) / r_grid.tile_size).floor() as i32,
@@ -87,7 +87,7 @@ pub fn tile_place_system(
 
         if project.map_entity.tiles.get(&tile_cords).is_some() { return; }
 
-        let tile = Tile { character: tile_to_place, fg_entity: None, bg_entity: None };
+        let tile = Tile::from(tile_to_place);
         e_set_tile.send(TilePlaceEvent { tile, coordinates: tile_cords, should_update_sprites: true });
     }
 }

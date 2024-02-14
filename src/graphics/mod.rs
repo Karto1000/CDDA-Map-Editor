@@ -104,8 +104,38 @@ pub enum SpriteType {
     },
 }
 
+pub struct TileSprite<'a> {
+    pub terrain: Option<&'a Sprite>,
+    pub furniture: Option<&'a Sprite>,
+    pub items: Option<&'a Sprite>,
+    pub toilets: Option<&'a Sprite>,
+}
+
+impl<'a> Default for TileSprite<'a> {
+    fn default() -> Self {
+        return Self {
+            terrain: None,
+            furniture: None,
+            items: None,
+            toilets: None,
+        };
+    }
+}
+
 pub trait GetTexture: Send + Sync {
-    fn get_texture(&self, project: &Project, character: &char, coordinates: &Coordinates) -> &Sprite;
+    fn get_textures(&self, project: &Project, character: &char, coordinates: &Coordinates) -> TileSprite {
+        return TileSprite {
+            terrain: self.get_terrain(project, character, coordinates),
+            furniture: self.get_furniture(project, character, coordinates),
+            items: self.get_item(project, character, coordinates),
+            toilets: self.get_toilets(project, character, coordinates),
+        };
+    }
+
+    fn get_terrain(&self, project: &Project, character: &char, coordinates: &Coordinates) -> Option<&Sprite>;
+    fn get_furniture(&self, project: &Project, character: &char, coordinates: &Coordinates) -> Option<&Sprite>;
+    fn get_item(&self, project: &Project, character: &char, coordinates: &Coordinates) -> Option<&Sprite>;
+    fn get_toilets(&self, project: &Project, character: &char, coordinates: &Coordinates) -> Option<&Sprite>;
 }
 
 pub struct LegacyTextures {
@@ -135,63 +165,141 @@ impl LegacyTextures {
             fallback_textures: fallback_sprites,
         };
     }
+
+    pub fn get_fallback_texture(&self, character: &char) -> &Sprite {
+        return self.fallback_textures.get(&format!("{}_WHITE", &character.to_string().to_uppercase())).unwrap_or(
+            self.fallback_textures.get("?_WHITE").unwrap()
+        );
+    }
+}
+
+fn get_sprite_from_sprite_type<'a>(
+    project: &Project,
+    coordinates: &Coordinates,
+    character: &char,
+    sprite_type: &'a SpriteType,
+) -> &'a Sprite {
+    return match sprite_type {
+        SpriteType::Single(s) => s,
+        SpriteType::Multitile { center, corner, t_connection, edge, end_piece, unconnected } => {
+            let tiles_around = project.map_entity.get_tiles_around(coordinates);
+
+            let is_tile_ontop_same_type = match tiles_around.get(0).unwrap().0 {
+                None => false,
+                Some(top) => top.character == *character
+            };
+
+            let is_tile_right_same_type = match tiles_around.get(1).unwrap().0 {
+                None => false,
+                Some(right) => right.character == *character
+            };
+
+            let is_tile_below_same_type = match tiles_around.get(2).unwrap().0 {
+                None => false,
+                Some(below) => below.character == *character
+            };
+
+            let is_tile_left_same_type = match tiles_around.get(3).unwrap().0 {
+                None => false,
+                Some(left) => left.character == *character
+            };
+
+            return match (is_tile_ontop_same_type, is_tile_right_same_type, is_tile_below_same_type, is_tile_left_same_type) {
+                // Some of the worst code i've ever written lol
+                (true, true, true, true) => &center,
+                (true, true, true, false) => &t_connection.west,
+                (true, true, false, true) => &t_connection.south,
+                (true, false, true, true) => &t_connection.east,
+                (false, true, true, true) => &t_connection.north,
+                (true, true, false, false) => &corner.south_west,
+                (true, false, false, true) => &corner.south_east,
+                (false, true, true, false) => &corner.north_west,
+                (false, false, true, true) => &corner.north_east,
+                (true, false, false, false) => &end_piece.south,
+                (false, true, false, false) => &end_piece.west,
+                (false, false, true, false) => &end_piece.north,
+                (false, false, false, true) => &end_piece.east,
+                (false, true, false, true) => &edge.east_west,
+                (true, false, true, false) => &edge.north_south,
+                (false, false, false, false) => &unconnected
+            };
+        }
+    };
 }
 
 impl GetTexture for LegacyTextures {
-    fn get_texture(&self, project: &Project, character: &char, coordinates: &Coordinates) -> &Sprite {
-        let sprite_type = match self.textures.get(&project.map_entity.get_terrain_id_from_character(character)) {
-            None => {
-                return self.fallback_textures.get(&format!("{}_WHITE", &character.to_string().to_uppercase())).unwrap_or(
-                    self.fallback_textures.get("?_WHITE").unwrap()
-                );
+    fn get_terrain(&self, project: &Project, character: &char, coordinates: &Coordinates) -> Option<&Sprite> {
+        match &project.map_entity.get_ids(character).terrain {
+            None => return None,
+            Some(terrain) => {
+                let sprite_type = match self.textures.get(terrain) {
+                    None => return None,
+                    Some(s) => s
+                };
+
+                return Some(get_sprite_from_sprite_type(
+                    project,
+                    coordinates,
+                    character,
+                    sprite_type,
+                ));
             }
-            Some(s) => s
         };
+    }
 
-        return match sprite_type {
-            SpriteType::Single(s) => s,
-            SpriteType::Multitile { center, corner, t_connection, edge, end_piece, unconnected } => {
-                let tiles_around = project.map_entity.get_tiles_around(coordinates);
-
-                let is_tile_ontop_same_type = match tiles_around.get(0).unwrap().0 {
-                    None => false,
-                    Some(top) => top.character == *character
+    fn get_furniture(&self, project: &Project, character: &char, coordinates: &Coordinates) -> Option<&Sprite> {
+        match &project.map_entity.get_ids(character).furniture {
+            None => return None,
+            Some(furniture) => {
+                let sprite_type = match self.textures.get(furniture) {
+                    None => return None,
+                    Some(s) => s
                 };
 
-                let is_tile_right_same_type = match tiles_around.get(1).unwrap().0 {
-                    None => false,
-                    Some(right) => right.character == *character
+                return Some(get_sprite_from_sprite_type(
+                    project,
+                    coordinates,
+                    character,
+                    sprite_type,
+                ));
+            }
+        };
+    }
+
+    fn get_item(&self, project: &Project, character: &char, coordinates: &Coordinates) -> Option<&Sprite> {
+        match &project.map_entity.get_ids(character).item {
+            None => return None,
+            Some(item) => {
+                let sprite_type = match self.textures.get(item) {
+                    None => return None,
+                    Some(s) => s
                 };
 
-                let is_tile_below_same_type = match tiles_around.get(2).unwrap().0 {
-                    None => false,
-                    Some(below) => below.character == *character
+                return Some(get_sprite_from_sprite_type(
+                    project,
+                    coordinates,
+                    character,
+                    sprite_type,
+                ));
+            }
+        };
+    }
+
+    fn get_toilets(&self, project: &Project, character: &char, coordinates: &Coordinates) -> Option<&Sprite> {
+        match &project.map_entity.get_ids(character).toilet {
+            None => return None,
+            Some(toilet) => {
+                let sprite_type = match self.textures.get(toilet) {
+                    None => return None,
+                    Some(s) => s
                 };
 
-                let is_tile_left_same_type = match tiles_around.get(3).unwrap().0 {
-                    None => false,
-                    Some(left) => left.character == *character
-                };
-
-                return match (is_tile_ontop_same_type, is_tile_right_same_type, is_tile_below_same_type, is_tile_left_same_type) {
-                    // Some of the worst code i've ever written lol
-                    (true, true, true, true) => &center,
-                    (true, true, true, false) => &t_connection.west,
-                    (true, true, false, true) => &t_connection.south,
-                    (true, false, true, true) => &t_connection.east,
-                    (false, true, true, true) => &t_connection.north,
-                    (true, true, false, false) => &corner.south_west,
-                    (true, false, false, true) => &corner.south_east,
-                    (false, true, true, false) => &corner.north_west,
-                    (false, false, true, true) => &corner.north_east,
-                    (true, false, false, false) => &end_piece.south,
-                    (false, true, false, false) => &end_piece.west,
-                    (false, false, true, false) => &end_piece.north,
-                    (false, false, false, true) => &end_piece.east,
-                    (false, true, false, true) => &edge.east_west,
-                    (true, false, true, false) => &edge.north_south,
-                    (false, false, false, false) => &unconnected
-                };
+                return Some(get_sprite_from_sprite_type(
+                    project,
+                    coordinates,
+                    character,
+                    sprite_type,
+                ));
             }
         };
     }

@@ -11,7 +11,7 @@ use crate::{EditorData, GraphicsResource};
 use crate::graphics::{GetTexture, LegacyTextures};
 use crate::grid::resources::Grid;
 use crate::map::events::{ClearTiles, SpawnMapEntity, TileDeleteEvent, TilePlaceEvent, UpdateSpriteEvent};
-use crate::map::systems::{clear_tiles_reader, map_save_system, save_directory_picked, spawn_map_entity_reader, update_sprite_reader};
+use crate::map::systems::{clear_tiles_reader, map_save_system, save_directory_picked, spawn_map_entity_reader, spawn_sprite, SpawnSprite, update_sprite_reader};
 use crate::tiles::components::Tile;
 
 pub(crate) mod systems;
@@ -29,6 +29,7 @@ impl Plugin for MapPlugin {
         app.add_systems(Update, clear_tiles_reader);
 
         app.add_event::<TilePlaceEvent>();
+        app.add_event::<SpawnSprite>();
         app.add_event::<TileDeleteEvent>();
         app.add_event::<UpdateSpriteEvent>();
         app.add_event::<SpawnMapEntity>();

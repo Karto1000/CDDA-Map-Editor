@@ -1,23 +1,151 @@
 use std::fs;
+use std::sync::Arc;
 
 use bevy::asset::Handle;
 use bevy::hierarchy::Children;
 use bevy::input::Input;
 use bevy::math::Vec3;
-use bevy::prelude::{Commands, default, Entity, EventReader, EventWriter, Image, KeyCode, Query, Res, ResMut, SpriteBundle, Text, Transform, With};
+use bevy::prelude::{Commands, default, Entity, Event, EventReader, EventWriter, Image, KeyCode, Query, Res, ResMut, SpriteBundle, Text, Transform, With};
 use bevy::text::TextSection;
 use bevy_file_dialog::{DialogFileSaved, FileDialogExt};
+use serde::{Deserialize, Serialize};
 
+use crate::common::Coordinates;
 use crate::EditorData;
-use crate::graphics::GraphicsResource;
+use crate::graphics::{GraphicsResource, Sprite};
 use crate::graphics::tileset::legacy::{GetBackground, GetForeground};
 use crate::grid::resources::Grid;
 use crate::map::{TileDeleteEvent, TilePlaceEvent};
 use crate::map::events::{ClearTiles, SpawnMapEntity, UpdateSpriteEvent};
-use crate::map::resources::MapEntityType;
 use crate::project::resources::{Project, ProjectSaveState};
 use crate::tiles::components::Tile;
 use crate::ui::tabs::components::Tab;
+
+#[derive(Event)]
+pub struct SpawnSprite {
+    z: u32,
+    tile: Tile,
+    coordinates: Coordinates,
+    sprite_kind: SpriteKind,
+}
+
+pub enum SpriteKind {
+    Item(Sprite),
+    Terrain(Sprite),
+    Furniture(Sprite),
+    Toilet(Sprite),
+}
+
+impl SpriteKind {
+    pub fn get_fg(&self) -> &Option<Arc<dyn GetForeground>> {
+        return match self {
+            SpriteKind::Item(i) => &i.fg,
+            SpriteKind::Terrain(t) => &t.fg,
+            SpriteKind::Furniture(f) => &f.fg,
+            SpriteKind::Toilet(t) => &t.fg
+        };
+    }
+
+    pub fn get_bg(&self) -> &Option<Arc<dyn GetBackground>> {
+        return match self {
+            SpriteKind::Item(i) => &i.bg,
+            SpriteKind::Terrain(t) => &t.bg,
+            SpriteKind::Furniture(f) => &f.bg,
+            SpriteKind::Toilet(t) => &t.bg
+        };
+    }
+}
+
+pub fn spawn_sprite(
+    mut commands: Commands,
+    r_grid: Res<Grid>,
+    mut e_spawn_sprite: EventReader<SpawnSprite>,
+    mut r_editor_data: ResMut<EditorData>,
+) {
+    let project = match r_editor_data.get_current_project_mut() {
+        None => return,
+        Some(p) => p
+    };
+
+    for e in e_spawn_sprite.read() {
+        let fg = e.sprite_kind.get_fg();
+        let bg = e.sprite_kind.get_bg();
+
+        if fg.is_some() {
+            let fg_entity_commands = commands.spawn((
+                e.tile.clone(),
+                SpriteBundle {
+                    texture: fg.as_ref().unwrap().get_sprite().clone(),
+                    transform: Transform {
+                        translation: Vec3 {
+                            // Spawn off-screen
+                            x: -1000.0,
+                            y: -1000.0,
+                            z: e.z as f32 + 1.,
+                        },
+                        scale: Vec3 {
+                            x: r_grid.tile_size / r_grid.default_tile_size,
+                            y: r_grid.tile_size / r_grid.default_tile_size,
+                            z: 0.,
+                        },
+                        ..default()
+                    },
+                    ..default()
+                },
+                e.coordinates.clone()
+            ));
+
+            let tile = project.map_entity.tiles.get_mut(&e.coordinates).unwrap();
+            match &e.sprite_kind {
+                SpriteKind::Item(_) => { panic!("Not Implemented") }
+                SpriteKind::Terrain(_) => {
+                    tile.terrain.fg_entity = Some(fg_entity_commands.id());
+                }
+                SpriteKind::Furniture(_) => {
+                    tile.furniture.fg_entity = Some(fg_entity_commands.id())
+                }
+                SpriteKind::Toilet(_) => { panic!("Not Implemented") }
+            }
+        }
+
+        if bg.is_some() {
+            let bg_entity_commands = commands.spawn((
+                e.tile.clone(),
+                SpriteBundle {
+                    texture: bg.as_ref().unwrap().get_sprite().clone(),
+                    transform: Transform {
+                        translation: Vec3 {
+                            // Spawn off screen
+                            x: -1000.0,
+                            y: -1000.0,
+                            z: e.z as f32,
+                        },
+                        scale: Vec3 {
+                            x: r_grid.tile_size / r_grid.default_tile_size,
+                            y: r_grid.tile_size / r_grid.default_tile_size,
+                            z: 0.,
+                        },
+                        ..default()
+                    },
+                    ..default()
+                },
+                e.coordinates.clone()
+            ));
+
+            let tile = project.map_entity.tiles.get_mut(&e.coordinates).unwrap();
+            match &e.sprite_kind {
+                SpriteKind::Item(_) => { panic!("Not Implemented") }
+                SpriteKind::Terrain(_) => {
+                    tile.terrain.bg_entity = Some(bg_entity_commands.id());
+                }
+                SpriteKind::Furniture(_) => {
+                    tile.furniture.bg_entity = Some(bg_entity_commands.id())
+                }
+                SpriteKind::Toilet(_) => { panic!("Not Implemented") }
+            };
+        }
+    }
+}
 
 pub fn map_save_system(
     keys: Res<Input<KeyCode>>,
@@ -155,90 +283,103 @@ pub fn update_sprite_reader(
     };
 
     for e in e_update_sprite.read() {
-        let sprite = r_textures.textures.get_texture(&project, &e.tile.character, &e.coordinates);
-
-        if let Some(fg) = &sprite.fg {
-            match e.tile.fg_entity {
-                None => {
-                    // Spawn the Sprite
-                    let fg_entity_commands = commands.spawn((
-                        e.tile,
-                        SpriteBundle {
-                            texture: fg.get_sprite().clone(),
-                            transform: Transform {
-                                translation: Vec3 {
-                                    // Spawn off screen
-                                    x: -1000.0,
-                                    y: -1000.0,
-                                    z: 2.0,
+        let tile_sprite = r_textures.textures.get_textures(&project, &e.tile.character, &e.coordinates);
+        macro_rules! spawn_sprite {
+            ($sprite: expr, $tile_path: expr, $sprite_type: ident) => {
+                if let Some(fg) = &$sprite.fg {
+                    match $tile_path.fg_entity {
+                        None => {
+                            // Spawn the Sprite
+                            let fg_entity_commands = commands.spawn((
+                                e.tile,
+                                SpriteBundle {
+                                    texture: fg.get_sprite().clone(),
+                                    transform: Transform {
+                                         translation: Vec3 {
+                                                       // Spawn off screen
+                                                       x: -1000.0,
+                                                       y: -1000.0,
+                                                       z: 2.0,
+                                                       },
+                                         scale: Vec3 {
+                                                 x: r_grid.tile_size / r_grid.default_tile_size,
+                                                 y: r_grid.tile_size / r_grid.default_tile_size,
+                                                 z: 0.,
+                                                 },
+                                         ..default()
+                                     },
+                                    ..default()
                                 },
-                                scale: Vec3 {
-                                    x: r_grid.tile_size / r_grid.default_tile_size,
-                                    y: r_grid.tile_size / r_grid.default_tile_size,
-                                    z: 0.,
-                                },
-                                ..default()
-                            },
-                            ..default()
-                        },
-                        e.coordinates.clone()
-                    ));
+                                e.coordinates.clone()
+                            ));
 
-                    project.map_entity.tiles.get_mut(&e.coordinates).unwrap().fg_entity = Some(fg_entity_commands.id());
-                }
-                Some(i) => {
-                    match q_sprite.get_mut(i) {
-                        Ok(mut i) => {
-                            *i = fg.get_sprite().clone()
+                            let tile = project.map_entity.tiles.get_mut(&e.coordinates).unwrap();
+                            tile.$sprite_type.fg_entity = Some(fg_entity_commands.id());
                         }
-                        Err(_) => {}
+                        Some(i) => {
+                            match q_sprite.get_mut(i) {
+                               Ok(mut i) => {
+                                   *i = fg.get_sprite().clone()
+                               }
+                                   Err(_) => {}
+                               }
+                        }
+                    }
+                }
+
+                if let Some(bg) = &$sprite.bg {
+                    match $tile_path.bg_entity {
+                        None => {
+                            let bg_entity_commands = commands.spawn((
+                                e.tile,
+                                SpriteBundle {
+                                     texture: bg.get_sprite().clone(),
+                                     transform: Transform {
+                                          translation: Vec3 {
+                                              // Spawn off screen
+                                              x: -1000.0,
+                                              y: -1000.0,
+                                              z: 1.0,
+                                          },
+                                          scale: Vec3 {
+                                              x: r_grid.tile_size / r_grid.default_tile_size,
+                                              y: r_grid.tile_size / r_grid.default_tile_size,
+                                              z: 0.,
+                                          },
+                                          ..default()
+                                          },
+                                     ..default()
+                                     },
+                                e.coordinates.clone()
+                            ));
+
+                            let tile = project.map_entity.tiles.get_mut(&e.coordinates).unwrap();
+                            tile.$sprite_type.bg_entity = Some(bg_entity_commands.id());
+                        }
+                        Some(i) => match q_sprite.get_mut(i) {
+                            Ok(mut i) => {
+                                match $sprite.bg.as_ref() {
+                                    None => {
+                                      // Sprite was deleted
+                                    }
+                                    Some(s) => {
+                                      *i = s.get_sprite().clone();
+                                    }
+                                }
+                            }
+                            Err(_) => {}
+                        }
                     }
                 }
             }
         }
 
-        if let Some(bg) = &sprite.bg {
-            match e.tile.bg_entity {
-                None => {
-                    let bg_entity_commands = commands.spawn((
-                        e.tile,
-                        SpriteBundle {
-                            texture: bg.get_sprite().clone(),
-                            transform: Transform {
-                                translation: Vec3 {
-                                    // Spawn off screen
-                                    x: -1000.0,
-                                    y: -1000.0,
-                                    z: 1.0,
-                                },
-                                scale: Vec3 {
-                                    x: r_grid.tile_size / r_grid.default_tile_size,
-                                    y: r_grid.tile_size / r_grid.default_tile_size,
-                                    z: 0.,
-                                },
-                                ..default()
-                            },
-                            ..default()
-                        },
-                        e.coordinates.clone()
-                    ));
+        if let Some(sprite) = tile_sprite.terrain {
+            spawn_sprite!(sprite, e.tile.terrain, terrain);
+        }
 
-                    project.map_entity.tiles.get_mut(&e.coordinates).unwrap().bg_entity = Some(bg_entity_commands.id());
-                }
-                Some(i) => match q_sprite.get_mut(i) {
-                    Ok(mut i) => {
-                        match sprite.bg.as_ref() {
-                            None => {
-                                // Sprite was deleted
-                            }
-                            Some(s) => {
-                                *i = s.get_sprite().clone();
-                            }
-                        }
-                    }
-                    Err(_) => {}
-                }
-            }
+        if let Some(sprite) = tile_sprite.furniture {
+            spawn_sprite!(sprite, e.tile.furniture, furniture);
         }
     }
 }
@@ -246,6 +387,7 @@ pub fn update_sprite_reader(
 pub fn tile_spawn_reader(
     mut commands: Commands,
     mut e_tile_place: EventReader<TilePlaceEvent>,
+    mut e_spawn_sprite: EventWriter<SpawnSprite>,
     mut e_update_sprite: EventWriter<UpdateSpriteEvent>,
     r_grid: Res<Grid>,
     r_textures: Res<GraphicsResource>,
@@ -256,62 +398,32 @@ pub fn tile_spawn_reader(
         Some(p) => { p }
     };
 
+
     for e in e_tile_place.read() {
-        let sprite = r_textures.textures.get_texture(&project, &e.tile.character, &e.coordinates);
+        let sprites = r_textures.textures.get_textures(project, &e.tile.character, &e.coordinates);
 
-        if sprite.fg.is_some() {
-            let fg_entity_commands = commands.spawn((
-                e.tile,
-                SpriteBundle {
-                    texture: sprite.fg.as_ref().unwrap().get_sprite().clone(),
-                    transform: Transform {
-                        translation: Vec3 {
-                            // Spawn off screen
-                            x: -1000.0,
-                            y: -1000.0,
-                            z: 2.0,
-                        },
-                        scale: Vec3 {
-                            x: r_grid.tile_size / r_grid.default_tile_size,
-                            y: r_grid.tile_size / r_grid.default_tile_size,
-                            z: 0.,
-                        },
-                        ..default()
-                    },
-                    ..default()
-                },
-                e.coordinates.clone()
-            ));
-
-            project.map_entity.tiles.get_mut(&e.coordinates).unwrap().fg_entity = Some(fg_entity_commands.id());
+        if let Some(terrain) = sprites.terrain {
+            e_spawn_sprite.send(
+                SpawnSprite {
+                    coordinates: e.coordinates.clone(),
+                    sprite_kind: SpriteKind::Terrain(terrain.clone()),
+                    tile: e.tile.clone(),
+                    z: 1
+                }
+            )
         }
 
-        if sprite.bg.is_some() {
-            let bg_entity_commands = commands.spawn((
-                e.tile,
-                SpriteBundle {
-                    texture: sprite.bg.as_ref().unwrap().get_sprite().clone(),
-                    transform: Transform {
-                        translation: Vec3 {
-                            // Spawn off screen
-                            x: -1000.0,
-                            y: -1000.0,
-                            z: 1.0,
-                        },
-                        scale: Vec3 {
-                            x: r_grid.tile_size / r_grid.default_tile_size,
-                            y: r_grid.tile_size / r_grid.default_tile_size,
-                            z: 0.,
-                        },
-                        ..default()
-                    },
-                    ..default()
-                },
-                e.coordinates.clone()
-            ));
-
-            project.map_entity.tiles.get_mut(&e.coordinates).unwrap().bg_entity = Some(bg_entity_commands.id());
+        if let Some(furniture) = sprites.furniture {
+            e_spawn_sprite.send(
+                SpawnSprite {
+                    coordinates: e.coordinates.clone(),
+                    sprite_kind: SpriteKind::Furniture(furniture.clone()),
+                    tile: e.tile.clone(),
+                    z: 3
+                }
+            )
         }
+
 
         // Check here because i couldn't figure out why the sprites were not correct when spawning a saved map
         if e.should_update_sprites {
@@ -346,19 +458,28 @@ pub fn tile_despawn_reader(
     };
 
     for e in e_tile_delete.read() {
-        match e.tile.fg_entity {
-            None => {}
-            Some(entity) => {
-                commands.get_entity(entity).unwrap().despawn()
+        macro_rules! despawn {
+            ($path: expr) => {
+                match $path.fg_entity {
+                    None => {}
+                    Some(entity) => {
+                        commands.get_entity(entity).unwrap().despawn()
+                    }
+                }
+
+                match $path.bg_entity {
+                    None => {}
+                    Some(entity) => {
+                        commands.get_entity(entity).unwrap().despawn()
+                    }
+                }
             }
         }
 
-        match e.tile.bg_entity {
-            None => {}
-            Some(entity) => {
-                commands.get_entity(entity).unwrap().despawn()
-            }
-        }
+        despawn!(e.tile.terrain);
+        despawn!(e.tile.furniture);
+        despawn!(e.tile.toilets);
+        despawn!(e.tile.items);
 
         let tiles_around = project.map_entity.get_tiles_around(&e.coordinates);
 

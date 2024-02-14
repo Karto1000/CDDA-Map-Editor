@@ -34,11 +34,10 @@ use crate::map::events::{ClearTiles, SpawnMapEntity};
 use crate::map::loader::MapEntityImporter;
 use crate::map::MapPlugin;
 use crate::map::resources::MapEntity;
-use crate::map::systems::{set_tile_reader, tile_despawn_reader, tile_remove_reader, tile_spawn_reader, update_sprite_reader};
+use crate::map::systems::{set_tile_reader, spawn_sprite, tile_despawn_reader, tile_remove_reader, tile_spawn_reader, update_sprite_reader};
 use crate::palettes::loader::PaletteLoader;
 use crate::project::resources::{Project, ProjectSaveState};
 use crate::project::saver::ProjectSaver;
-use crate::tile_selector::TileSelectorPlugin;
 use crate::tiles::components::Tile;
 use crate::tiles::TilePlugin;
 use crate::ui::tabs::events::SpawnTab;
@@ -51,7 +50,6 @@ mod ui;
 mod project;
 mod graphics;
 mod palettes;
-mod tile_selector;
 mod common;
 
 
@@ -251,7 +249,6 @@ fn main() {
         .add_systems(Startup, setup)
         .add_event::<SwitchProject>()
         .add_plugins(WorldInspectorPlugin::new())
-        .add_plugins(TileSelectorPlugin)
         .add_plugins(FileDialogPlugin::new()
             .with_save_file::<Project>()
             .with_load_file::<Project>()
@@ -270,7 +267,8 @@ fn main() {
             apply_deferred,
             tile_spawn_reader,
             apply_deferred,
-            update_sprite_reader
+            spawn_sprite,
+            update_sprite_reader,
         ).chain())
         .run();
 }
@@ -288,8 +286,8 @@ fn setup(
 ) {
     commands.spawn(Camera2dBundle::default());
 
-    let tileset_loader = LegacyTilesetLoader::new(PathBuf::from(r"C:\CDDA\testing\gfx\MSX++UnDeadPeopleEdition"));
-    let palette_loader = PaletteLoader::new(PathBuf::from(r"C:\CDDA\testing\data\json\mapgen_palettes\testing.json"));
+    let tileset_loader = LegacyTilesetLoader::new(PathBuf::from(r"saves/tileset/TILESETS/gfx/MSX++UnDeadPeopleEdition"));
+    let palette_loader = PaletteLoader::new(PathBuf::from(r"saves/palettes/building.json"));
     let editor_data_saver = EditorDataSaver::new();
     let legacy_textures = LegacyTextures::new(tileset_loader, &mut r_images);
     let texture_resource = GraphicsResource::new(Box::new(legacy_textures));
@@ -298,15 +296,15 @@ fn setup(
     let mut editor_data = editor_data_saver.load().unwrap();
     let project: &mut Project = editor_data.get_current_project_mut().unwrap_or(&mut default_project);
 
-    let loader = MapEntityImporter::new(PathBuf::from(r"C:\CDDA\testing\data\json\mapgen\nested\house_nested.json"), "bedroom_4x4_adult_1_N".to_string());
-    project.map_entity = loader.load().unwrap();
+    // let loader = MapEntityImporter::new(PathBuf::from(r"saves/house_nested.json"), "bedroom_4x4_adult_1_N".to_string());
+    // project.map_entity = loader.load().unwrap();
 
-    let temp_loader = PaletteLoader::new(PathBuf::from(r"C:\CDDA\testing\data\json\mapgen_palettes\house_w_palette.json"));
-    project.map_entity.palettes.push(temp_loader.load().unwrap().first().unwrap().clone());
+    // let temp_loader = PaletteLoader::new(PathBuf::from(r"saves/palettes/house_w_palette.json"));
+    // project.map_entity.palettes.push(temp_loader.load().unwrap().first().unwrap().clone());
 
-    // let palettes = palette_loader.load().unwrap();
-    //
-    // project.map_entity.palettes = palettes;
+    let palettes = palette_loader.load().unwrap();
+
+    project.map_entity.palettes = palettes;
 
     e_spawn_map_entity.send(SpawnMapEntity {
         map_entity: Arc::new(project.map_entity.clone())

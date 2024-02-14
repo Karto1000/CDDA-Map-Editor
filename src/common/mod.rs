@@ -15,8 +15,20 @@ pub const PRIMARY_COLOR_FADED: Color = Color::rgb(0.23, 0.25, 0.27);
 pub const PRIMARY_COLOR_SELECTED: Color = Color::rgb(0.63, 0.70, 0.76);
 pub const ERROR: Color = Color::rgba(0.79, 0.2, 0.21, 0.5);
 
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum MeabyMulti<T> {
+    Multi(Vec<T>),
+    Single(T),
+}
+
 #[derive(Serialize, Deserialize, Eq, Hash, PartialEq, Clone, Debug)]
 pub struct TileId(pub String);
+
+#[derive(Serialize, Deserialize, Eq, Hash, PartialEq, Clone, Debug)]
+pub struct ItemId(pub String);
+
 
 #[derive(Serialize, Clone, Deserialize, Debug)]
 pub struct Weighted<T> {
@@ -40,7 +52,7 @@ impl<T: Num + SampleUniform + PartialOrd + Clone> MeabyNumberRange<T> {
                 return rng.gen_range(start.clone()..end.clone()).clone();
             }
             MeabyNumberRange::Single(num) => num.clone()
-        }
+        };
     }
 }
 

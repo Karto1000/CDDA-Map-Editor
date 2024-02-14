@@ -52,12 +52,6 @@ impl MapEntityType {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct TileEntity {
-    terrain: Option<Tile>,
-    furniture: Option<Tile>
-}
-
 #[derive(Serialize, Deserialize, Debug, Resource, Clone)]
 pub struct MapEntity {
     #[serde(flatten)]
@@ -84,6 +78,25 @@ impl Default for MapEntity {
     }
 }
 
+#[derive(Debug)]
+pub struct TileIdGroup {
+    pub terrain: Option<TileId>,
+    pub furniture: Option<TileId>,
+    pub toilet: Option<TileId>,
+    pub item: Option<TileId>
+}
+
+impl Default for TileIdGroup {
+    fn default() -> Self {
+        return Self {
+            terrain: None,
+            furniture: None,
+            toilet: None,
+            item: None
+        }
+    }
+}
+
 impl MapEntity {
     pub fn new(name: String, size: Vec2) -> Self {
         return Self {
@@ -98,36 +111,16 @@ impl MapEntity {
         };
     }
 
-    pub fn get_terrain_id_from_character(&self, character: &char) -> TileId {
-        for palette in self.palettes.iter() {
-            if let Some(id) = palette.terrain.get(character) {
-                match id {
+    pub fn get_ids(&self, character: &char) -> TileIdGroup {
+        let mut group = TileIdGroup::default();
+
+        macro_rules! match_id {
+            ($id: ident, $path: expr) => {
+                match $id {
                     MapObjectId::Single(v) => {
                         match v {
                             MeabyWeighted::NotWeighted(v) => {
-                                return v.clone();
-                            }
-                            MeabyWeighted::Weighted(_) => { panic!("Not Implemented") }
-                        }
-                    }
-                    MapObjectId::Grouped(_) => { panic!("Not Implemented") }
-                    MapObjectId::Nested(_) => { panic!("Not Implemented") }
-                    MapObjectId::Param { .. } => { panic!("Not Implemented") }
-                }
-            }
-        }
-
-        return TileId { 0: "TODO_IMPLEMENT_DEFAULT".into() };
-    }
-
-    pub fn get_furniture_id_from_character(&self, character: &char) -> TileId {
-        for palette in self.palettes.iter() {
-            if let Some(id) = palette.furniture.get(character) {
-                match id {
-                    MapObjectId::Single(v) => {
-                        match v {
-                            MeabyWeighted::NotWeighted(v) => {
-                                return v.clone();
+                                $path = Some(v.clone());
                             }
                             MeabyWeighted::Weighted(_) => { panic!("Not Implemented") }
                         }
@@ -144,7 +137,7 @@ impl MapEntity {
                         let mut rng = rand::thread_rng();
                         let random_index: usize = rng.gen_range(0..final_group.len());
                         let random_sprite = final_group.get(random_index).unwrap();
-                        return random_sprite.value.clone();
+                        $path = Some(random_sprite.value.clone());
                     }
                     MapObjectId::Nested(_) => { panic!("Not Implemented") }
                     MapObjectId::Param { .. } => { panic!("Not Implemented") }
@@ -152,7 +145,17 @@ impl MapEntity {
             }
         }
 
-        return TileId { 0: "TODO_IMPLEMENT_DEFAULT".into() };
+        for palette in self.palettes.iter() {
+            if let Some(id) = palette.furniture.get(character) {
+                match_id!(id, group.furniture);
+            }
+
+            if let Some(id) = palette.terrain.get(character) {
+                match_id!(id, group.terrain);
+            }
+        }
+
+        return group;
     }
 
     pub fn get_tiles_around(&self, coordinates: &Coordinates) -> Vec<(Option<&Tile>, Coordinates)> {
