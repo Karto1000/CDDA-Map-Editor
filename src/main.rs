@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::default::Default;
 use std::fs;
 use std::fs::File;
@@ -21,7 +22,7 @@ use bevy_file_dialog::FileDialogPlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
+use serde_json::{json, Map, Value};
 use winit::window::Icon;
 
 use crate::common::Coordinates;
@@ -35,7 +36,8 @@ use crate::map::loader::MapEntityImporter;
 use crate::map::MapPlugin;
 use crate::map::resources::MapEntity;
 use crate::map::systems::{set_tile_reader, spawn_sprite, tile_despawn_reader, tile_remove_reader, tile_spawn_reader, update_sprite_reader};
-use crate::palettes::loader::{PaletteLoader, PalettesLoader};
+use crate::palettes::loader::{PalettesLoader};
+use crate::palettes::{MapObjectId, Palette};
 use crate::project::resources::{Project, ProjectSaveState};
 use crate::project::saver::ProjectSaver;
 use crate::tiles::components::Tile;
@@ -70,6 +72,9 @@ pub struct EditorData {
     pub current_project_index: u32,
     pub projects: Vec<Project>,
     pub history: Vec<ProjectSaveState>,
+
+    #[serde(skip)]
+    pub all_palettes: HashMap<String, Palette>,
 }
 
 impl EditorData {
@@ -98,6 +103,7 @@ impl Default for EditorData {
             current_project_index: 0,
             projects: vec![project],
             history: vec![],
+            all_palettes: HashMap::new(),
         };
     }
 }
@@ -157,6 +163,9 @@ impl Save<EditorData> for EditorDataSaver {
 
 impl Load<EditorData> for EditorDataSaver {
     fn load(&self) -> Result<EditorData, LoadError> {
+        let palettes_loader = PalettesLoader::new(PathBuf::from(r"saves/palettes"));
+        let palettes = palettes_loader.load().unwrap();
+
         let dir = match ProjectDirs::from_path("CDDA Map Editor".into()) {
             None => { return Err(LoadError::DirectoryNotFound); }
             Some(d) => d
@@ -196,7 +205,12 @@ impl Load<EditorData> for EditorDataSaver {
                     ProjectSaveState::Saved(path) => {
                         match fs::read_to_string(path.clone()) {
                             Ok(s) => {
-                                let project: Project = serde_json::from_str(s.as_str()).expect("Valid Project");
+                                let mut project: Project = serde_json::from_str(s.as_str()).expect("Valid Project");
+
+                                project.map_entity.palettes = project.map_entity.palettes.iter().map(|pal_id| {
+                                    palettes.get(&pal_id.id).unwrap().clone()
+                                }).collect();
+
                                 Some(project)
                             }
                             Err(_) => {
@@ -208,7 +222,12 @@ impl Load<EditorData> for EditorDataSaver {
                     ProjectSaveState::AutoSaved(path) => {
                         match fs::read_to_string(path.clone()) {
                             Ok(s) => {
-                                let project: Project = serde_json::from_str(s.as_str()).expect("Valid Project");
+                                let mut project: Project = serde_json::from_str(s.as_str()).expect("Valid Project");
+
+                                project.map_entity.palettes = project.map_entity.palettes.iter().map(|pal_id| {
+                                    palettes.get(&pal_id.id).unwrap().clone()
+                                }).collect();
+
                                 Some(project)
                             }
                             Err(_) => {
@@ -231,6 +250,7 @@ impl Load<EditorData> for EditorDataSaver {
             current_project_index: 0,
             projects: projects_array,
             history: history_array,
+            all_palettes: palettes,
         });
     }
 }
@@ -286,30 +306,21 @@ fn setup(
 ) {
     commands.spawn(Camera2dBundle::default());
 
-    let palettes_loader = PalettesLoader::new(PathBuf::from(r"saves/palettes"));
-    palettes_loader.load().unwrap();
-
     let tileset_loader = LegacyTilesetLoader::new(PathBuf::from(r"saves/tileset/TILESETS/gfx/MSX++UnDeadPeopleEdition"));
-    let palette_loader = PaletteLoader::new(PathBuf::from(r"saves/palettes/building.json"));
     let editor_data_saver = EditorDataSaver::new();
     let legacy_textures = LegacyTextures::new(tileset_loader, &mut r_images);
     let texture_resource = GraphicsResource::new(Box::new(legacy_textures));
 
     let mut default_project = Project::default();
     let mut editor_data = editor_data_saver.load().unwrap();
+
     let project: &mut Project = editor_data.get_current_project_mut().unwrap_or(&mut default_project);
 
-    let loader = MapEntityImporter::new(PathBuf::from(r"saves/house_nested.json"), "bedroom_4x4_adult_1_N".to_string());
-    project.map_entity = loader.load().unwrap();
+    // let loader = MapEntityImporter::new(PathBuf::from(r"saves/house_nested.json"), "bedroom_4x4_adult_1_N".to_string());
+    // project.map_entity = loader.load().unwrap();
 
-    let temp_loader = PaletteLoader::new(PathBuf::from(r"saves/palettes/house_w_palette.json"));
-    project.map_entity.palettes.push(temp_loader.load().unwrap().first().unwrap().clone());
-
-    // let palettes = palette_loader.load().unwrap();
-    //
-    // project.map_entity.palettes = palettes;
-
-    println!("{:?}", project.map_entity.tiles);
+    // let temp_loader = PaletteLoader::new(PathBuf::from(r"saves/palettes/house_w_palette.json"));
+    // project.map_entity.palettes.push(temp_loader.load().unwrap().first().unwrap().clone());
 
     e_spawn_map_entity.send(SpawnMapEntity {
         map_entity: Arc::new(project.map_entity.clone())

@@ -52,7 +52,6 @@ pub enum Identifier {
 #[derive(Deserialize, Clone, Serialize, Debug)]
 #[serde(untagged)]
 pub enum MapObjectId {
-    Single(MeabyWeighted<Identifier>),
     Grouped(Vec<MeabyWeighted<Identifier>>),
     Nested(Vec<Vec<MeabyWeighted<Identifier>>>),
     Param { param: String, fallback: Option<String> },
@@ -60,6 +59,7 @@ pub enum MapObjectId {
         switch: Switch,
         cases: HashMap<String, String>,
     },
+    Single(MeabyWeighted<Identifier>),
 }
 
 #[derive(Deserialize, Clone, Serialize, Debug, Eq, Hash, PartialEq)]

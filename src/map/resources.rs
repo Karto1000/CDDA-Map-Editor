@@ -123,7 +123,10 @@ impl MapEntity {
                             MeabyWeighted::NotWeighted(v) => {
                                 let id = match v {
                                     Identifier::TileId(id) => id,
-                                    Identifier::Parameter(parameter) => {panic!("Not Implemented")}
+                                    Identifier::Parameter(parameter) => {
+                                        println!("{:?} {:?} {:?} {}", parameter.param, parameter.fallback, $id, character);
+                                        panic!("Not Implemented 1")
+                                    }
                                 };
                                 $path = Some(id.clone());
                             }
@@ -145,14 +148,20 @@ impl MapEntity {
 
                         let id = match &random_sprite.value {
                             Identifier::TileId(id) => id,
-                            Identifier::Parameter(parameter) => {panic!("Not Implemented")}
+                            Identifier::Parameter(parameter) => {
+                                println!("{}", parameter.param);
+                                panic!("Not Implemented")
+                            }
                         };
 
                         $path = Some(id.clone());
                     }
                     MapObjectId::Nested(_) => { panic!("Not Implemented") }
                     MapObjectId::Param { .. } => { panic!("Not Implemented") }
-                    MapObjectId::Switch {..} => {panic!("Not Implemented")}
+                    MapObjectId::Switch {switch, cases} => {
+                        println!("{:?} {:?}", switch, cases);
+                        panic!("Not Implemented")
+                    }
                 }
             }
         }

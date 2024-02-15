@@ -24,6 +24,9 @@ pub struct Tile {
     pub character: char,
 
     #[serde(skip)]
+    pub fallback: SpriteRepresentation,
+
+    #[serde(skip)]
     pub terrain: SpriteRepresentation,
 
     #[serde(skip)]
@@ -41,6 +44,7 @@ impl From<char> for Tile {
     fn from(value: char) -> Self {
         return Self {
             character: value,
+            fallback: SpriteRepresentation::default(),
             terrain: SpriteRepresentation::default(),
             furniture: SpriteRepresentation::default(),
             items: SpriteRepresentation::default(),

@@ -104,31 +104,33 @@ pub enum SpriteType {
     },
 }
 
-pub struct TileSprite<'a> {
-    pub terrain: Option<&'a Sprite>,
-    pub furniture: Option<&'a Sprite>,
-    pub items: Option<&'a Sprite>,
-    pub toilets: Option<&'a Sprite>,
-}
-
-impl<'a> Default for TileSprite<'a> {
-    fn default() -> Self {
-        return Self {
-            terrain: None,
-            furniture: None,
-            items: None,
-            toilets: None,
-        };
-    }
+pub enum TileSprite<'a> {
+    Exists {
+        terrain: Option<&'a Sprite>,
+        furniture: Option<&'a Sprite>,
+        items: Option<&'a Sprite>,
+        toilets: Option<&'a Sprite>,
+    },
+    Default(&'a Sprite),
 }
 
 pub trait GetTexture: Send + Sync {
     fn get_textures(&self, project: &Project, character: &char, coordinates: &Coordinates) -> TileSprite {
-        return TileSprite {
-            terrain: self.get_terrain(project, character, coordinates),
-            furniture: self.get_furniture(project, character, coordinates),
-            items: self.get_item(project, character, coordinates),
-            toilets: self.get_toilets(project, character, coordinates),
+        let terrain = self.get_terrain(project, character, coordinates);
+        let furniture = self.get_furniture(project, character, coordinates);
+        let items = self.get_item(project, character, coordinates);
+        let toilets = self.get_toilets(project, character, coordinates);
+
+        if terrain.is_none() && furniture.is_none() && items.is_none() && toilets.is_none() {
+            // Return Default Texture
+            return TileSprite::Default(self.get_fallback_texture(character));
+        }
+
+        return TileSprite::Exists {
+            terrain,
+            furniture,
+            items,
+            toilets,
         };
     }
 
@@ -136,6 +138,7 @@ pub trait GetTexture: Send + Sync {
     fn get_furniture(&self, project: &Project, character: &char, coordinates: &Coordinates) -> Option<&Sprite>;
     fn get_item(&self, project: &Project, character: &char, coordinates: &Coordinates) -> Option<&Sprite>;
     fn get_toilets(&self, project: &Project, character: &char, coordinates: &Coordinates) -> Option<&Sprite>;
+    fn get_fallback_texture(&self, character: &char) -> &Sprite;
 }
 
 pub struct LegacyTextures {
@@ -164,12 +167,6 @@ impl LegacyTextures {
             textures,
             fallback_textures: fallback_sprites,
         };
-    }
-
-    pub fn get_fallback_texture(&self, character: &char) -> &Sprite {
-        return self.fallback_textures.get(&format!("{}_WHITE", &character.to_string().to_uppercase())).unwrap_or(
-            self.fallback_textures.get("?_WHITE").unwrap()
-        );
     }
 }
 
@@ -302,6 +299,12 @@ impl GetTexture for LegacyTextures {
                 ));
             }
         };
+    }
+
+    fn get_fallback_texture(&self, character: &char) -> &Sprite {
+         return self.fallback_textures.get(&format!("{}_WHITE", &character.to_string().to_uppercase())).unwrap_or(
+            self.fallback_textures.get("?_WHITE").unwrap()
+        );
     }
 }
 

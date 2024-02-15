@@ -46,6 +46,7 @@ impl Load<Project> for ProjectAutoSaveLoader {
 
         let mut contents = Vec::new();
         file.read_to_end(&mut contents).unwrap();
+
         return Ok(serde_json::from_slice(contents.as_slice()).unwrap());
     }
 }

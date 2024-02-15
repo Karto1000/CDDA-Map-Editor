@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::common::Coordinates;
 use crate::EditorData;
-use crate::graphics::{GraphicsResource, Sprite};
+use crate::graphics::{GraphicsResource, Sprite, TileSprite};
 use crate::graphics::tileset::legacy::{GetBackground, GetForeground};
 use crate::grid::resources::Grid;
 use crate::map::{TileDeleteEvent, TilePlaceEvent};
@@ -34,6 +34,7 @@ pub enum SpriteKind {
     Terrain(Sprite),
     Furniture(Sprite),
     Toilet(Sprite),
+    Fallback(Sprite)
 }
 
 impl SpriteKind {
@@ -42,7 +43,8 @@ impl SpriteKind {
             SpriteKind::Item(i) => &i.fg,
             SpriteKind::Terrain(t) => &t.fg,
             SpriteKind::Furniture(f) => &f.fg,
-            SpriteKind::Toilet(t) => &t.fg
+            SpriteKind::Toilet(t) => &t.fg,
+            SpriteKind::Fallback(f) => &f.fg
         };
     }
 
@@ -51,7 +53,8 @@ impl SpriteKind {
             SpriteKind::Item(i) => &i.bg,
             SpriteKind::Terrain(t) => &t.bg,
             SpriteKind::Furniture(f) => &f.bg,
-            SpriteKind::Toilet(t) => &t.bg
+            SpriteKind::Toilet(t) => &t.bg,
+            SpriteKind::Fallback(_) => &None
         };
     }
 }
@@ -105,6 +108,9 @@ pub fn spawn_sprite(
                     tile.furniture.fg_entity = Some(fg_entity_commands.id())
                 }
                 SpriteKind::Toilet(_) => { panic!("Not Implemented") }
+                SpriteKind::Fallback(_) => {
+                    tile.fallback.fg_entity = Some(fg_entity_commands.id());
+                }
             }
         }
 
@@ -142,6 +148,7 @@ pub fn spawn_sprite(
                     tile.furniture.bg_entity = Some(bg_entity_commands.id())
                 }
                 SpriteKind::Toilet(_) => { panic!("Not Implemented") }
+                SpriteKind::Fallback(_) => {panic!("Not Implemented")}
             };
         }
     }
@@ -374,12 +381,19 @@ pub fn update_sprite_reader(
             }
         }
 
-        if let Some(sprite) = tile_sprite.terrain {
-            spawn_sprite!(sprite, e.tile.terrain, terrain);
-        }
+        match tile_sprite {
+            TileSprite::Exists { terrain, furniture, .. } => {
+                if let Some(sprite) = terrain {
+                    spawn_sprite!(sprite, e.tile.terrain, terrain);
+                }
 
-        if let Some(sprite) = tile_sprite.furniture {
-            spawn_sprite!(sprite, e.tile.furniture, furniture);
+                if let Some(sprite) = furniture {
+                    spawn_sprite!(sprite, e.tile.furniture, furniture);
+                }
+            }
+            TileSprite::Default(default) => {
+                spawn_sprite!(default, e.tile.fallback, fallback);
+            }
         }
     }
 }
@@ -402,28 +416,41 @@ pub fn tile_spawn_reader(
     for e in e_tile_place.read() {
         let sprites = r_textures.textures.get_textures(project, &e.tile.character, &e.coordinates);
 
-        if let Some(terrain) = sprites.terrain {
-            e_spawn_sprite.send(
-                SpawnSprite {
-                    coordinates: e.coordinates.clone(),
-                    sprite_kind: SpriteKind::Terrain(terrain.clone()),
-                    tile: e.tile.clone(),
-                    z: 1
+        match sprites {
+            TileSprite::Exists { terrain, furniture, .. } => {
+                if let Some(terrain) = terrain {
+                    e_spawn_sprite.send(
+                        SpawnSprite {
+                            coordinates: e.coordinates.clone(),
+                            sprite_kind: SpriteKind::Terrain(terrain.clone()),
+                            tile: e.tile.clone(),
+                            z: 1,
+                        }
+                    )
                 }
-            )
-        }
 
-        if let Some(furniture) = sprites.furniture {
-            e_spawn_sprite.send(
-                SpawnSprite {
-                    coordinates: e.coordinates.clone(),
-                    sprite_kind: SpriteKind::Furniture(furniture.clone()),
-                    tile: e.tile.clone(),
-                    z: 3
+                if let Some(furniture) = furniture {
+                    e_spawn_sprite.send(
+                        SpawnSprite {
+                            coordinates: e.coordinates.clone(),
+                            sprite_kind: SpriteKind::Furniture(furniture.clone()),
+                            tile: e.tile.clone(),
+                            z: 3,
+                        }
+                    )
                 }
-            )
+            },
+            TileSprite::Default(default) => {
+                e_spawn_sprite.send(
+                    SpawnSprite {
+                        coordinates: e.coordinates.clone(),
+                        sprite_kind: SpriteKind::Fallback(default.clone()),
+                        tile: e.tile.clone(),
+                        z: 1
+                    }
+                )
+            }
         }
-
 
         // Check here because i couldn't figure out why the sprites were not correct when spawning a saved map
         if e.should_update_sprites {
@@ -480,6 +507,7 @@ pub fn tile_despawn_reader(
         despawn!(e.tile.furniture);
         despawn!(e.tile.toilets);
         despawn!(e.tile.items);
+        despawn!(e.tile.fallback);
 
         let tiles_around = project.map_entity.get_tiles_around(&e.coordinates);
 
