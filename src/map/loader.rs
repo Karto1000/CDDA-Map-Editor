@@ -52,12 +52,13 @@ impl Load<MapEntity> for MapEntityImporter {
         // let palettes: Vec<Palette> = serde_json::from_value(object.get("palettes").unwrap().clone()).unwrap();
 
         let size = Vec2::new(
-            json_tiles.get(0).unwrap().to_string().len() as f32,
+            json_tiles.get(0).unwrap().as_str().unwrap().len() as f32,
             json_tiles.len() as f32,
         );
 
         for (row, tile) in json_tiles.iter().enumerate() {
-            for (column, char) in tile.to_string().chars().enumerate() {
+            // to_string returns quotes so we use as_str
+            for (column, char) in tile.as_str().unwrap().chars().enumerate() {
                 tiles.insert(
                     Coordinates::new(column as i32, row as i32),
                     Tile::from(char),

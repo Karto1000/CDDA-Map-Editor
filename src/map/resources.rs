@@ -2,11 +2,12 @@ use std::collections::HashMap;
 
 use bevy::math::Vec2;
 use bevy::prelude::Resource;
+use either::Either;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 use crate::common::{Coordinates, MeabyNumberRange, MeabyWeighted, TileId, Weighted};
-use crate::palettes::{MapObjectId, Palette};
+use crate::palettes::{Identifier, MapObjectId, Palette};
 use crate::tiles::components::Tile;
 
 #[derive(Serialize, Deserialize, Debug, Resource, Clone)]
@@ -120,13 +121,17 @@ impl MapEntity {
                     MapObjectId::Single(v) => {
                         match v {
                             MeabyWeighted::NotWeighted(v) => {
-                                $path = Some(v.clone());
+                                let id = match v {
+                                    Identifier::TileId(id) => id,
+                                    Identifier::Parameter(parameter) => {panic!("Not Implemented")}
+                                };
+                                $path = Some(id.clone());
                             }
                             MeabyWeighted::Weighted(_) => { panic!("Not Implemented") }
                         }
                     }
                     MapObjectId::Grouped(g) => {
-                        let final_group: Vec<Weighted<TileId>> = g.iter().map(|mw| {
+                        let final_group: Vec<Weighted<Identifier>> = g.iter().map(|mw| {
                             match mw {
                                 MeabyWeighted::NotWeighted(v) => Weighted::new(v.clone(), 1),
                                 MeabyWeighted::Weighted(w) => w.clone()
@@ -137,10 +142,17 @@ impl MapEntity {
                         let mut rng = rand::thread_rng();
                         let random_index: usize = rng.gen_range(0..final_group.len());
                         let random_sprite = final_group.get(random_index).unwrap();
-                        $path = Some(random_sprite.value.clone());
+
+                        let id = match &random_sprite.value {
+                            Identifier::TileId(id) => id,
+                            Identifier::Parameter(parameter) => {panic!("Not Implemented")}
+                        };
+
+                        $path = Some(id.clone());
                     }
                     MapObjectId::Nested(_) => { panic!("Not Implemented") }
                     MapObjectId::Param { .. } => { panic!("Not Implemented") }
+                    MapObjectId::Switch {..} => {panic!("Not Implemented")}
                 }
             }
         }

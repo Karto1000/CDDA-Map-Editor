@@ -29,7 +29,6 @@ pub struct TileId(pub String);
 #[derive(Serialize, Deserialize, Eq, Hash, PartialEq, Clone, Debug)]
 pub struct ItemId(pub String);
 
-
 #[derive(Serialize, Clone, Deserialize, Debug)]
 pub struct Weighted<T> {
     #[serde(alias = "value", alias = "sprite")]

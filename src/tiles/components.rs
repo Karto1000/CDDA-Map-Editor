@@ -14,8 +14,8 @@ impl Default for SpriteRepresentation {
     fn default() -> Self {
         return Self {
             fg_entity: None,
-            bg_entity: None
-        }
+            bg_entity: None,
+        };
     }
 }
 
@@ -23,10 +23,17 @@ impl Default for SpriteRepresentation {
 pub struct Tile {
     pub character: char,
 
+    #[serde(skip)]
     pub terrain: SpriteRepresentation,
+
+    #[serde(skip)]
     pub furniture: SpriteRepresentation,
+
+    #[serde(skip)]
     pub items: SpriteRepresentation,
-    pub toilets: SpriteRepresentation
+
+    #[serde(skip)]
+    pub toilets: SpriteRepresentation,
     // TODO: Add missing representations
 }
 
@@ -37,7 +44,7 @@ impl From<char> for Tile {
             terrain: SpriteRepresentation::default(),
             furniture: SpriteRepresentation::default(),
             items: SpriteRepresentation::default(),
-            toilets: SpriteRepresentation::default()
+            toilets: SpriteRepresentation::default(),
         };
     }
 }

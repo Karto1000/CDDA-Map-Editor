@@ -48,7 +48,7 @@ pub fn tile_place_system(
     buttons: Res<Input<MouseButton>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     r_grid: Res<Grid>,
-    r_editor_data: Res<EditorData>,
+    mut r_editor_data: ResMut<EditorData>,
     r_captured: Res<IsCursorCaptured>,
 ) {
     if buttons.just_released(MouseButton::Left) {
@@ -56,7 +56,7 @@ pub fn tile_place_system(
     }
 
     if buttons.pressed(MouseButton::Left) {
-        let project = match r_editor_data.get_current_project() {
+        let project = match r_editor_data.get_current_project_mut() {
             None => return,
             Some(p) => p
         };
@@ -85,7 +85,13 @@ pub fn tile_place_system(
             return;
         }
 
-        if project.map_entity.tiles.get(&tile_cords).is_some() { return; }
+        let existing_tile = project.map_entity.tiles.get(&tile_cords);
+        if let Some(existing_tile) = existing_tile {
+            // Overwrite empty characters
+            if existing_tile.character != ' ' { return; }
+
+            project.map_entity.tiles.remove(&tile_cords);
+        }
 
         let tile = Tile::from(tile_to_place);
         e_set_tile.send(TilePlaceEvent { tile, coordinates: tile_cords, should_update_sprites: true });
