@@ -233,6 +233,7 @@ impl GetTexture for LegacyTextures {
         match &project.map_entity.get_ids(character).terrain {
             None => return None,
             Some(terrain) => {
+                println!("{:?}", terrain);
                 let sprite_type = match self.textures.get(terrain) {
                     None => return None,
                     Some(s) => s

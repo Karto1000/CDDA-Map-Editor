@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::process::exit;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -10,11 +11,11 @@ use anyhow::Error;
 use bevy::asset::{Assets, AssetServer, Handle};
 use bevy::prelude::{Image, Res, ResMut, Vec2};
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-use image::{DynamicImage, EncodableLayout, GenericImageView, ImageBuffer, imageops, Rgb, Rgba};
+use image::{ColorType, DynamicImage, EncodableLayout, GenericImageView, ImageBuffer, imageops, Rgb, Rgba};
 use image::io::Reader;
 use imageproc::definitions::HasBlack;
 use imageproc::geometric_transformations::{Interpolation, rotate};
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
 use rand::Rng;
 use serde::Deserialize;
 use serde_json::Value;
@@ -601,6 +602,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
     fn load_textures(&self, image_resource: &mut ResMut<Assets<Image>>) -> Result<HashMap<i32, Handle<Image>>, Error> {
         let tileset = self.load().unwrap();
         let mut textures: HashMap<i32, Handle<Image>> = HashMap::new();
+        let mut out_of_range = Vec::new();
 
         for group in tileset.tiles.iter() {
             if group.file == "fallback.png".to_string() {
@@ -678,12 +680,9 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
 
                                         let xy = get_xy_from_index(fg, start as i32);
 
-                                        // For some fucking reason the
-                                        // Grass tiles in the UndeadPeopleTileset specify a fg id which isn't
-                                        // even available in the file
-                                        // TODO FIX
-
                                         if fg < &(start as i32) || fg > &(end as i32) {
+                                            warn!("fg {} out of range", fg);
+                                            out_of_range.push((fg, xy));
                                             continue;
                                         }
 
@@ -895,8 +894,13 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                 match fg {
                                     MeabyWeighted::NotWeighted(fg) => {
                                         match loaded_sprites.get(fg) {
-                                            None => None,
-                                            Some(sprite) => Some(Arc::new(SingleForeground { sprite: sprite.clone() }))
+                                            None => {
+                                                error!("No Sprite found for fg {}", fg);
+                                                None
+                                            }
+                                            Some(sprite) => {
+                                                Some(Arc::new(SingleForeground { sprite: sprite.clone() }))
+                                            }
                                         }
                                     }
                                     MeabyWeighted::Weighted(w) => {

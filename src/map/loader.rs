@@ -3,7 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use bevy::prelude::{Res, Vec2};
-use log::warn;
+use log::{info, warn};
 use serde_json::Value;
 
 use crate::common::Coordinates;
@@ -15,15 +15,15 @@ use crate::tiles::components::Tile;
 
 pub struct MapEntityImporter<'a> {
     path: PathBuf,
-    nested_mapgen_id: String,
+    id: String,
     all_palettes: &'a HashMap<String, Palette>
 }
 
 impl<'a> MapEntityImporter<'a> {
-    pub fn new(path: PathBuf, nested_mapgen_id: String, all_palettes: &'a HashMap<String, Palette>) -> Self {
+    pub fn new(path: PathBuf, id: String, all_palettes: &'a HashMap<String, Palette>) -> Self {
         return Self {
             path,
-            nested_mapgen_id,
+            id,
             all_palettes
         };
     }
@@ -34,14 +34,26 @@ impl<'a> Load<MapEntity> for MapEntityImporter<'a> {
         let parsed = serde_json::from_str::<Value>(fs::read_to_string(&self.path).unwrap().as_str())
             .unwrap();
 
-        let found_object = parsed
+        let found_object = match parsed
             .as_array()
             .unwrap()
             .iter()
             .find(|v| {
-                return v.get("nested_mapgen_id").unwrap().as_str().unwrap().to_string() == self.nested_mapgen_id;
-            })
-            .unwrap();
+                match v.get("nested_mapgen_id") {
+                    None => false,
+                    Some(v) => v.as_str().unwrap().to_string() == self.id
+                }
+            }) {
+            None => {
+                parsed.as_array().unwrap().iter().find(|v| {
+                    match v.get("om_terrain") {
+                        None => false,
+                        Some(v) => v.as_str().unwrap().to_string() == self.id
+                    }
+                }).unwrap()
+            }
+            Some(v) => v
+        };
 
         let object = found_object.get("object").unwrap();
 
@@ -75,9 +87,8 @@ impl<'a> Load<MapEntity> for MapEntityImporter<'a> {
             tiles,
             size,
             place_nested: Vec::new(),
-            // TODO Load Palette
             palettes: vec![],
-            terrain: HashMap::new(),
+            terrain: serde_json::from_value(object.get("terrain").unwrap().clone()).unwrap(),
             furniture: HashMap::new(),
             items: HashMap::new(),
             parameters: HashMap::new(),
@@ -88,11 +99,13 @@ impl<'a> Load<MapEntity> for MapEntityImporter<'a> {
 
             let palette = match self.all_palettes.get(&string_palette) {
                 None => {
-                    warn!("Could not find Palette {} specified in {}", string_palette, self.nested_mapgen_id);
+                    warn!("Could not find Palette {} specified in {}", string_palette, self.id);
                     continue;
                 }
                 Some(v) => v
             };
+
+            info!("Successfully loaded Palette {}", palette.id);
 
             map_entity.add_palette(palette);
         }

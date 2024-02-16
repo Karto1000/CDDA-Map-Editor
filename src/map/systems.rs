@@ -34,7 +34,7 @@ pub enum SpriteKind {
     Terrain(Sprite),
     Furniture(Sprite),
     Toilet(Sprite),
-    Fallback(Sprite)
+    Fallback(Sprite),
 }
 
 impl SpriteKind {
@@ -148,7 +148,7 @@ pub fn spawn_sprite(
                     tile.furniture.bg_entity = Some(bg_entity_commands.id())
                 }
                 SpriteKind::Toilet(_) => { panic!("Not Implemented") }
-                SpriteKind::Fallback(_) => {panic!("Not Implemented")}
+                SpriteKind::Fallback(_) => { panic!("Not Implemented") }
             };
         }
     }
@@ -442,14 +442,14 @@ pub fn tile_spawn_reader(
                         }
                     )
                 }
-            },
+            }
             TileSprite::Default(default) => {
                 e_spawn_sprite.send(
                     SpawnSprite {
                         coordinates: e.coordinates.clone(),
                         sprite_kind: SpriteKind::Fallback(default.clone()),
                         tile: e.tile.clone(),
-                        z: 1
+                        z: 1,
                     }
                 )
             }

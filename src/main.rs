@@ -330,8 +330,8 @@ fn setup(
     let mut editor_data = editor_data_saver.load().unwrap();
 
     let loader = MapEntityImporter::new(
-        PathBuf::from(r"saves/house_nested.json"),
-        "bedroom_4x4_adult_1_N".to_string(),
+        PathBuf::from(r"saves/mapgen/house/house01.json"),
+        "house_01".to_string(),
         &editor_data.all_palettes,
     );
 

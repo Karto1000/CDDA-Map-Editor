@@ -26,6 +26,12 @@ pub enum MeabyMulti<T> {
 #[derive(Serialize, Deserialize, Eq, Hash, PartialEq, Clone, Debug)]
 pub struct TileId(pub String);
 
+impl From<&'static str> for TileId {
+    fn from(value: &'static str) -> Self {
+        return Self {0: value.to_string()};
+    }
+}
+
 #[derive(Serialize, Deserialize, Eq, Hash, PartialEq, Clone, Debug)]
 pub struct ItemId(pub String);
 

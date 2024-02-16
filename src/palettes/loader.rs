@@ -20,7 +20,6 @@ impl PalettesLoader {
     }
 }
 
-
 impl Load<HashMap<String, Palette>> for PalettesLoader {
     fn load(&self) -> Result<HashMap<String, Palette>, LoadError> {
         let files = recurse_files(&self.parent_dir).unwrap();
