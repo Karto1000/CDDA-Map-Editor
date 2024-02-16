@@ -36,8 +36,8 @@ use crate::map::loader::MapEntityImporter;
 use crate::map::MapPlugin;
 use crate::map::resources::MapEntity;
 use crate::map::systems::{set_tile_reader, spawn_sprite, tile_despawn_reader, tile_remove_reader, tile_spawn_reader, update_sprite_reader};
-use crate::palettes::loader::{PalettesLoader};
 use crate::palettes::{MapObjectId, Palette};
+use crate::palettes::loader::PalettesLoader;
 use crate::project::resources::{Project, ProjectSaveState};
 use crate::project::saver::ProjectSaver;
 use crate::tiles::components::Tile;
@@ -176,7 +176,10 @@ impl Load<EditorData> for EditorDataSaver {
         if !data_dir.exists() { fs::create_dir_all(data_dir).unwrap(); }
 
         let contents = match fs::read_to_string(data_dir.join("data.json")) {
-            Err(_) => return Ok(EditorData::default()),
+            Err(_) => return Ok(EditorData {
+                all_palettes: palettes,
+                ..default()
+            }),
             Ok(f) => f
         };
 
@@ -207,9 +210,15 @@ impl Load<EditorData> for EditorDataSaver {
                             Ok(s) => {
                                 let mut project: Project = serde_json::from_str(s.as_str()).expect("Valid Project");
 
-                                project.map_entity.palettes = project.map_entity.palettes.iter().map(|pal_id| {
-                                    palettes.get(&pal_id.id).unwrap().clone()
+                                let project_specific_palettes: Vec<&Palette> = project.map_entity.palettes.iter().map(|id| {
+                                    palettes.get(&id.id).unwrap()
                                 }).collect();
+
+                                for palette in project_specific_palettes {
+                                    project.map_entity.add_palette(palette);
+                                }
+
+                                info!("Loaded Saved Project at Path {:?}", path);
 
                                 Some(project)
                             }
@@ -224,9 +233,15 @@ impl Load<EditorData> for EditorDataSaver {
                             Ok(s) => {
                                 let mut project: Project = serde_json::from_str(s.as_str()).expect("Valid Project");
 
-                                project.map_entity.palettes = project.map_entity.palettes.iter().map(|pal_id| {
-                                    palettes.get(&pal_id.id).unwrap().clone()
+                                let project_specific_palettes: Vec<&Palette> = project.map_entity.palettes.iter().map(|id| {
+                                    palettes.get(&id.id).unwrap()
                                 }).collect();
+
+                                for palette in project_specific_palettes {
+                                    project.map_entity.add_palette(palette);
+                                }
+
+                                info!("Loaded Auto saved Project at Path {:?}", path);
 
                                 Some(project)
                             }
@@ -313,8 +328,10 @@ fn setup(
 
     let mut default_project = Project::default();
     let mut editor_data = editor_data_saver.load().unwrap();
+    let palette = editor_data.all_palettes.get("testing_palette").unwrap().clone();
 
     let project: &mut Project = editor_data.get_current_project_mut().unwrap_or(&mut default_project);
+    project.map_entity.add_palette(&palette);
 
     // let loader = MapEntityImporter::new(PathBuf::from(r"saves/house_nested.json"), "bedroom_4x4_adult_1_N".to_string());
     // project.map_entity = loader.load().unwrap();

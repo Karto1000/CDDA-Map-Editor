@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use either::Either;
+use rand::Rng;
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
 use crate::common::{ItemId, MeabyNumberRange, MeabyWeighted, TileId};
@@ -28,12 +29,51 @@ pub enum MapGenValue {
     Switch { switch: Switch, cases: HashMap<String, String> },
 }
 
+impl MapGenValue {
+    pub fn get_value(&self) -> TileId {
+        match self {
+            MapGenValue::Simple(_) => { panic!() }
+            MapGenValue::Distribution { distribution } => {
+                let mut rng = rand::thread_rng();
+                let random_index: usize = rng.gen_range(0..distribution.len());
+                // TODO Take weights into account
+                let random_id = distribution.get(random_index).unwrap();
+                match random_id {
+                    MeabyWeighted::Weighted(w) => {
+                        return TileId(w.value.clone())
+                    },
+                    MeabyWeighted::NotWeighted(v) => return TileId(v.clone())
+                };
+            }
+            MapGenValue::Param { .. } => { panic!() }
+            MapGenValue::Switch { .. } => { panic!() }
+        }
+    }
+}
+
+#[derive(Deserialize, Clone, Serialize, Debug)]
+pub enum ParameterType {
+    #[serde(rename = "ter_str_id")]
+    TerStrId,
+    #[serde(rename = "furn_str_id")]
+    FurnStrId,
+    #[serde(rename = "nested_mapgen_id")]
+    NestedMapgenId,
+    #[serde(rename = "string")]
+    // TODO: Figure out what this does
+    String,
+    #[serde(rename = "palette_id")]
+    PaletteId,
+}
 
 #[derive(Deserialize, Clone, Serialize, Debug)]
 pub struct Parameter {
     #[serde(rename = "type")]
-    pub parameter_type: String,
+    pub parameter_type: ParameterType,
     pub default: MapGenValue,
+
+    #[serde(skip)]
+    pub calculated_value: Option<TileId>
 }
 
 #[derive(Deserialize, Clone, Serialize, Debug)]

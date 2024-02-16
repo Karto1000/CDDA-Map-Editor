@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::common::{Coordinates, MeabyNumberRange, MeabyWeighted, TileId, Weighted};
 use crate::palettes::{Identifier, MapObjectId, Palette};
 use crate::tiles::components::Tile;
+use crate::palettes::ParameterType;
 
 #[derive(Serialize, Deserialize, Debug, Resource, Clone)]
 #[serde(untagged)]
@@ -64,6 +65,19 @@ pub struct MapEntity {
     pub palettes: Vec<Palette>,
 }
 
+impl MapEntity {
+    pub fn add_palette(&mut self, palette: &Palette) {
+        let mut computed_palette = palette.clone();
+
+        // Compute parameters
+        for (_, parameter) in computed_palette.parameters.iter_mut() {
+            parameter.calculated_value = Some(parameter.default.get_value());
+        }
+
+        self.palettes.push(computed_palette);
+    }
+}
+
 impl Default for MapEntity {
     fn default() -> Self {
         return Self {
@@ -84,7 +98,7 @@ pub struct TileIdGroup {
     pub terrain: Option<TileId>,
     pub furniture: Option<TileId>,
     pub toilet: Option<TileId>,
-    pub item: Option<TileId>
+    pub item: Option<TileId>,
 }
 
 impl Default for TileIdGroup {
@@ -93,8 +107,8 @@ impl Default for TileIdGroup {
             terrain: None,
             furniture: None,
             toilet: None,
-            item: None
-        }
+            item: None,
+        };
     }
 }
 
@@ -116,7 +130,7 @@ impl MapEntity {
         let mut group = TileIdGroup::default();
 
         macro_rules! match_id {
-            ($id: ident, $path: expr) => {
+            ($id: ident, $path: expr, $palette: ident) => {
                 match $id {
                     MapObjectId::Single(v) => {
                         match v {
@@ -150,14 +164,25 @@ impl MapEntity {
                             Identifier::TileId(id) => id,
                             Identifier::Parameter(parameter) => {
                                 println!("{}", parameter.param);
-                                panic!("Not Implemented")
+                                panic!("Not Implemented Pid")
                             }
                         };
 
                         $path = Some(id.clone());
                     }
                     MapObjectId::Nested(_) => { panic!("Not Implemented") }
-                    MapObjectId::Param { .. } => { panic!("Not Implemented") }
+                    MapObjectId::Param { param, fallback } => {
+                        let mut parameter = $palette.parameters.get(param).expect(format!("Parameter {} to exist", param).as_str());
+
+                        match &parameter.calculated_value {
+                            Some(v) => {
+                                $path = Some(v.clone())
+                            }
+                            None => {
+                                panic!("Value was not calculated for parameter {}", param);
+                            }
+                        }
+                    }
                     MapObjectId::Switch {switch, cases} => {
                         println!("{:?} {:?}", switch, cases);
                         panic!("Not Implemented")
@@ -168,11 +193,11 @@ impl MapEntity {
 
         for palette in self.palettes.iter() {
             if let Some(id) = palette.furniture.get(character) {
-                match_id!(id, group.furniture);
+                match_id!(id, group.furniture, palette);
             }
 
             if let Some(id) = palette.terrain.get(character) {
-                match_id!(id, group.terrain);
+                match_id!(id, group.terrain, palette);
             }
         }
 

@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+
 use log::{info, warn};
 use serde_json::Value;
 
 use crate::common::io::{Load, LoadError, recurse_files};
-use crate::palettes::Palette;
-
+use crate::palettes::{Palette, ParameterType};
 
 pub struct PalettesLoader {
     pub parent_dir: PathBuf,
@@ -21,7 +21,6 @@ impl PalettesLoader {
 }
 
 
-
 impl Load<HashMap<String, Palette>> for PalettesLoader {
     fn load(&self) -> Result<HashMap<String, Palette>, LoadError> {
         let files = recurse_files(&self.parent_dir).unwrap();
@@ -32,7 +31,7 @@ impl Load<HashMap<String, Palette>> for PalettesLoader {
                 Err(_) => {
                     warn!("Failed to deserialize {:?} to Vec of Values", path);
                     continue;
-                },
+                }
                 Ok(p) => {
                     for element in p {
                         match serde_json::from_value::<Palette>(element) {
