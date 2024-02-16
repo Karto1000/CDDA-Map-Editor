@@ -394,6 +394,9 @@ pub fn update_sprite_reader(
             TileSprite::Default(default) => {
                 spawn_sprite!(default, e.tile.fallback, fallback);
             }
+            TileSprite::Empty => {
+                // Do Nothing
+            }
         }
     }
 }
@@ -449,6 +452,9 @@ pub fn tile_spawn_reader(
                         z: 1
                     }
                 )
+            }
+            TileSprite::Empty => {
+                // Do Nothing
             }
         }
 

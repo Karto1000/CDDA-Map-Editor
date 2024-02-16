@@ -1,15 +1,13 @@
 use std::collections::HashMap;
 
 use bevy::math::Vec2;
-use bevy::prelude::Resource;
-use either::Either;
+use bevy::prelude::{default, Resource};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-use crate::common::{Coordinates, MeabyNumberRange, MeabyWeighted, TileId, Weighted};
-use crate::palettes::{Identifier, MapObjectId, Palette};
+use crate::common::{Coordinates, MeabyMulti, MeabyNumberRange, MeabyWeighted, TileId, Weighted};
+use crate::palettes::{Identifier, Item, MapObjectId, Palette, Parameter};
 use crate::tiles::components::Tile;
-use crate::palettes::ParameterType;
 
 #[derive(Serialize, Deserialize, Debug, Resource, Clone)]
 #[serde(untagged)]
@@ -61,7 +59,22 @@ pub struct MapEntity {
     pub tiles: HashMap<Coordinates, Tile>,
     pub size: Vec2,
 
-    pub place_nested: Option<Vec<PlaceNested>>,
+    #[serde(default)]
+    pub parameters: HashMap<String, Parameter>,
+
+    #[serde(default)]
+    pub terrain: HashMap<char, MapObjectId>,
+
+    #[serde(default)]
+    pub furniture: HashMap<char, MapObjectId>,
+
+    #[serde(default)]
+    pub items: HashMap<char, MeabyMulti<Item>>,
+
+    #[serde(default)]
+    pub place_nested: Vec<PlaceNested>,
+
+    #[serde(default)]
     pub palettes: Vec<Palette>,
 }
 
@@ -87,8 +100,12 @@ impl Default for MapEntity {
             },
             tiles: HashMap::new(),
             size: Vec2::new(24., 24.),
+            parameters: Default::default(),
+            terrain: Default::default(),
+            furniture: Default::default(),
             palettes: Vec::new(),
-            place_nested: None,
+            place_nested: Vec::new(),
+            items: Default::default(),
         };
     }
 }
@@ -121,8 +138,12 @@ impl MapEntity {
             },
             tiles: HashMap::new(),
             size,
+            parameters: Default::default(),
+            terrain: Default::default(),
+            furniture: Default::default(),
             palettes: Vec::new(),
-            place_nested: None,
+            place_nested: Vec::new(),
+            items: Default::default(),
         };
     }
 
@@ -130,7 +151,7 @@ impl MapEntity {
         let mut group = TileIdGroup::default();
 
         macro_rules! match_id {
-            ($id: ident, $path: expr, $palette: ident) => {
+            ($id: ident, $path: expr, $obj_with_parameter: ident) => {
                 match $id {
                     MapObjectId::Single(v) => {
                         match v {
@@ -172,7 +193,7 @@ impl MapEntity {
                     }
                     MapObjectId::Nested(_) => { panic!("Not Implemented") }
                     MapObjectId::Param { param, fallback } => {
-                        let mut parameter = $palette.parameters.get(param).expect(format!("Parameter {} to exist", param).as_str());
+                        let mut parameter = $obj_with_parameter.parameters.get(param).expect(format!("Parameter {} to exist", param).as_str());
 
                         match &parameter.calculated_value {
                             Some(v) => {
@@ -189,6 +210,14 @@ impl MapEntity {
                     }
                 }
             }
+        }
+
+        if let Some(id) = self.terrain.get(character) {
+            match_id!(id, group.terrain, self);
+        }
+
+        if let Some(id) = self.furniture.get(character) {
+            match_id!(id, group.furniture, self);
         }
 
         for palette in self.palettes.iter() {

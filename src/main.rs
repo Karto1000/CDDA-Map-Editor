@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use winit::window::Icon;
 
-use crate::common::Coordinates;
+use crate::common::{Coordinates, MeabyWeighted};
 use crate::common::io::{Load, LoadError, Save, SaveError};
 use crate::graphics::{GraphicsResource, LegacyTextures};
 use crate::graphics::tileset::legacy::LegacyTilesetLoader;
@@ -36,7 +36,7 @@ use crate::map::loader::MapEntityImporter;
 use crate::map::MapPlugin;
 use crate::map::resources::MapEntity;
 use crate::map::systems::{set_tile_reader, spawn_sprite, tile_despawn_reader, tile_remove_reader, tile_spawn_reader, update_sprite_reader};
-use crate::palettes::{MapObjectId, Palette};
+use crate::palettes::{Identifier, MapObjectId, Palette};
 use crate::palettes::loader::PalettesLoader;
 use crate::project::resources::{Project, ProjectSaveState};
 use crate::project::saver::ProjectSaver;
@@ -328,16 +328,21 @@ fn setup(
 
     let mut default_project = Project::default();
     let mut editor_data = editor_data_saver.load().unwrap();
-    let palette = editor_data.all_palettes.get("testing_palette").unwrap().clone();
+
+    let loader = MapEntityImporter::new(
+        PathBuf::from(r"saves/house_nested.json"),
+        "bedroom_4x4_adult_1_N".to_string(),
+        &editor_data.all_palettes,
+    );
+
+    let map_entity = loader.load().unwrap();
 
     let project: &mut Project = editor_data.get_current_project_mut().unwrap_or(&mut default_project);
-    project.map_entity.add_palette(&palette);
+    project.map_entity = map_entity;
 
-    // let loader = MapEntityImporter::new(PathBuf::from(r"saves/house_nested.json"), "bedroom_4x4_adult_1_N".to_string());
-    // project.map_entity = loader.load().unwrap();
-
-    // let temp_loader = PaletteLoader::new(PathBuf::from(r"saves/palettes/house_w_palette.json"));
-    // project.map_entity.palettes.push(temp_loader.load().unwrap().first().unwrap().clone());
+    // project.map_entity.terrain.insert('g', MapObjectId::from("t_grass"));
+    // project.map_entity.furniture.insert('g', MapObjectId::from("f_chair"));
+    // project.map_entity.add_palette(&palette);
 
     e_spawn_map_entity.send(SpawnMapEntity {
         map_entity: Arc::new(project.map_entity.clone())

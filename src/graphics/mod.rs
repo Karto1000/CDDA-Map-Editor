@@ -112,10 +112,14 @@ pub enum TileSprite<'a> {
         toilets: Option<&'a Sprite>,
     },
     Default(&'a Sprite),
+    // Reserved for " " chars
+    Empty
 }
 
 pub trait GetTexture: Send + Sync {
     fn get_textures(&self, project: &Project, character: &char, coordinates: &Coordinates) -> TileSprite {
+        if character == &' ' { return TileSprite::Empty }
+
         let terrain = self.get_terrain(project, character, coordinates);
         let furniture = self.get_furniture(project, character, coordinates);
         let items = self.get_item(project, character, coordinates);

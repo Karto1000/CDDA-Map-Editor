@@ -40,8 +40,8 @@ impl MapGenValue {
                 let random_id = distribution.get(random_index).unwrap();
                 match random_id {
                     MeabyWeighted::Weighted(w) => {
-                        return TileId(w.value.clone())
-                    },
+                        return TileId(w.value.clone());
+                    }
                     MeabyWeighted::NotWeighted(v) => return TileId(v.clone())
                 };
             }
@@ -73,7 +73,7 @@ pub struct Parameter {
     pub default: MapGenValue,
 
     #[serde(skip)]
-    pub calculated_value: Option<TileId>
+    pub calculated_value: Option<TileId>,
 }
 
 #[derive(Deserialize, Clone, Serialize, Debug)]
@@ -100,6 +100,12 @@ pub enum MapObjectId {
         cases: HashMap<String, String>,
     },
     Single(MeabyWeighted<Identifier>),
+}
+
+impl From<&'static str> for MapObjectId {
+    fn from(value: &'static str) -> Self {
+        return Self::Single(MeabyWeighted::NotWeighted(Identifier::TileId(TileId { 0: value.to_string() })));
+    }
 }
 
 #[derive(Deserialize, Clone, Serialize, Debug, Eq, Hash, PartialEq)]

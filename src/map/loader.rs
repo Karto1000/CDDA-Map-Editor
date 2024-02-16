@@ -2,30 +2,34 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-use bevy::prelude::Vec2;
+use bevy::prelude::{Res, Vec2};
+use log::warn;
 use serde_json::Value;
 
 use crate::common::Coordinates;
 use crate::common::io::{Load, LoadError};
+use crate::EditorData;
 use crate::map::resources::{MapEntity, MapEntityType};
 use crate::palettes::Palette;
 use crate::tiles::components::Tile;
 
-pub struct MapEntityImporter {
+pub struct MapEntityImporter<'a> {
     path: PathBuf,
     nested_mapgen_id: String,
+    all_palettes: &'a HashMap<String, Palette>
 }
 
-impl MapEntityImporter {
-    pub fn new(path: PathBuf, nested_mapgen_id: String) -> Self {
+impl<'a> MapEntityImporter<'a> {
+    pub fn new(path: PathBuf, nested_mapgen_id: String, all_palettes: &'a HashMap<String, Palette>) -> Self {
         return Self {
             path,
             nested_mapgen_id,
+            all_palettes
         };
     }
 }
 
-impl Load<MapEntity> for MapEntityImporter {
+impl<'a> Load<MapEntity> for MapEntityImporter<'a> {
     fn load(&self) -> Result<MapEntity, LoadError> {
         let parsed = serde_json::from_str::<Value>(fs::read_to_string(&self.path).unwrap().as_str())
             .unwrap();
@@ -49,7 +53,7 @@ impl Load<MapEntity> for MapEntityImporter {
 
         let map_type: MapEntityType = serde_json::from_value(found_object.clone()).unwrap();
         let mut tiles = HashMap::new();
-        // let palettes: Vec<Palette> = serde_json::from_value(object.get("palettes").unwrap().clone()).unwrap();
+        let palettes: Vec<String> = serde_json::from_value(object.get("palettes").unwrap().clone()).unwrap();
 
         let size = Vec2::new(
             json_tiles.get(0).unwrap().as_str().unwrap().len() as f32,
@@ -66,13 +70,33 @@ impl Load<MapEntity> for MapEntityImporter {
             }
         }
 
-        return Ok(MapEntity {
+        let mut map_entity = MapEntity {
             map_type,
             tiles,
             size,
-            place_nested: None,
+            place_nested: Vec::new(),
             // TODO Load Palette
             palettes: vec![],
-        });
+            terrain: HashMap::new(),
+            furniture: HashMap::new(),
+            items: HashMap::new(),
+            parameters: HashMap::new(),
+        };
+
+        for palette in palettes {
+            let string_palette = palette.to_string();
+
+            let palette = match self.all_palettes.get(&string_palette) {
+                None => {
+                    warn!("Could not find Palette {} specified in {}", string_palette, self.nested_mapgen_id);
+                    continue;
+                }
+                Some(v) => v
+            };
+
+            map_entity.add_palette(palette);
+        }
+
+        return Ok(map_entity);
     }
 }
