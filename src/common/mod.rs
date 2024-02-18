@@ -1,5 +1,4 @@
-pub(crate) mod io;
-
+use std::collections::HashMap;
 use std::fmt::Formatter;
 
 use bevy::prelude::Color;
@@ -9,6 +8,8 @@ use rand::{Rng, thread_rng};
 use rand::distributions::uniform::{SampleRange, SampleUniform};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::Visitor;
+
+pub(crate) mod io;
 
 pub const PRIMARY_COLOR: Color = Color::rgb(0.19, 0.21, 0.23);
 pub const PRIMARY_COLOR_FADED: Color = Color::rgb(0.23, 0.25, 0.27);
@@ -28,7 +29,48 @@ pub struct TileId(pub String);
 
 impl From<&'static str> for TileId {
     fn from(value: &'static str) -> Self {
-        return Self {0: value.to_string()};
+        return Self { 0: value.to_string() };
+    }
+}
+
+pub trait GetRandom<T> {
+    fn get_random_weighted(&self) -> Option<&T>;
+}
+
+impl<T> GetRandom<T> for Vec<Weighted<T>> {
+    fn get_random_weighted(&self) -> Option<&T> {
+        let mut rng = thread_rng();
+        let random_index: usize = rng.gen_range(0..self.len());
+        // TODO Take weights into account
+        let weighted = self.get(random_index).unwrap();
+        return Some(&weighted.value);
+    }
+}
+
+impl<T> GetRandom<T> for Vec<MeabyWeighted<T>> {
+    fn get_random_weighted(&self) -> Option<&T> {
+        let mut rng = thread_rng();
+        let random_index: usize = rng.gen_range(0..self.len());
+        // TODO Take weights into account
+        let random_id = self.get(random_index).unwrap();
+
+        return match random_id {
+            MeabyWeighted::Weighted(w) => Some(&w.value),
+            MeabyWeighted::NotWeighted(v) => Some(&v)
+        };
+    }
+}
+
+impl<K> GetRandom<K> for HashMap<K, u32> {
+    fn get_random_weighted(&self) -> Option<&K> {
+        if self.is_empty() { return None; }
+
+        let mut rng = thread_rng();
+        let keys: Vec<&K> = self.keys().collect();
+        let random_index = rng.gen_range(0..keys.len());
+
+        // TODO Take weights into account
+        return Some(keys.get(random_index).unwrap().clone());
     }
 }
 

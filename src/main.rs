@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use winit::window::Icon;
 
-use crate::common::{Coordinates, MeabyWeighted};
+use crate::common::{Coordinates, MeabyWeighted, Weighted};
 use crate::common::io::{Load, LoadError, Save, SaveError};
 use crate::graphics::{GraphicsResource, LegacyTextures};
 use crate::graphics::tileset::legacy::LegacyTilesetLoader;
@@ -40,6 +40,7 @@ use crate::palettes::{Identifier, MapObjectId, Palette};
 use crate::palettes::loader::PalettesLoader;
 use crate::project::resources::{Project, ProjectSaveState};
 use crate::project::saver::ProjectSaver;
+use crate::region_settings::loader::RegionSettingsLoader;
 use crate::tiles::components::Tile;
 use crate::tiles::TilePlugin;
 use crate::ui::tabs::events::SpawnTab;
@@ -53,6 +54,7 @@ mod project;
 mod graphics;
 mod palettes;
 mod common;
+mod region_settings;
 
 
 #[derive(Component)]
@@ -163,7 +165,7 @@ impl Save<EditorData> for EditorDataSaver {
 
 impl Load<EditorData> for EditorDataSaver {
     fn load(&self) -> Result<EditorData, LoadError> {
-        let palettes_loader = PalettesLoader::new(PathBuf::from(r"saves/palettes"));
+        let palettes_loader = PalettesLoader::new(PathBuf::from(r"C:\CDDA\testing\data\json\mapgen_palettes"));
         let palettes = palettes_loader.load().unwrap();
 
         let dir = match ProjectDirs::from_path("CDDA Map Editor".into()) {
@@ -214,8 +216,10 @@ impl Load<EditorData> for EditorDataSaver {
                                     palettes.get(&id.id).unwrap()
                                 }).collect();
 
+                                project.map_entity.palettes.clear();
+
                                 for palette in project_specific_palettes {
-                                    project.map_entity.add_palette(palette);
+                                    project.map_entity.add_palette(&palettes, palette);
                                 }
 
                                 info!("Loaded Saved Project at Path {:?}", path);
@@ -237,8 +241,10 @@ impl Load<EditorData> for EditorDataSaver {
                                     palettes.get(&id.id).unwrap()
                                 }).collect();
 
+                                project.map_entity.palettes.clear();
+
                                 for palette in project_specific_palettes {
-                                    project.map_entity.add_palette(palette);
+                                    project.map_entity.add_palette(&palettes, palette);
                                 }
 
                                 info!("Loaded Auto saved Project at Path {:?}", path);
@@ -321,16 +327,18 @@ fn setup(
 ) {
     commands.spawn(Camera2dBundle::default());
 
-    let tileset_loader = LegacyTilesetLoader::new(PathBuf::from(r"saves/tileset/TILESETS/gfx/MSX++UnDeadPeopleEdition"));
+    let tileset_loader = LegacyTilesetLoader::new(PathBuf::from(r"C:\CDDA\testing\gfx\MSX++UnDeadPeopleEdition"));
+    let region_settings_loader = RegionSettingsLoader::new(PathBuf::from(r"C:\CDDA\testing\data\json\regional_map_settings.json"), "default".to_string());
+
     let editor_data_saver = EditorDataSaver::new();
-    let legacy_textures = LegacyTextures::new(tileset_loader, &mut r_images);
+    let legacy_textures = LegacyTextures::new(tileset_loader, region_settings_loader, &mut r_images);
     let texture_resource = GraphicsResource::new(Box::new(legacy_textures));
 
     let mut default_project = Project::default();
     let mut editor_data = editor_data_saver.load().unwrap();
 
     let loader = MapEntityImporter::new(
-        PathBuf::from(r"saves/mapgen/house/house01.json"),
+        PathBuf::from(r"C:\CDDA\testing\data\json\mapgen\house\house01.json"),
         "house_01".to_string(),
         &editor_data.all_palettes,
     );

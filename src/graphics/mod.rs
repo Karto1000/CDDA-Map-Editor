@@ -3,10 +3,12 @@ use std::sync::Arc;
 
 use bevy::prelude::{Assets, Image, ResMut, Resource};
 
-use crate::common::{Coordinates, TileId};
+use crate::common::{Coordinates, GetRandom, TileId};
+use crate::common::io::Load;
 use crate::graphics::tileset::legacy::{GetBackground, GetForeground, LegacyTileset, SingleForeground};
 use crate::graphics::tileset::TilesetLoader;
 use crate::project::resources::Project;
+use crate::region_settings::RegionSettings;
 
 pub(crate) mod tileset;
 
@@ -113,12 +115,12 @@ pub enum TileSprite<'a> {
     },
     Default(&'a Sprite),
     // Reserved for " " chars
-    Empty
+    Empty,
 }
 
 pub trait GetTexture: Send + Sync {
     fn get_textures(&self, project: &Project, character: &char, coordinates: &Coordinates) -> TileSprite {
-        if character == &' ' { return TileSprite::Empty }
+        if character == &' ' { return TileSprite::Empty; }
 
         let terrain = self.get_terrain(project, character, coordinates);
         let furniture = self.get_furniture(project, character, coordinates);
@@ -148,10 +150,11 @@ pub trait GetTexture: Send + Sync {
 pub struct LegacyTextures {
     textures: HashMap<TileId, SpriteType>,
     fallback_textures: HashMap<String, Sprite>,
+    region_settings: RegionSettings,
 }
 
 impl LegacyTextures {
-    pub fn new(loader: impl TilesetLoader<LegacyTileset, i32>, image_resource: &mut ResMut<Assets<Image>>) -> Self {
+    pub fn new(loader: impl TilesetLoader<LegacyTileset, i32>, region_settings: impl Load<RegionSettings>, image_resource: &mut ResMut<Assets<Image>>) -> Self {
         let textures = loader.assign_textures(image_resource).unwrap();
         let fallback_textures = loader.load_fallback_textures(image_resource).unwrap();
 
@@ -170,6 +173,7 @@ impl LegacyTextures {
         return Self {
             textures,
             fallback_textures: fallback_sprites,
+            region_settings: region_settings.load().unwrap(),
         };
     }
 }
@@ -233,7 +237,20 @@ impl GetTexture for LegacyTextures {
         match &project.map_entity.get_ids(character).terrain {
             None => return None,
             Some(terrain) => {
-                println!("{:?}", terrain);
+                if let Some(terrain_region) = self.region_settings.region_terrain_and_furniture.terrain.get(&terrain.0) {
+                    let sprite_type = match self.textures.get(terrain_region.get_random_weighted().unwrap()) {
+                        None => return None,
+                        Some(s) => s
+                    };
+
+                    return Some(get_sprite_from_sprite_type(
+                        project,
+                        coordinates,
+                        character,
+                        sprite_type,
+                    ));
+                }
+
                 let sprite_type = match self.textures.get(terrain) {
                     None => return None,
                     Some(s) => s
@@ -307,7 +324,7 @@ impl GetTexture for LegacyTextures {
     }
 
     fn get_fallback_texture(&self, character: &char) -> &Sprite {
-         return self.fallback_textures.get(&format!("{}_WHITE", &character.to_string().to_uppercase())).unwrap_or(
+        return self.fallback_textures.get(&format!("{}_WHITE", &character.to_string().to_uppercase())).unwrap_or(
             self.fallback_textures.get("?_WHITE").unwrap()
         );
     }

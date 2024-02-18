@@ -5,8 +5,8 @@ use bevy::prelude::{default, Resource};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-use crate::common::{Coordinates, MeabyMulti, MeabyNumberRange, MeabyWeighted, TileId, Weighted};
-use crate::palettes::{Identifier, Item, MapObjectId, Palette, Parameter};
+use crate::common::{Coordinates, GetRandom, MeabyMulti, MeabyNumberRange, MeabyWeighted, TileId, Weighted};
+use crate::palettes::{Identifier, Item, MapObjectId, Palette, Parameter, ParentPalette};
 use crate::tiles::components::Tile;
 
 #[derive(Serialize, Deserialize, Debug, Resource, Clone)]
@@ -79,13 +79,15 @@ pub struct MapEntity {
 }
 
 impl MapEntity {
-    pub fn add_palette(&mut self, palette: &Palette) {
+    pub fn add_palette(&mut self, all_palettes: &HashMap<String, Palette>, palette: &Palette) {
         let mut computed_palette = palette.clone();
 
         // Compute parameters
         for (_, parameter) in computed_palette.parameters.iter_mut() {
             parameter.calculated_value = Some(parameter.default.get_value());
         }
+
+        computed_palette.compute_parent_palettes(all_palettes);
 
         self.palettes.push(computed_palette);
     }
@@ -176,12 +178,8 @@ impl MapEntity {
                             }
                         }).collect();
 
-                        // TODO Take weights into account
-                        let mut rng = rand::thread_rng();
-                        let random_index: usize = rng.gen_range(0..final_group.len());
-                        let random_sprite = final_group.get(random_index).unwrap();
-
-                        let id = match &random_sprite.value {
+                        let random_sprite = final_group.get_random_weighted().unwrap();
+                        let id = match &random_sprite {
                             Identifier::TileId(id) => id,
                             Identifier::Parameter(parameter) => {
                                 println!("{}", parameter.param);
@@ -227,6 +225,21 @@ impl MapEntity {
 
             if let Some(id) = palette.terrain.get(character) {
                 match_id!(id, group.terrain, palette);
+            }
+
+            for parent_palette in palette.palettes.iter() {
+                match parent_palette {
+                    ParentPalette::NotComputed(_) => { panic!() }
+                    ParentPalette::Computed(p) => {
+                        if let Some(id) = p.furniture.get(character) {
+                            match_id!(id, group.furniture, p);
+                        }
+
+                        if let Some(id) = p.terrain.get(character) {
+                            match_id!(id, group.terrain, p);
+                        }
+                    }
+                }
             }
         }
 

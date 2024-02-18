@@ -20,7 +20,7 @@ use rand::Rng;
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::common::{MeabyMulti, MeabyWeighted, TileId, Weighted};
+use crate::common::{GetRandom, MeabyMulti, MeabyWeighted, TileId, Weighted};
 use crate::common::io::{Load, LoadError};
 use crate::graphics::{Corner, Edge, FullCardinal, Sprite, SpriteType};
 use crate::graphics::tileset::TilesetLoader;
@@ -463,11 +463,7 @@ pub struct WeightedForeground {
 
 impl GetForeground for WeightedForeground {
     fn get_sprite(&self) -> &Handle<Image> {
-        let mut rng = rand::thread_rng();
-        let random_index: usize = rng.gen_range(0..self.weighted_sprites.len());
-        // TODO Take weights into account
-        let random_sprite = self.weighted_sprites.get(random_index).unwrap();
-        return &random_sprite.value;
+        return self.weighted_sprites.get_random_weighted().unwrap();
     }
 }
 
@@ -499,11 +495,7 @@ pub struct WeightedBackground {
 
 impl GetBackground for WeightedBackground {
     fn get_sprite(&self) -> &Handle<Image> {
-        let mut rng = rand::thread_rng();
-        let random_index: usize = rng.gen_range(0..self.weighted_sprites.len());
-        // TODO Take weights into account
-        let random_sprite = self.weighted_sprites.get(random_index).unwrap();
-        return &random_sprite.value;
+        return self.weighted_sprites.get_random_weighted().unwrap();
     }
 }
 

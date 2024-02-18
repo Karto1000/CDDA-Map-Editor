@@ -107,7 +107,7 @@ impl<'a> Load<MapEntity> for MapEntityImporter<'a> {
 
             info!("Successfully loaded Palette {}", palette.id);
 
-            map_entity.add_palette(palette);
+            map_entity.add_palette(self.all_palettes, palette);
         }
 
         return Ok(map_entity);
