@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::Formatter;
+use std::ops::Add;
 
 use bevy::prelude::Color;
 use bevy::prelude::Component;
@@ -151,6 +152,14 @@ impl Coordinates {
             x,
             y,
         };
+    }
+}
+
+impl Add for Coordinates {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        return Self::new(self.x + rhs.x, self.y + rhs.y) ;
     }
 }
 

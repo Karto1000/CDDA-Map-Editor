@@ -105,6 +105,11 @@ pub struct TileGroup {
     pub range: Option<String>,
     pub tiles: Vec<TilesetTileDescriptor>,
     pub ascii: Option<Vec<AsciiTilesetDescriptor>>,
+
+    pub sprite_width: Option<u32>,
+    pub sprite_height: Option<u32>,
+    pub sprite_offset_x: Option<i32>,
+    pub sprite_offset_y: Option<i32>,
 }
 
 
@@ -617,6 +622,9 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
             let end: u32 = range_vec.last().unwrap().parse().unwrap();
 
             for tile in group.tiles.iter() {
+                let group_width: u32 = group.sprite_width.unwrap_or(tileset.info.tile_width);
+                let group_height: u32 = group.sprite_height.unwrap_or(tileset.info.tile_height);
+
                 match &tile.fg {
                     None => {
                         info!("No fg for tile {:?}", tile.id);
@@ -635,10 +643,10 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
 
                                             let image = get_image_from_tileset(
                                                 &image,
-                                                xy.x as u32 * tileset.info.tile_width,
-                                                xy.y as u32 * tileset.info.tile_height,
-                                                tileset.info.tile_width,
-                                                tileset.info.tile_height,
+                                                xy.x as u32 * group_width,
+                                                xy.y as u32 * group_height,
+                                                group_width,
+                                                group_height,
                                             );
 
                                             textures.insert(*fg, image_resource.add(image));
@@ -652,10 +660,10 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
 
                                             let image = get_image_from_tileset(
                                                 &image,
-                                                xy.x as u32 * tileset.info.tile_width,
-                                                xy.y as u32 * tileset.info.tile_height,
-                                                tileset.info.tile_width,
-                                                tileset.info.tile_height,
+                                                xy.x as u32 * group_width,
+                                                xy.y as u32 * group_height,
+                                                group_width,
+                                                group_height,
                                             );
 
                                             textures.insert(w.value, image_resource.add(image));
@@ -680,10 +688,10 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
 
                                         let image = get_image_from_tileset(
                                             &image,
-                                            xy.x as u32 * tileset.info.tile_width,
-                                            xy.y as u32 * tileset.info.tile_height,
-                                            tileset.info.tile_width,
-                                            tileset.info.tile_height,
+                                            xy.x as u32 * group_width,
+                                            xy.y as u32 * group_height,
+                                            group_width,
+                                            group_height,
                                         );
 
                                         textures.insert(*fg, image_resource.add(image));
@@ -701,10 +709,10 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
 
                                         let image = get_image_from_tileset(
                                             &image,
-                                            xy.x as u32 * tileset.info.tile_width,
-                                            xy.y as u32 * tileset.info.tile_height,
-                                            tileset.info.tile_width,
-                                            tileset.info.tile_height,
+                                            xy.x as u32 * group_width,
+                                            xy.y as u32 * group_height,
+                                            group_width,
+                                            group_height,
                                         );
 
                                         textures.insert(w.value, image_resource.add(image));
@@ -737,10 +745,10 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
 
                                                         let image = get_image_from_tileset(
                                                             &image,
-                                                            xy.x as u32 * tileset.info.tile_width,
-                                                            xy.y as u32 * tileset.info.tile_height,
-                                                            tileset.info.tile_width,
-                                                            tileset.info.tile_height,
+                                                            xy.x as u32 * group_width,
+                                                            xy.y as u32 * group_height,
+                                                            group_width,
+                                                            group_height,
                                                         );
 
                                                         textures.insert(*fg, image_resource.add(image));
@@ -754,10 +762,10 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
 
                                                         let image = get_image_from_tileset(
                                                             &image,
-                                                            xy.x as u32 * tileset.info.tile_width,
-                                                            xy.y as u32 * tileset.info.tile_height,
-                                                            tileset.info.tile_width,
-                                                            tileset.info.tile_height,
+                                                            xy.x as u32 * group_width,
+                                                            xy.y as u32 * group_height,
+                                                            group_width,
+                                                            group_height,
                                                         );
 
                                                         textures.insert(w.value, image_resource.add(image));
@@ -785,10 +793,10 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
 
                                                     let image = get_image_from_tileset(
                                                         &image,
-                                                        xy.x as u32 * tileset.info.tile_width,
-                                                        xy.y as u32 * tileset.info.tile_height,
-                                                        tileset.info.tile_width,
-                                                        tileset.info.tile_height,
+                                                        xy.x as u32 * group_width,
+                                                        xy.y as u32 * group_height,
+                                                        group_width,
+                                                        group_height,
                                                     );
 
                                                     textures.insert(*fg, image_resource.add(image));
@@ -806,10 +814,10 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
 
                                                     let image = get_image_from_tileset(
                                                         &image,
-                                                        xy.x as u32 * tileset.info.tile_width,
-                                                        xy.y as u32 * tileset.info.tile_height,
-                                                        tileset.info.tile_width,
-                                                        tileset.info.tile_height,
+                                                        xy.x as u32 * group_width,
+                                                        xy.y as u32 * group_height,
+                                                        group_width,
+                                                        group_height,
                                                     );
 
                                                     textures.insert(w.value, image_resource.add(image));
@@ -875,6 +883,9 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
         let mut assigned_textures: HashMap<TileId, SpriteType> = HashMap::new();
 
         for group in tileset.tiles.iter() {
+            let offset_x = group.sprite_offset_x.unwrap_or(0);
+            let offset_y = group.sprite_offset_y.unwrap_or(0);
+
             for tile in group.tiles.iter() {
                 // TODO: Revisit
                 // Figure out what to do here
@@ -989,6 +1000,8 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                     SpriteType::Single(Sprite {
                                         fg: get_main_fg.clone(),
                                         bg: get_main_bg.clone(),
+                                        offset_x,
+                                        offset_y,
                                     }),
                                 );
                             }
@@ -1000,6 +1013,8 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                         SpriteType::Single(Sprite {
                                             fg: get_main_fg.clone(),
                                             bg: get_main_bg.clone(),
+                                            offset_x,
+                                            offset_y,
                                         }),
                                     );
                                 }
@@ -1040,6 +1055,8 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                         center = Some(Sprite {
                                             fg: v.0,
                                             bg: v.1,
+                                            offset_x,
+                                            offset_y,
                                         })
                                     }
                                     "corner" => {
@@ -1049,7 +1066,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                             fg,
                                             bg,
                                         );
-                                        corner = Some(Corner::from(v))
+                                        corner = Some(Corner::from((v.0, v.1, offset_x, offset_y)))
                                     }
                                     "t_connection" => {
                                         let v = get_multi_fg_and_bg(
@@ -1058,7 +1075,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                             fg,
                                             bg,
                                         );
-                                        t_connection = Some(FullCardinal::from(v));
+                                        t_connection = Some(FullCardinal::from((v.0, v.1, offset_x, offset_y)));
                                     }
                                     "edge" => {
                                         let v = get_multi_fg_and_bg(
@@ -1067,7 +1084,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                             fg,
                                             bg,
                                         );
-                                        edge = Some(Edge::from(v));
+                                        edge = Some(Edge::from((v.0, v.1, offset_x, offset_y)));
                                     }
                                     "end_piece" => {
                                         let v = get_multi_fg_and_bg(
@@ -1076,7 +1093,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                             fg,
                                             bg,
                                         );
-                                        end_piece = Some(FullCardinal::from(v));
+                                        end_piece = Some(FullCardinal::from((v.0, v.1, offset_x, offset_y)));
                                     }
                                     "unconnected" => {
                                         let (get_fg, get_bg) = get_single_fg_and_bg(
@@ -1087,6 +1104,8 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                         unconnected = Some(Sprite {
                                             fg: get_fg,
                                             bg: get_bg,
+                                            offset_x,
+                                            offset_y,
                                         });
                                     }
                                     _ => { warn!("Got Unexpected id {} for fg {:?}", additional_tile.id, fg) }
@@ -1096,6 +1115,8 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                             let default_sprite = Sprite {
                                 fg: get_main_fg.clone(),
                                 bg: get_main_bg.clone(),
+                                offset_x: 0,
+                                offset_y: 0,
                             };
 
                             assigned_textures.insert(

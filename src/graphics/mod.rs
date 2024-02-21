@@ -17,6 +17,8 @@ pub(crate) mod tileset;
 pub struct Sprite {
     pub fg: Option<Arc<dyn GetForeground>>,
     pub bg: Option<Arc<dyn GetBackground>>,
+    pub offset_x: i32,
+    pub offset_y: i32,
 }
 
 pub struct FullCardinal {
@@ -26,24 +28,32 @@ pub struct FullCardinal {
     pub west: Sprite,
 }
 
-impl From<(Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>)> for FullCardinal {
-    fn from(value: (Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>)) -> Self {
+impl From<(Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>, i32, i32)> for FullCardinal {
+    fn from(value: (Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>, i32, i32)) -> Self {
         return FullCardinal {
             north: Sprite {
                 fg: value.0.get(0).cloned(),
                 bg: value.1.clone(),
+                offset_x: value.2,
+                offset_y: value.3,
             },
             west: Sprite {
                 fg: value.0.get(1).cloned(),
                 bg: value.1.clone(),
+                offset_x: value.2,
+                offset_y: value.3,
             },
             south: Sprite {
                 fg: value.0.get(2).cloned(),
                 bg: value.1.clone(),
+                offset_x: value.2,
+                offset_y: value.3,
             },
             east: Sprite {
                 fg: value.0.get(3).cloned(),
                 bg: value.1,
+                offset_x: value.2,
+                offset_y: value.3,
             },
         };
     }
@@ -57,24 +67,32 @@ pub struct Corner {
     pub north_east: Sprite,
 }
 
-impl From<(Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>)> for Corner {
-    fn from(value: (Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>)) -> Self {
+impl From<(Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>, i32, i32)> for Corner {
+    fn from(value: (Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>, i32, i32)) -> Self {
         return Corner {
             north_west: Sprite {
                 fg: value.0.get(0).cloned(),
                 bg: value.1.clone(),
+                offset_x: value.2,
+                offset_y: value.3,
             },
             south_west: Sprite {
                 fg: value.0.get(1).cloned(),
                 bg: value.1.clone(),
+                offset_x: value.2,
+                offset_y: value.3,
             },
             south_east: Sprite {
                 fg: value.0.get(2).cloned(),
                 bg: value.1.clone(),
+                offset_x: value.2,
+                offset_y: value.3,
             },
             north_east: Sprite {
                 fg: value.0.get(3).cloned(),
                 bg: value.1.clone(),
+                offset_x: value.2,
+                offset_y: value.3,
             },
         };
     }
@@ -85,11 +103,11 @@ pub struct Edge {
     pub east_west: Sprite,
 }
 
-impl From<(Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>)> for Edge {
-    fn from(value: (Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>)) -> Self {
+impl From<(Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>, i32, i32)> for Edge {
+    fn from(value: (Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>, i32, i32)) -> Self {
         return Self {
-            north_south: Sprite { fg: value.0.get(0).cloned(), bg: value.1.clone() },
-            east_west: Sprite { fg: value.0.get(1).cloned(), bg: value.1.clone() },
+            north_south: Sprite { fg: value.0.get(0).cloned(), bg: value.1.clone(), offset_x: value.2, offset_y: value.3 },
+            east_west: Sprite { fg: value.0.get(1).cloned(), bg: value.1.clone(), offset_x: value.2, offset_y: value.3 },
         };
     }
 }
@@ -105,6 +123,7 @@ pub enum SpriteType {
         unconnected: Sprite,
     },
 }
+
 
 pub enum TileSprite<'a> {
     Exists {
@@ -166,6 +185,8 @@ impl LegacyTextures {
                 Sprite {
                     fg: Some(Arc::new(SingleForeground::new(image))),
                     bg: None,
+                    offset_x: 0,
+                    offset_y: 0
                 },
             );
         };

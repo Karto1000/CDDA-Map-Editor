@@ -41,7 +41,7 @@ use crate::palettes::loader::PalettesLoader;
 use crate::project::resources::{Project, ProjectSaveState};
 use crate::project::saver::ProjectSaver;
 use crate::region_settings::loader::RegionSettingsLoader;
-use crate::tiles::components::Tile;
+use crate::tiles::components::{Offset, Tile};
 use crate::tiles::TilePlugin;
 use crate::ui::tabs::events::SpawnTab;
 use crate::ui::UiPlugin;
@@ -165,7 +165,7 @@ impl Save<EditorData> for EditorDataSaver {
 
 impl Load<EditorData> for EditorDataSaver {
     fn load(&self) -> Result<EditorData, LoadError> {
-        let palettes_loader = PalettesLoader::new(PathBuf::from(r"C:\CDDA\testing\data\json\mapgen_palettes"));
+        let palettes_loader = PalettesLoader::new(PathBuf::from(r"saves/palettes"));
         let palettes = palettes_loader.load().unwrap();
 
         let dir = match ProjectDirs::from_path("CDDA Map Editor".into()) {
@@ -327,8 +327,8 @@ fn setup(
 ) {
     commands.spawn(Camera2dBundle::default());
 
-    let tileset_loader = LegacyTilesetLoader::new(PathBuf::from(r"C:\CDDA\testing\gfx\MSX++UnDeadPeopleEdition"));
-    let region_settings_loader = RegionSettingsLoader::new(PathBuf::from(r"C:\CDDA\testing\data\json\regional_map_settings.json"), "default".to_string());
+    let tileset_loader = LegacyTilesetLoader::new(PathBuf::from(r"saves/tileset/gfx/MSX++UnDeadPeopleEdition"));
+    let region_settings_loader = RegionSettingsLoader::new(PathBuf::from(r"saves/regional_map_settings.json"), "default".to_string());
 
     let editor_data_saver = EditorDataSaver::new();
     let legacy_textures = LegacyTextures::new(tileset_loader, region_settings_loader, &mut r_images);
@@ -338,8 +338,8 @@ fn setup(
     let mut editor_data = editor_data_saver.load().unwrap();
 
     let loader = MapEntityImporter::new(
-        PathBuf::from(r"C:\CDDA\testing\data\json\mapgen\house\house01.json"),
-        "house_01".to_string(),
+        PathBuf::from(r"saves\mapgen\house\house01.json"),
+        "testing".to_string(),
         &editor_data.all_palettes,
     );
 
@@ -415,7 +415,7 @@ fn setup(
 fn update(
     res_grid: Res<Grid>,
     res_cursor: Res<IsCursorCaptured>,
-    mut tiles: Query<(&mut Tile, &mut Transform, &Coordinates), Without<GridMarker>>,
+    mut tiles: Query<(&mut Transform, &Coordinates, &Offset), With<Tile>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     mut grid_material: ResMut<Assets<GridMaterial>>,
     r_data: Res<EditorData>,
@@ -439,10 +439,10 @@ fn update(
     };
     grid_material.1.scale_factor = window.resolution.scale_factor() as f32;
 
-    for (tile, mut transform, coordinates) in tiles.iter_mut() {
+    for (mut transform, coordinates, sprite_offset) in tiles.iter_mut() {
         //                                              < CENTER TO TOP LEFT >                                  < ALIGN ON GRID >
         transform.translation.x = (-window.resolution.width() / 2. + res_grid.tile_size / 2.) - (res_grid.offset.x - coordinates.x as f32 * res_grid.tile_size);
-        transform.translation.y = (window.resolution.height() / 2. - res_grid.tile_size / 2.) + (res_grid.offset.y - coordinates.y as f32 * res_grid.tile_size);
+        transform.translation.y = (window.resolution.height() / 2. - (res_grid.tile_size + (sprite_offset.y as f32 * (res_grid.tile_size / res_grid.default_tile_size))) / 2.) + (res_grid.offset.y - coordinates.y as f32 * res_grid.tile_size);
     }
 }
 
