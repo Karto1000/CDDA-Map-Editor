@@ -4,8 +4,9 @@ use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::ops::Deref;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::string::ToString;
 use std::sync::Arc;
 
 use bevy::{prelude::*, window::PrimaryWindow};
@@ -21,6 +22,7 @@ use bevy::winit::WinitWindows;
 use bevy_file_dialog::FileDialogPlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use directories::ProjectDirs;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use winit::window::Icon;
@@ -56,6 +58,11 @@ mod palettes;
 mod common;
 mod region_settings;
 
+pub const CDDA_DIR: &'static str = r"C:\CDDA\testing";
+
+lazy_static! {
+    pub static ref ALL_PALETTES: HashMap<String, Palette> = PalettesLoader::new(PathBuf::from(format!(r"{}/data/json/mapgen_palettes", CDDA_DIR))).load().unwrap();
+}
 
 #[derive(Component)]
 pub struct MouseLocationTextMarker;
@@ -74,9 +81,6 @@ pub struct EditorData {
     pub current_project_index: u32,
     pub projects: Vec<Project>,
     pub history: Vec<ProjectSaveState>,
-
-    #[serde(skip)]
-    pub all_palettes: HashMap<String, Palette>,
 }
 
 impl EditorData {
@@ -105,7 +109,6 @@ impl Default for EditorData {
             current_project_index: 0,
             projects: vec![project],
             history: vec![],
-            all_palettes: HashMap::new(),
         };
     }
 }
@@ -165,9 +168,6 @@ impl Save<EditorData> for EditorDataSaver {
 
 impl Load<EditorData> for EditorDataSaver {
     fn load(&self) -> Result<EditorData, LoadError> {
-        let palettes_loader = PalettesLoader::new(PathBuf::from(r"saves/palettes"));
-        let palettes = palettes_loader.load().unwrap();
-
         let dir = match ProjectDirs::from_path("CDDA Map Editor".into()) {
             None => { return Err(LoadError::DirectoryNotFound); }
             Some(d) => d
@@ -179,7 +179,6 @@ impl Load<EditorData> for EditorDataSaver {
 
         let contents = match fs::read_to_string(data_dir.join("data.json")) {
             Err(_) => return Ok(EditorData {
-                all_palettes: palettes,
                 ..default()
             }),
             Ok(f) => f
@@ -213,13 +212,13 @@ impl Load<EditorData> for EditorDataSaver {
                                 let mut project: Project = serde_json::from_str(s.as_str()).expect("Valid Project");
 
                                 let project_specific_palettes: Vec<&Palette> = project.map_entity.palettes.iter().map(|id| {
-                                    palettes.get(&id.id).unwrap()
+                                    ALL_PALETTES.get(&id.id).unwrap()
                                 }).collect();
 
                                 project.map_entity.palettes.clear();
 
                                 for palette in project_specific_palettes {
-                                    project.map_entity.add_palette(&palettes, palette);
+                                    project.map_entity.add_palette(palette);
                                 }
 
                                 info!("Loaded Saved Project at Path {:?}", path);
@@ -238,13 +237,13 @@ impl Load<EditorData> for EditorDataSaver {
                                 let mut project: Project = serde_json::from_str(s.as_str()).expect("Valid Project");
 
                                 let project_specific_palettes: Vec<&Palette> = project.map_entity.palettes.iter().map(|id| {
-                                    palettes.get(&id.id).unwrap()
+                                    ALL_PALETTES.get(&id.id).unwrap()
                                 }).collect();
 
                                 project.map_entity.palettes.clear();
 
                                 for palette in project_specific_palettes {
-                                    project.map_entity.add_palette(&palettes, palette);
+                                    project.map_entity.add_palette(palette);
                                 }
 
                                 info!("Loaded Auto saved Project at Path {:?}", path);
@@ -271,7 +270,6 @@ impl Load<EditorData> for EditorDataSaver {
             current_project_index: 0,
             projects: projects_array,
             history: history_array,
-            all_palettes: palettes,
         });
     }
 }
@@ -327,8 +325,8 @@ fn setup(
 ) {
     commands.spawn(Camera2dBundle::default());
 
-    let tileset_loader = LegacyTilesetLoader::new(PathBuf::from(r"saves/tileset/gfx/MSX++UnDeadPeopleEdition"));
-    let region_settings_loader = RegionSettingsLoader::new(PathBuf::from(r"saves/regional_map_settings.json"), "default".to_string());
+    let tileset_loader = LegacyTilesetLoader::new(PathBuf::from(format!(r"{}/gfx/MSX++UnDeadPeopleEdition", CDDA_DIR)));
+    let region_settings_loader = RegionSettingsLoader::new(PathBuf::from(format!(r"{}/data/json/regional_map_settings.json", CDDA_DIR)), "default".to_string());
 
     let editor_data_saver = EditorDataSaver::new();
     let legacy_textures = LegacyTextures::new(tileset_loader, region_settings_loader, &mut r_images);
@@ -338,9 +336,8 @@ fn setup(
     let mut editor_data = editor_data_saver.load().unwrap();
 
     let loader = MapEntityImporter::new(
-        PathBuf::from(r"saves\mapgen\house\house01.json"),
+        PathBuf::from(format!(r"{}/data/json/mapgen/house/house01.json", CDDA_DIR)),
         "testing".to_string(),
-        &editor_data.all_palettes,
     );
 
     let map_entity = loader.load().unwrap();

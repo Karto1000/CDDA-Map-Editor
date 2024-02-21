@@ -5,10 +5,9 @@ use bevy::asset::Handle;
 use bevy::hierarchy::Children;
 use bevy::input::Input;
 use bevy::math::Vec3;
-use bevy::prelude::{Commands, default, Entity, Event, EventReader, EventWriter, Image, KeyCode, Query, Res, ResMut, SpriteBundle, Text, Transform, Vec2, With};
+use bevy::prelude::{Commands, default, Entity, Event, EventReader, EventWriter, Image, KeyCode, Query, Res, ResMut, SpriteBundle, Text, Transform, With};
 use bevy::text::TextSection;
 use bevy_file_dialog::{DialogFileSaved, FileDialogExt};
-use serde::{Deserialize, Serialize};
 
 use crate::common::Coordinates;
 use crate::EditorData;
@@ -27,7 +26,7 @@ pub struct SpawnSprite {
     tile: Tile,
     coordinates: Coordinates,
     sprite_kind: SpriteKind,
-    offset: Coordinates
+    offset: Offset,
 }
 
 pub enum SpriteKind {
@@ -320,7 +319,8 @@ pub fn update_sprite_reader(
                                      },
                                     ..default()
                                 },
-                                e.coordinates.clone()
+                                e.coordinates.clone(),
+                                Offset {x: $sprite.offset_x, y: $sprite.offset_y }
                             ));
 
                             let tile = project.map_entity.tiles.get_mut(&e.coordinates).unwrap();
@@ -360,7 +360,8 @@ pub fn update_sprite_reader(
                                           },
                                      ..default()
                                      },
-                                e.coordinates.clone()
+                                e.coordinates.clone(),
+                                Offset {x: $sprite.offset_x, y: $sprite.offset_y }
                             ));
 
                             let tile = project.map_entity.tiles.get_mut(&e.coordinates).unwrap();
@@ -431,7 +432,7 @@ pub fn tile_spawn_reader(
                             sprite_kind: SpriteKind::Terrain(terrain.clone()),
                             tile: e.tile.clone(),
                             z: 1,
-                            offset: Coordinates::new(terrain.offset_x, terrain.offset_y)
+                            offset: Offset { x: terrain.offset_x, y: terrain.offset_y },
                         }
                     )
                 }
@@ -443,7 +444,7 @@ pub fn tile_spawn_reader(
                             sprite_kind: SpriteKind::Furniture(furniture.clone()),
                             tile: e.tile.clone(),
                             z: 3,
-                            offset: Coordinates::new(furniture.offset_x, furniture.offset_y)
+                            offset: Offset {x: furniture.offset_x, y: furniture.offset_y},
                         }
                     )
                 }
@@ -455,7 +456,7 @@ pub fn tile_spawn_reader(
                         sprite_kind: SpriteKind::Fallback(default.clone()),
                         tile: e.tile.clone(),
                         z: 1,
-                        offset: Coordinates::default()
+                        offset: Offset::default(),
                     }
                 )
             }

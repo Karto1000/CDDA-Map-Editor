@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use bevy::math::Vec2;
 use bevy::prelude::{default, Resource};
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 use crate::common::{Coordinates, GetRandom, MeabyMulti, MeabyNumberRange, MeabyWeighted, TileId, Weighted};
@@ -79,7 +78,7 @@ pub struct MapEntity {
 }
 
 impl MapEntity {
-    pub fn add_palette(&mut self, all_palettes: &HashMap<String, Palette>, palette: &Palette) {
+    pub fn add_palette(&mut self, palette: &Palette) {
         let mut computed_palette = palette.clone();
 
         // Compute parameters
@@ -87,7 +86,7 @@ impl MapEntity {
             parameter.calculated_value = Some(parameter.default.get_value());
         }
 
-        computed_palette.compute_parent_palettes(all_palettes);
+        computed_palette.compute_parent_palettes();
 
         self.palettes.push(computed_palette);
     }
@@ -149,6 +148,20 @@ impl MapEntity {
         };
     }
 
+    fn get_parameter(&self, name: &String) -> Option<&Parameter> {
+        if let Some(p) = self.parameters.get(name) {
+            return Some(p);
+        }
+
+        for palette in self.palettes.iter() {
+            if let Some(p) = palette.get_parameter(name) {
+                return Some(p);
+            }
+        }
+
+        return None;
+    }
+
     pub fn get_ids(&self, character: &char) -> TileIdGroup {
         let mut group = TileIdGroup::default();
 
@@ -161,7 +174,6 @@ impl MapEntity {
                                 let id = match v {
                                     Identifier::TileId(id) => id,
                                     Identifier::Parameter(parameter) => {
-                                        println!("{:?} {:?} {:?} {}", parameter.param, parameter.fallback, $id, character);
                                         panic!("Not Implemented 1")
                                     }
                                 };
@@ -182,8 +194,7 @@ impl MapEntity {
                         let id = match &random_sprite {
                             Identifier::TileId(id) => id,
                             Identifier::Parameter(parameter) => {
-                                println!("{}", parameter.param);
-                                panic!("Not Implemented Pid")
+                                panic!("Not Implemented")
                             }
                         };
 
@@ -191,7 +202,7 @@ impl MapEntity {
                     }
                     MapObjectId::Nested(_) => { panic!("Not Implemented") }
                     MapObjectId::Param { param, fallback } => {
-                        let mut parameter = $obj_with_parameter.parameters.get(param).expect(format!("Parameter {} to exist", param).as_str());
+                        let mut parameter = $obj_with_parameter.get_parameter(param).expect(format!("Parameter {} to exist", param).as_str());
 
                         match &parameter.calculated_value {
                             Some(v) => {
@@ -203,7 +214,6 @@ impl MapEntity {
                         }
                     }
                     MapObjectId::Switch {switch, cases} => {
-                        println!("{:?} {:?}", switch, cases);
                         panic!("Not Implemented")
                     }
                 }
@@ -220,11 +230,15 @@ impl MapEntity {
 
         for palette in self.palettes.iter() {
             if let Some(id) = palette.furniture.get(character) {
-                match_id!(id, group.furniture, palette);
+                if group.furniture.is_none() {
+                    match_id!(id, group.furniture, palette);
+                }
             }
 
             if let Some(id) = palette.terrain.get(character) {
-                match_id!(id, group.terrain, palette);
+                if group.terrain.is_none() {
+                    match_id!(id, group.terrain, palette);
+                }
             }
 
             for parent_palette in palette.palettes.iter() {
@@ -232,11 +246,15 @@ impl MapEntity {
                     ParentPalette::NotComputed(_) => { panic!() }
                     ParentPalette::Computed(p) => {
                         if let Some(id) = p.furniture.get(character) {
-                            match_id!(id, group.furniture, p);
+                            if group.furniture.is_none() {
+                                match_id!(id, group.furniture, p);
+                            }
                         }
 
                         if let Some(id) = p.terrain.get(character) {
-                            match_id!(id, group.terrain, p);
+                            if group.terrain.is_none() {
+                                match_id!(id, group.terrain, p);
+                            }
                         }
                     }
                 }

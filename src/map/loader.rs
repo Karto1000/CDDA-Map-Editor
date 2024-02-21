@@ -12,24 +12,23 @@ use crate::EditorData;
 use crate::map::resources::{MapEntity, MapEntityType};
 use crate::palettes::Palette;
 use crate::tiles::components::Tile;
+use crate::ALL_PALETTES;
 
-pub struct MapEntityImporter<'a> {
+pub struct MapEntityImporter {
     path: PathBuf,
     id: String,
-    all_palettes: &'a HashMap<String, Palette>
 }
 
-impl<'a> MapEntityImporter<'a> {
-    pub fn new(path: PathBuf, id: String, all_palettes: &'a HashMap<String, Palette>) -> Self {
+impl MapEntityImporter {
+    pub fn new(path: PathBuf, id: String) -> Self {
         return Self {
             path,
             id,
-            all_palettes
         };
     }
 }
 
-impl<'a> Load<MapEntity> for MapEntityImporter<'a> {
+impl Load<MapEntity> for MapEntityImporter {
     fn load(&self) -> Result<MapEntity, LoadError> {
         let parsed = serde_json::from_str::<Value>(fs::read_to_string(&self.path).unwrap().as_str())
             .unwrap();
@@ -97,7 +96,7 @@ impl<'a> Load<MapEntity> for MapEntityImporter<'a> {
         for palette in palettes {
             let string_palette = palette.to_string();
 
-            let palette = match self.all_palettes.get(&string_palette) {
+            let palette = match ALL_PALETTES.get(&string_palette) {
                 None => {
                     warn!("Could not find Palette {} specified in {}", string_palette, self.id);
                     continue;
@@ -107,7 +106,7 @@ impl<'a> Load<MapEntity> for MapEntityImporter<'a> {
 
             info!("Successfully loaded Palette {}", palette.id);
 
-            map_entity.add_palette(self.all_palettes, palette);
+            map_entity.add_palette(palette);
         }
 
         return Ok(map_entity);

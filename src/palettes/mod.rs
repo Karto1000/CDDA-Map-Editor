@@ -4,6 +4,7 @@ use rand::Rng;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
+use crate::ALL_PALETTES;
 use crate::common::{GetRandom, ItemId, MeabyNumberRange, MeabyWeighted, TileId};
 use crate::common::MeabyMulti;
 
@@ -200,7 +201,7 @@ pub struct Palette {
 }
 
 impl Palette {
-    pub fn compute_parent_palettes(&mut self, all_palettes: &HashMap<String, Palette>) {
+    pub fn compute_parent_palettes(&mut self) {
         let mut computed_palettes = vec![];
 
         for palette in self.palettes.iter_mut() {
@@ -209,10 +210,20 @@ impl Palette {
                     MapObjectId::Grouped(_) => { panic!() }
                     MapObjectId::Nested(_) => { panic!() }
                     MapObjectId::Param { param, fallback } => {
-                        all_palettes.get(&self.parameters.get(&param.clone()).unwrap().calculated_value.as_ref().unwrap().0).unwrap().clone()
+                        ALL_PALETTES.get(&self.parameters.get(&param.clone()).unwrap().calculated_value.as_ref().unwrap().0).unwrap().clone()
                     }
                     MapObjectId::Switch { .. } => { panic!() }
-                    MapObjectId::Single(_) => { panic!() }
+                    MapObjectId::Single(s) => {
+                        match s {
+                            MeabyWeighted::NotWeighted(i) => {
+                                match i {
+                                    Identifier::TileId(id) => ALL_PALETTES.get(&id.0).unwrap().clone(),
+                                    Identifier::Parameter(_) => {panic!()}
+                                }
+                            }
+                            MeabyWeighted::Weighted(_) => {panic!()}
+                        }
+                    }
                 };
 
                 // Compute parameters
@@ -226,6 +237,53 @@ impl Palette {
 
         self.palettes.clear();
         self.palettes.append(&mut computed_palettes);
+    }
+
+    pub fn get_parameter(&self, name: &String) -> Option<&Parameter> {
+        if let Some(p) = self.parameters.get(name) {
+            return Some(p);
+        }
+
+        for pallete in self.palettes.iter() {
+            match pallete {
+                ParentPalette::NotComputed(p) => {
+                    let id = match p {
+                        MapObjectId::Grouped(_) => { panic!() }
+                        MapObjectId::Nested(_) => { panic!() }
+                        MapObjectId::Param { .. } => { panic!() }
+                        MapObjectId::Switch { .. } => { panic!() }
+                        MapObjectId::Single(s) => {
+                            match s {
+                                MeabyWeighted::NotWeighted(i) => match i {
+                                    Identifier::TileId(id) => id.0.clone(),
+                                    Identifier::Parameter(_) => { panic!() }
+                                },
+                                MeabyWeighted::Weighted(w) => match w.value.clone() {
+                                    Identifier::TileId(id) => id.0,
+                                    Identifier::Parameter(_) => {panic!()}
+                                }
+                            }
+                        }
+                    };
+
+                    let computed = ALL_PALETTES.get(&id).unwrap();
+
+                    if let Some(p) = computed.get_parameter(name) {
+                        return Some(p)
+                    }
+
+                    return None
+                }
+                ParentPalette::Computed(p) => {
+                    if let Some(p) = p.get_parameter(name) {
+                        return Some(p)
+                    }
+                    return None
+                }
+            }
+        }
+
+        return None;
     }
 }
 
