@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::common::{TileId, Weighted};
+use crate::common::{GetRandom, TileId, Weighted};
 
 pub(crate) mod loader;
 
@@ -17,6 +17,7 @@ pub struct TerrainAndFurniture {
     pub furniture: HashMap<RegionId, HashMap<TileId, u32>>,
 }
 
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RegionSettings {
     pub id: String,
@@ -27,4 +28,34 @@ pub struct RegionSettings {
     pub default_groundcover: Vec<Weighted<String>>,
 
     pub region_terrain_and_furniture: TerrainAndFurniture,
+}
+
+impl RegionSettings {
+    pub fn get_random_terrain_from_region(&self, region_id: &RegionId) -> Option<&TileId> {
+        if let Some(terrain) = self.region_terrain_and_furniture.terrain.get(region_id) {
+            let picked = terrain.get_random_weighted().unwrap();
+
+            // Regions can have region ids themselves
+            return match self.get_random_terrain_from_region(&picked.0) {
+                Some(t) => Some(t),
+                None => Some(picked)
+            };
+        }
+
+        return None;
+    }
+
+    pub fn get_random_furniture_from_region(&self, region_id: &RegionId) -> Option<&TileId> {
+        if let Some(furniture) = self.region_terrain_and_furniture.furniture.get(region_id) {
+            let picked = furniture.get_random_weighted().unwrap();
+
+            // Regions can have region ids themselves
+            return match self.get_random_furniture_from_region(&picked.0) {
+                Some(t) => Some(t),
+                None => Some(picked)
+            };
+        }
+
+        return None;
+    }
 }

@@ -186,7 +186,7 @@ impl LegacyTextures {
                     fg: Some(Arc::new(SingleForeground::new(image))),
                     bg: None,
                     offset_x: 0,
-                    offset_y: 0
+                    offset_y: 0,
                 },
             );
         };
@@ -258,8 +258,8 @@ impl GetTexture for LegacyTextures {
         match &project.map_entity.get_ids(character).terrain {
             None => return None,
             Some(terrain) => {
-                if let Some(terrain_region) = self.region_settings.region_terrain_and_furniture.terrain.get(&terrain.0) {
-                    let sprite_type = match self.textures.get(terrain_region.get_random_weighted().unwrap()) {
+                if let Some(terrain) = self.region_settings.get_random_terrain_from_region(&terrain.0) {
+                    let sprite_type = match self.textures.get(terrain) {
                         None => return None,
                         Some(s) => s
                     };
@@ -291,6 +291,20 @@ impl GetTexture for LegacyTextures {
         match &project.map_entity.get_ids(character).furniture {
             None => return None,
             Some(furniture) => {
+                if let Some(furniture) = self.region_settings.get_random_furniture_from_region(&furniture.0) {
+                    let sprite_type = match self.textures.get(furniture) {
+                        None => return None,
+                        Some(s) => s
+                    };
+
+                    return Some(get_sprite_from_sprite_type(
+                        project,
+                        coordinates,
+                        character,
+                        sprite_type,
+                    ));
+                }
+
                 let sprite_type = match self.textures.get(furniture) {
                     None => return None,
                     Some(s) => s
