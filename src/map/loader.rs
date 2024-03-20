@@ -1,79 +1,133 @@
 use std::collections::HashMap;
-use std::fs;
 use std::path::PathBuf;
 
-use bevy::prelude::{Res, Vec2};
-use log::{info, warn};
+use bevy::math::Vec2;
+use bevy::prelude::Resource;
+use log::info;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::common::Coordinates;
-use crate::common::io::{Load, LoadError};
-use crate::EditorData;
-use crate::map::resources::{MapEntity, MapEntityType};
-use crate::palettes::Palette;
-use crate::tiles::components::Tile;
 use crate::ALL_PALETTES;
+use crate::common::{Coordinates, MeabyMulti, MeabyNumberRange, MeabyWeighted};
+use crate::common::io::{Load, LoadError};
+use crate::map::resources::MapEntity;
+use crate::palettes::{Identifier, Item, MapGenValue, MapObjectId, PaletteId, ParameterType};
+use crate::tiles::components::Tile;
+use crate::map::resources::ComputedParameters;
+use crate::map::resources::MapEntityType;
 
-pub struct MapEntityImporter {
-    path: PathBuf,
-    id: String,
+/**
+ * Copyright (c) YPSOMED AG, Burgdorf / Switzerland
+ * YDS INNOVATION - Digital Innovation
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ * This project is for demonstration purposes only and can not be used
+ * for medical purposes or in a production environment.
+ *
+ * email: diginno@ypsomed.com
+ * author: Tim Leuenberger (Tim.leuenberger@ypsomed.com)
+ */
+
+pub type ParameterId = String;
+
+pub struct MapEntityLoader {
+    pub path: PathBuf,
+    pub id: String,
 }
 
-impl MapEntityImporter {
-    pub fn new(path: PathBuf, id: String) -> Self {
-        return Self {
-            path,
-            id,
-        };
-    }
+#[derive(Deserialize, Clone, Serialize, Debug)]
+pub struct Parameter {
+    #[serde(rename = "type")]
+    pub parameter_type: ParameterType,
+    pub default: MapGenValue,
 }
 
-impl Load<MapEntity> for MapEntityImporter {
-    fn load(&self) -> Result<MapEntity, LoadError> {
-        let parsed = serde_json::from_str::<Value>(fs::read_to_string(&self.path).unwrap().as_str())
-            .unwrap();
+fn compute_palettes(parameters: &HashMap<String, String>, palettes: &Vec<MapObjectId>) -> HashMap<PaletteId, ComputedParameters> {
+    let mut computed_palettes = HashMap::new();
 
-        let found_object = match parsed
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|v| {
-                match v.get("nested_mapgen_id") {
-                    None => false,
-                    Some(v) => v.as_str().unwrap().to_string() == self.id
+    for palette in palettes.iter() {
+        let palette_id: PaletteId = match palette {
+            MapObjectId::Grouped(_) => { todo!() }
+            MapObjectId::Nested(_) => { todo!() }
+            MapObjectId::Param { param, fallback } => {
+                match parameters.get(param) {
+                    None => fallback.as_ref().unwrap().clone(),
+                    Some(v) => v.clone()
                 }
-            }) {
-            None => {
-                parsed.as_array().unwrap().iter().find(|v| {
-                    match v.get("om_terrain") {
-                        None => false,
-                        Some(v) => v.as_str().unwrap().to_string() == self.id
-                    }
-                }).unwrap()
             }
-            Some(v) => v
+            MapObjectId::Switch { .. } => { todo!() }
+            MapObjectId::Single(o) => {
+                match o {
+                    MeabyWeighted::NotWeighted(i) => {
+                        match i {
+                            Identifier::TileId(i) => {
+                                i.0.clone()
+                            }
+                            Identifier::Parameter(_) => { todo!() }
+                        }
+                    }
+                    MeabyWeighted::Weighted(_) => { todo!() }
+                }
+            }
         };
 
-        let object = found_object.get("object").unwrap();
+        let associated_palette = ALL_PALETTES.get(&palette_id).unwrap();
 
-        let json_tiles = object
-            .get("rows")
-            .unwrap()
-            .as_array()
-            .unwrap();
+        let mut this = HashMap::new();
 
-        let map_type: MapEntityType = serde_json::from_value(found_object.clone()).unwrap();
+        for (name, parameter) in associated_palette.parameters.iter() {
+            this.insert(name.clone(), parameter.default.get_value().0);
+        }
+
+        let computed_palette_parameters = ComputedParameters {
+            this: this.clone(),
+            palettes: compute_palettes(&this, &associated_palette.palettes),
+        };
+
+        computed_palettes.insert(palette_id, computed_palette_parameters);
+
+        info!("Computed Parameters for {:?}", palette)
+    }
+
+    return computed_palettes;
+}
+
+impl Load<MapEntity> for MapEntityLoader {
+    fn load(&self) -> Result<MapEntity, LoadError> {
+        let objects = serde_json::from_str::<Vec<HashMap<String, Value>>>(std::fs::read_to_string(&self.path).unwrap().as_str()).unwrap();
+        let filtered_objects = objects
+            .into_iter()
+            .filter(|o| {
+                return match o.get("om_terrain") {
+                    None => false,
+                    Some(s) => s.as_str().unwrap() == self.id,
+                };
+            })
+            .collect::<Vec<HashMap<String, Value>>>();
+
+        let mapgen_entity = filtered_objects.first().unwrap();
+        let object = mapgen_entity.get("object").unwrap();
+
+
+        let parameters = match object.get("parameters") {
+            None => HashMap::new(),
+            Some(v) => serde_json::from_value::<HashMap<ParameterId, Parameter>>(v.clone()).unwrap()
+        };
+
+        let rows: Vec<String> = serde_json::from_value(object.get("rows").unwrap().clone()).unwrap();
+
         let mut tiles = HashMap::new();
-        let palettes: Vec<String> = serde_json::from_value(object.get("palettes").unwrap().clone()).unwrap();
 
         let size = Vec2::new(
-            json_tiles.get(0).unwrap().as_str().unwrap().len() as f32,
-            json_tiles.len() as f32,
+            rows.get(0).unwrap().as_str().len() as f32,
+            rows.len() as f32,
         );
 
-        for (row, tile) in json_tiles.iter().enumerate() {
+        for (row, tile) in rows.iter().enumerate() {
             // to_string returns quotes so we use as_str
-            for (column, char) in tile.as_str().unwrap().chars().enumerate() {
+            for (column, char) in tile.as_str().chars().enumerate() {
                 tiles.insert(
                     Coordinates::new(column as i32, row as i32),
                     Tile::from(char),
@@ -81,34 +135,48 @@ impl Load<MapEntity> for MapEntityImporter {
             }
         }
 
-        let mut map_entity = MapEntity {
-            map_type,
-            tiles,
-            size,
-            place_nested: Vec::new(),
-            palettes: vec![],
-            terrain: serde_json::from_value(object.get("terrain").unwrap().clone()).unwrap(),
-            furniture: HashMap::new(),
-            items: HashMap::new(),
-            parameters: HashMap::new(),
-        };
+        let palettes: Vec<MapObjectId> = serde_json::from_value(object.get("palettes").unwrap().clone()).unwrap();
 
-        for palette in palettes {
-            let string_palette = palette.to_string();
+        let mut this = HashMap::new();
 
-            let palette = match ALL_PALETTES.get(&string_palette) {
-                None => {
-                    warn!("Could not find Palette {} specified in {}", string_palette, self.id);
-                    continue;
-                }
-                Some(v) => v
-            };
-
-            info!("Successfully loaded Palette {}", palette.id);
-
-            map_entity.add_palette(palette);
+        for (parameter_id, parameter) in parameters.iter() {
+            this.insert(
+                parameter_id.clone(),
+                parameter.default.get_value().0,
+            );
         }
 
-        return Ok(map_entity);
+        let computed_parameters = ComputedParameters {
+            this: this.clone(),
+            palettes: compute_palettes(&this, &palettes),
+        };
+
+
+        let terrain = match object.get("terrain") {
+            None => HashMap::new(),
+            Some(t) => serde_json::from_value(t.clone()).unwrap()
+        };
+
+        let furniture = match object.get("furniture") {
+            None => HashMap::new(),
+            Some(f) => serde_json::from_value(f.clone()).unwrap()
+        };
+
+        return Ok(
+            MapEntity {
+                map_type: MapEntityType::Default {
+                    om_terrain: mapgen_entity.get("om_terrain").unwrap().as_str().unwrap().to_string(),
+                    weight: 100,
+                },
+                palettes,
+                computed_parameters,
+                tiles,
+                size,
+                terrain,
+                furniture,
+                items: Default::default(),
+                place_nested: vec![],
+            }
+        );
     }
 }

@@ -34,10 +34,10 @@ use crate::graphics::tileset::legacy::LegacyTilesetLoader;
 use crate::grid::{GridMarker, GridMaterial, GridPlugin};
 use crate::grid::resources::Grid;
 use crate::map::events::{ClearTiles, SpawnMapEntity};
-use crate::map::loader::MapEntityImporter;
 use crate::map::MapPlugin;
-use crate::map::resources::MapEntity;
 use crate::map::systems::{set_tile_reader, spawn_sprite, tile_despawn_reader, tile_remove_reader, tile_spawn_reader, update_sprite_reader};
+use crate::map::loader::MapEntityLoader;
+use crate::map::resources::MapEntity;
 use crate::palettes::{Identifier, MapObjectId, Palette};
 use crate::palettes::loader::PalettesLoader;
 use crate::project::resources::{Project, ProjectSaveState};
@@ -58,10 +58,10 @@ mod palettes;
 mod common;
 mod region_settings;
 
-pub const CDDA_DIR: &'static str = r"C:\CDDA\testing";
+pub const CDDA_DIR: &'static str = r"C:\DEV\SelfDEV\CDDA\CDDA-Map-Editor\saves";
 
 lazy_static! {
-    pub static ref ALL_PALETTES: HashMap<String, Palette> = PalettesLoader::new(PathBuf::from(format!(r"{}/data/json/mapgen_palettes", CDDA_DIR))).load().unwrap();
+    pub static ref ALL_PALETTES: HashMap<String, Palette> = PalettesLoader::new(PathBuf::from(format!(r"{}/palettes", CDDA_DIR))).load().unwrap();
 }
 
 #[derive(Component)]
@@ -211,16 +211,6 @@ impl Load<EditorData> for EditorDataSaver {
                             Ok(s) => {
                                 let mut project: Project = serde_json::from_str(s.as_str()).expect("Valid Project");
 
-                                let project_specific_palettes: Vec<&Palette> = project.map_entity.palettes.iter().map(|id| {
-                                    ALL_PALETTES.get(&id.id).unwrap()
-                                }).collect();
-
-                                project.map_entity.palettes.clear();
-
-                                for palette in project_specific_palettes {
-                                    project.map_entity.add_palette(palette);
-                                }
-
                                 info!("Loaded Saved Project at Path {:?}", path);
 
                                 Some(project)
@@ -234,17 +224,7 @@ impl Load<EditorData> for EditorDataSaver {
                     ProjectSaveState::AutoSaved(path) => {
                         match fs::read_to_string(path.clone()) {
                             Ok(s) => {
-                                let mut project: Project = serde_json::from_str(s.as_str()).expect("Valid Project");
-
-                                let project_specific_palettes: Vec<&Palette> = project.map_entity.palettes.iter().map(|id| {
-                                    ALL_PALETTES.get(&id.id).unwrap()
-                                }).collect();
-
-                                project.map_entity.palettes.clear();
-
-                                for palette in project_specific_palettes {
-                                    project.map_entity.add_palette(palette);
-                                }
+                                let project: Project = serde_json::from_str(s.as_str()).expect("Valid Project");
 
                                 info!("Loaded Auto saved Project at Path {:?}", path);
 
@@ -325,8 +305,8 @@ fn setup(
 ) {
     commands.spawn(Camera2dBundle::default());
 
-    let tileset_loader = LegacyTilesetLoader::new(PathBuf::from(format!(r"{}/gfx/MSX++UnDeadPeopleEdition", CDDA_DIR)));
-    let region_settings_loader = RegionSettingsLoader::new(PathBuf::from(format!(r"{}/data/json/regional_map_settings.json", CDDA_DIR)), "default".to_string());
+    let tileset_loader = LegacyTilesetLoader::new(PathBuf::from(format!(r"{}/tileset/gfx/MSX++UnDeadPeopleEdition", CDDA_DIR)));
+    let region_settings_loader = RegionSettingsLoader::new(PathBuf::from(format!(r"{}/regional_map_settings.json", CDDA_DIR)), "default".to_string());
 
     let editor_data_saver = EditorDataSaver::new();
     let legacy_textures = LegacyTextures::new(tileset_loader, region_settings_loader, &mut r_images);
@@ -335,10 +315,10 @@ fn setup(
     let mut default_project = Project::default();
     let mut editor_data = editor_data_saver.load().unwrap();
 
-    let loader = MapEntityImporter::new(
-        PathBuf::from(format!(r"{}/data/json/mapgen/house/house01.json", CDDA_DIR)),
-        "testing".to_string(),
-    );
+    let loader = MapEntityLoader {
+        path: PathBuf::from(format!(r"{}/mapgen/house/house01.json", CDDA_DIR)),
+        id: "testing".to_string(),
+    };
 
     let map_entity = loader.load().unwrap();
 

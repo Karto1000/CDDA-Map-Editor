@@ -1,12 +1,69 @@
 use std::collections::HashMap;
-
-use bevy::math::Vec2;
-use bevy::prelude::{default, Resource};
+use bevy::prelude::{Resource, Vec2};
 use serde::{Deserialize, Serialize};
-
-use crate::common::{Coordinates, GetRandom, MeabyMulti, MeabyNumberRange, MeabyWeighted, TileId, Weighted};
-use crate::palettes::{Identifier, Item, MapObjectId, Palette, Parameter, ParentPalette};
+use crate::common::{Coordinates, MeabyMulti, MeabyNumberRange, MeabyWeighted, TileId};
+use crate::map::loader::ParameterId;
+use crate::palettes::{Item, MapObjectId, PaletteId};
 use crate::tiles::components::Tile;
+use crate::{ALL_PALETTES, Identifier};
+use crate::Weighted;
+use crate::common::GetRandom;
+
+#[derive(Default, Serialize, Deserialize, Debug, Resource, Clone)]
+pub struct ComputedParameters {
+    pub this: HashMap<ParameterId, String>,
+    pub palettes: HashMap<PaletteId, ComputedParameters>,
+}
+
+impl ComputedParameters {
+    pub fn get_value(&self, parameter_id: &String) -> Option<&String> {
+        match self.this.get(parameter_id) {
+            None => {
+                for (_, parameters) in self.palettes.iter() {
+                    match parameters.get_value(parameter_id) {
+                        None => {}
+                        Some(v) => return Some(v)
+                    }
+                }
+            },
+            Some(v) => return Some(v)
+        };
+
+        return None;
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum MapEntityType {
+    Nested {
+        nested_mapgen_id: String,
+    },
+    Default {
+        om_terrain: String,
+        weight: u32,
+    },
+}
+
+impl MapEntityType {
+    pub fn set_name(&mut self, name: String) {
+        match self {
+            MapEntityType::Nested { ref mut nested_mapgen_id } => {
+                *nested_mapgen_id = name.clone()
+            },
+            MapEntityType::Default { ref mut om_terrain, .. } => {
+                *om_terrain = name.clone()
+            }
+        }
+    }
+
+    pub fn get_name(&self) -> &String {
+        return match self {
+            MapEntityType::Nested { nested_mapgen_id } => nested_mapgen_id,
+            MapEntityType::Default { om_terrain, ..} => om_terrain
+        };
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Resource, Clone)]
 #[serde(untagged)]
@@ -23,34 +80,6 @@ pub enum PlaceNested {
     },
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(untagged)]
-pub enum MapEntityType {
-    Nested {
-        nested_mapgen_id: String,
-    },
-    Default {
-        om_terrain: String,
-        weight: u32,
-    },
-}
-
-impl MapEntityType {
-    pub fn get_name(&self) -> &String {
-        return match self {
-            MapEntityType::Nested { nested_mapgen_id, .. } => nested_mapgen_id,
-            MapEntityType::Default { om_terrain, .. } => om_terrain
-        };
-    }
-
-    pub fn set_name(&mut self, name: String) {
-        match self {
-            MapEntityType::Nested { ref mut nested_mapgen_id, .. } => { *nested_mapgen_id = name }
-            MapEntityType::Default { ref mut om_terrain, .. } => { *om_terrain = name }
-        };
-    }
-}
-
 #[derive(Serialize, Deserialize, Debug, Resource, Clone)]
 pub struct MapEntity {
     #[serde(flatten)]
@@ -58,8 +87,8 @@ pub struct MapEntity {
     pub tiles: HashMap<Coordinates, Tile>,
     pub size: Vec2,
 
-    #[serde(default)]
-    pub parameters: HashMap<String, Parameter>,
+    #[serde(skip)]
+    pub computed_parameters: ComputedParameters,
 
     #[serde(default)]
     pub terrain: HashMap<char, MapObjectId>,
@@ -74,40 +103,25 @@ pub struct MapEntity {
     pub place_nested: Vec<PlaceNested>,
 
     #[serde(default)]
-    pub palettes: Vec<Palette>,
-}
-
-impl MapEntity {
-    pub fn add_palette(&mut self, palette: &Palette) {
-        let mut computed_palette = palette.clone();
-
-        // Compute parameters
-        for (_, parameter) in computed_palette.parameters.iter_mut() {
-            parameter.calculated_value = Some(parameter.default.get_value());
-        }
-
-        computed_palette.compute_parent_palettes();
-
-        self.palettes.push(computed_palette);
-    }
+    pub palettes: Vec<MapObjectId>,
 }
 
 impl Default for MapEntity {
     fn default() -> Self {
         return Self {
             map_type: MapEntityType::Default {
-                om_terrain: "unnamed".into(),
-                weight: 0,
+                om_terrain: "unnamed_01".to_string(),
+                weight: 100
             },
-            tiles: HashMap::new(),
-            size: Vec2::new(24., 24.),
-            parameters: Default::default(),
+            tiles: Default::default(),
+            size: Vec2 { x: 24., y: 24. },
+            computed_parameters: ComputedParameters { this: Default::default(), palettes: Default::default() },
             terrain: Default::default(),
             furniture: Default::default(),
-            palettes: Vec::new(),
-            place_nested: Vec::new(),
             items: Default::default(),
-        };
+            place_nested: vec![],
+            palettes: vec![],
+        }
     }
 }
 
@@ -139,7 +153,7 @@ impl MapEntity {
             },
             tiles: HashMap::new(),
             size,
-            parameters: Default::default(),
+            computed_parameters: ComputedParameters { this: Default::default(), palettes: Default::default() },
             terrain: Default::default(),
             furniture: Default::default(),
             palettes: Vec::new(),
@@ -148,25 +162,11 @@ impl MapEntity {
         };
     }
 
-    fn get_parameter(&self, name: &String) -> Option<&Parameter> {
-        if let Some(p) = self.parameters.get(name) {
-            return Some(p);
-        }
-
-        for palette in self.palettes.iter() {
-            if let Some(p) = palette.get_parameter(name) {
-                return Some(p);
-            }
-        }
-
-        return None;
-    }
-
     pub fn get_ids(&self, character: &char) -> TileIdGroup {
         let mut group = TileIdGroup::default();
 
         macro_rules! match_id {
-            ($id: ident, $path: expr, $obj_with_parameter: ident) => {
+            ($id: ident, $path: expr) => {
                 match $id {
                     MapObjectId::Single(v) => {
                         match v {
@@ -202,16 +202,7 @@ impl MapEntity {
                     }
                     MapObjectId::Nested(_) => { panic!("Not Implemented") }
                     MapObjectId::Param { param, fallback } => {
-                        let mut parameter = $obj_with_parameter.get_parameter(param).expect(format!("Parameter {} to exist", param).as_str());
-
-                        match &parameter.calculated_value {
-                            Some(v) => {
-                                $path = Some(v.clone())
-                            }
-                            None => {
-                                panic!("Value was not calculated for parameter {}", param);
-                            }
-                        }
+                        $path = Some(TileId(self.computed_parameters.get_value(param).expect(format!("Parameter {} to exist", param).as_str()).clone()));
                     }
                     MapObjectId::Switch {switch, cases} => {
                         panic!("Not Implemented")
@@ -221,41 +212,78 @@ impl MapEntity {
         }
 
         if let Some(id) = self.terrain.get(character) {
-            match_id!(id, group.terrain, self);
+            match_id!(id, group.terrain);
         }
 
         if let Some(id) = self.furniture.get(character) {
-            match_id!(id, group.furniture, self);
+            match_id!(id, group.furniture);
         }
 
-        for palette in self.palettes.iter() {
+        for palette_object_id in self.palettes.iter() {
+            let palette_id = match palette_object_id {
+                MapObjectId::Grouped(_) => {todo!()}
+                MapObjectId::Nested(_) => {todo!()}
+                MapObjectId::Param { .. } => {todo!()}
+                MapObjectId::Switch { .. } => {todo!()}
+                MapObjectId::Single(mw) => {
+                    match mw {
+                        MeabyWeighted::NotWeighted(i) => {
+                            match i {
+                                Identifier::TileId(id) => {
+                                    id
+                                }
+                                Identifier::Parameter(_) => {todo!()}
+                            }
+                        }
+                        MeabyWeighted::Weighted(_) => {todo!()}
+                    }
+                }
+            };
+            
+            let palette = ALL_PALETTES.get(&palette_id.0).unwrap();
+            
             if let Some(id) = palette.furniture.get(character) {
                 if group.furniture.is_none() {
-                    match_id!(id, group.furniture, palette);
+                    match_id!(id, group.furniture);
                 }
             }
-
+        
             if let Some(id) = palette.terrain.get(character) {
                 if group.terrain.is_none() {
-                    match_id!(id, group.terrain, palette);
+                    match_id!(id, group.terrain);
                 }
             }
-
+        
             for parent_palette in palette.palettes.iter() {
-                match parent_palette {
-                    ParentPalette::NotComputed(_) => { panic!() }
-                    ParentPalette::Computed(p) => {
-                        if let Some(id) = p.furniture.get(character) {
-                            if group.furniture.is_none() {
-                                match_id!(id, group.furniture, p);
-                            }
+                let id = match parent_palette {
+                    MapObjectId::Single(mw) => {
+                        match mw {
+                            MeabyWeighted::NotWeighted(v) => match v {
+                                Identifier::TileId(id) => id.clone(),
+                                Identifier::Parameter(_) => {todo!()}
+                            },
+                            _ => todo!()
                         }
-
-                        if let Some(id) = p.terrain.get(character) {
-                            if group.terrain.is_none() {
-                                match_id!(id, group.terrain, p);
-                            }
-                        }
+                    },
+                    MapObjectId::Grouped(_) => {todo!()}
+                    MapObjectId::Nested(_) => {todo!()}
+                    MapObjectId::Param { param, fallback } => {
+                        TileId(self.computed_parameters.get_value(param).unwrap().clone())
+                    }
+                    MapObjectId::Switch { .. } => {todo!()}
+                };
+        
+                let p = ALL_PALETTES.get(&id.0).unwrap();
+        
+                if let Some(id) = p.furniture.get(character) {
+                    if group.furniture.is_none() {
+                        match_id!(id, group.furniture);
+                    }
+                }
+        
+                if let Some(id) = p.terrain.get(character) {
+                    if group.terrain.is_none() {
+                        match_id!(id, group.terrain);
                     }
                 }
             }

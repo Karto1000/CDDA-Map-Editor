@@ -1,23 +1,21 @@
 use bevy::app::{App, Plugin, Update};
-use bevy::asset::Handle;
-use bevy::prelude::{Commands, Component, default, Entity, Event, EventReader, EventWriter, Image, Query, Res, ResMut, Resource, SpriteBundle, Transform, Vec3, With};
+use bevy::prelude::{Component, Event, Resource};
 use bevy::prelude::IntoSystemConfigs;
 use bevy::reflect::TypeData;
 use bevy::utils::tracing::Instrument;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::Visitor;
 
-use crate::{EditorData, GraphicsResource};
-use crate::graphics::{GetTexture, LegacyTextures};
-use crate::grid::resources::Grid;
+use crate::common::io::Load;
+use crate::graphics::GetTexture;
 use crate::map::events::{ClearTiles, SpawnMapEntity, TileDeleteEvent, TilePlaceEvent, UpdateSpriteEvent};
-use crate::map::systems::{clear_tiles_reader, map_save_system, save_directory_picked, spawn_map_entity_reader, spawn_sprite, SpawnSprite, update_sprite_reader};
-use crate::tiles::components::Tile;
+use crate::map::systems::{clear_tiles_reader, map_save_system, save_directory_picked, spawn_map_entity_reader, SpawnSprite};
 
 pub(crate) mod systems;
 pub(crate) mod resources;
 pub(crate) mod events;
 pub(crate) mod loader;
+
 
 pub struct MapPlugin;
 
