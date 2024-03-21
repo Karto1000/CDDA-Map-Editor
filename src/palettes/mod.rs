@@ -4,10 +4,13 @@ use rand::Rng;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
+use crate::ALL_PALETTES;
 use crate::common::{GetRandom, ItemId, MeabyNumberRange, MeabyWeighted, TileId};
 use crate::common::MeabyMulti;
 
 pub(crate) mod loader;
+
+pub type PaletteId = String;
 
 fn default_chance() -> u32 {
     100
@@ -175,7 +178,7 @@ pub struct Palette {
 
     #[serde(default)]
     #[serde(skip_serializing)]
-    pub palettes: Vec<ParentPalette>,
+    pub palettes: Vec<MapObjectId>,
 
     #[serde(default)]
     #[serde(skip_serializing)]
@@ -197,36 +200,6 @@ pub struct Palette {
     #[serde(skip_serializing)]
     // TODO: Figure out what the value is here
     pub toilets: HashMap<char, Value>,
-}
-
-impl Palette {
-    pub fn compute_parent_palettes(&mut self, all_palettes: &HashMap<String, Palette>) {
-        let mut computed_palettes = vec![];
-
-        for palette in self.palettes.iter_mut() {
-            if let ParentPalette::NotComputed(id) = palette {
-                let mut computed_palette = match id {
-                    MapObjectId::Grouped(_) => { panic!() }
-                    MapObjectId::Nested(_) => { panic!() }
-                    MapObjectId::Param { param, fallback } => {
-                        all_palettes.get(&self.parameters.get(&param.clone()).unwrap().calculated_value.as_ref().unwrap().0).unwrap().clone()
-                    }
-                    MapObjectId::Switch { .. } => { panic!() }
-                    MapObjectId::Single(_) => { panic!() }
-                };
-
-                // Compute parameters
-                for (_, parameter) in computed_palette.parameters.iter_mut() {
-                    parameter.calculated_value = Some(parameter.default.get_value());
-                }
-
-                computed_palettes.push(ParentPalette::Computed(computed_palette));
-            }
-        }
-
-        self.palettes.clear();
-        self.palettes.append(&mut computed_palettes);
-    }
 }
 
 impl Default for Palette {

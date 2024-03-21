@@ -11,7 +11,7 @@ pub struct SpriteRepresentation {
     pub bg_entity: Option<Entity>,
 }
 
-#[derive(Default, Debug, Component)]
+#[derive(Default, Debug, Component, Clone)]
 pub struct Offset {
     pub x: i32,
     pub y: i32
