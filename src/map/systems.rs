@@ -395,12 +395,10 @@ pub fn update_sprite_reader(
                     spawn_sprite!(sprite, e.tile.furniture, furniture);
                 }
             }
-            TileSprite::Default(default) => {
+            TileSprite::Fallback(default) => {
                 spawn_sprite!(default, e.tile.fallback, fallback);
             }
-            TileSprite::Empty => {
-                // Do Nothing
-            }
+            TileSprite::Empty => {}
         }
     }
 }
@@ -444,12 +442,12 @@ pub fn tile_spawn_reader(
                             sprite_kind: SpriteKind::Furniture(furniture.clone()),
                             tile: e.tile.clone(),
                             z: 3,
-                            offset: Offset {x: furniture.offset_x, y: furniture.offset_y},
+                            offset: Offset { x: furniture.offset_x, y: furniture.offset_y },
                         }
                     )
                 }
             }
-            TileSprite::Default(default) => {
+            TileSprite::Fallback(default) => {
                 e_spawn_sprite.send(
                     SpawnSprite {
                         coordinates: e.coordinates.clone(),
@@ -460,9 +458,7 @@ pub fn tile_spawn_reader(
                     }
                 )
             }
-            TileSprite::Empty => {
-                // Do Nothing
-            }
+            TileSprite::Empty => {}
         }
 
         // Check here because i couldn't figure out why the sprites were not correct when spawning a saved map

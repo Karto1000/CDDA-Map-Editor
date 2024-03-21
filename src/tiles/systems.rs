@@ -44,6 +44,7 @@ pub fn tile_resize_system(
 
 pub fn tile_place_system(
     mut e_set_tile: EventWriter<TilePlaceEvent>,
+    mut e_delete_tile: EventWriter<TileDeleteEvent>,
     mut r_place_info: ResMut<PlaceInfo>,
     buttons: Res<Input<MouseButton>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
@@ -71,7 +72,7 @@ pub fn tile_place_system(
         }
 
         // TODO - REPLACE
-        let tile_to_place: char = 'c';
+        let tile_to_place: char = '_';
 
         let tile_cords = Coordinates::new(
             ((xy.x + r_grid.offset.x) / r_grid.tile_size).floor() as i32,
@@ -90,7 +91,12 @@ pub fn tile_place_system(
             // Overwrite empty characters
             if existing_tile.character != ' ' { return; }
 
-            project.map_entity.tiles.remove(&tile_cords);
+            e_delete_tile.send(
+              TileDeleteEvent {
+                  tile: existing_tile.clone(),
+                  coordinates: tile_cords.clone(),
+              }  
+            );
         }
 
         let tile = Tile::from(tile_to_place);
@@ -101,6 +107,7 @@ pub fn tile_place_system(
 pub fn tile_delete_system(
     mut res_editor_data: ResMut<EditorData>,
     mut e_delete_tile: EventWriter<TileDeleteEvent>,
+    mut e_spawn_tile: EventWriter<TilePlaceEvent>,
     buttons: Res<Input<MouseButton>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     r_grid: Res<Grid>,
@@ -130,10 +137,23 @@ pub fn tile_delete_system(
             None => { return; }
             Some(t) => t
         };
+        
+        // Do not delete empty tiles
+        if tile.character == ' ' {
+            return
+        }
 
         e_delete_tile.send(TileDeleteEvent {
             tile: *tile,
-            coordinates: tile_cords,
+            coordinates: tile_cords.clone(),
         });
+        
+        e_spawn_tile.send(
+            TilePlaceEvent {
+                tile: Tile::from(' '),
+                coordinates: tile_cords.clone(),
+                should_update_sprites: true,
+            }
+        );
     }
 }

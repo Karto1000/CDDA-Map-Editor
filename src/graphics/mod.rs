@@ -132,23 +132,35 @@ pub enum TileSprite<'a> {
         items: Option<&'a Sprite>,
         toilets: Option<&'a Sprite>,
     },
-    Default(&'a Sprite),
-    // Reserved for " " chars
+    Fallback(&'a Sprite),
+    // Reserved for " " chars with no fill_ter
     Empty,
 }
 
 pub trait GetTexture: Send + Sync {
     fn get_textures(&self, project: &Project, character: &char, coordinates: &Coordinates) -> TileSprite {
-        if character == &' ' { return TileSprite::Empty; }
-
-        let terrain = self.get_terrain(project, character, coordinates);
+        let mut terrain = self.get_terrain(project, character, coordinates);
         let furniture = self.get_furniture(project, character, coordinates);
         let items = self.get_item(project, character, coordinates);
         let toilets = self.get_toilets(project, character, coordinates);
 
+        match &project.map_entity.fill {
+            None => {}
+            Some(v) => {
+                // Add fill_ter terrain texture when terrain does not exist
+                if terrain.is_none() {
+                    terrain = Some(self.get_texture_from_tile_id(project, coordinates, v).unwrap())
+                }
+            }
+        }
+
         if terrain.is_none() && furniture.is_none() && items.is_none() && toilets.is_none() {
+            if project.map_entity.fill.is_none() {
+                return TileSprite::Empty;
+            }
+
             // Return Default Texture
-            return TileSprite::Default(self.get_fallback_texture(character));
+            return TileSprite::Fallback(self.get_fallback_texture(character));
         }
 
         return TileSprite::Exists {
@@ -159,6 +171,7 @@ pub trait GetTexture: Send + Sync {
         };
     }
 
+    fn get_texture_from_tile_id(&self, project: &Project, coordinates: &Coordinates, id: &TileId) -> Option<&Sprite>;
     fn get_terrain(&self, project: &Project, character: &char, coordinates: &Coordinates) -> Option<&Sprite>;
     fn get_furniture(&self, project: &Project, character: &char, coordinates: &Coordinates) -> Option<&Sprite>;
     fn get_item(&self, project: &Project, character: &char, coordinates: &Coordinates) -> Option<&Sprite>;
@@ -254,6 +267,20 @@ fn get_sprite_from_sprite_type<'a>(
 }
 
 impl GetTexture for LegacyTextures {
+    fn get_texture_from_tile_id(&self, project: &Project, coordinates: &Coordinates, id: &TileId) -> Option<&Sprite> {
+        let sprite_type = match self.textures.get(id) {
+            None => return None,
+            Some(s) => s
+        };
+
+        return Some(get_sprite_from_sprite_type(
+            project,
+            coordinates,
+            &' ',
+            sprite_type,
+        ));
+    }
+
     fn get_terrain(&self, project: &Project, character: &char, coordinates: &Coordinates) -> Option<&Sprite> {
         match &project.map_entity.get_ids(character).terrain {
             None => return None,

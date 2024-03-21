@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::ALL_PALETTES;
-use crate::common::{Coordinates, MeabyMulti, MeabyNumberRange, MeabyWeighted};
+use crate::common::{Coordinates, MeabyMulti, MeabyNumberRange, MeabyWeighted, TileId};
 use crate::common::io::{Load, LoadError};
 use crate::map::resources::MapEntity;
 use crate::palettes::{Identifier, Item, MapGenValue, MapObjectId, PaletteId, ParameterType};
@@ -96,13 +96,28 @@ fn compute_palettes(parameters: &HashMap<String, String>, palettes: &Vec<MapObje
 
 impl Load<MapEntity> for MapEntityLoader {
     fn load(&self) -> Result<MapEntity, LoadError> {
+        let mut om_terrain = "".to_string();
+        
         let objects = serde_json::from_str::<Vec<HashMap<String, Value>>>(std::fs::read_to_string(&self.path).unwrap().as_str()).unwrap();
         let filtered_objects = objects
             .into_iter()
             .filter(|o| {
                 return match o.get("om_terrain") {
                     None => false,
-                    Some(s) => s.as_str().unwrap() == self.id,
+                    Some(s) => match s {
+                        Value::String(s) => {
+                            om_terrain = s.clone();
+                            s.clone() == self.id
+                        },
+                        Value::Array(a) => {
+                            // TODO actually implement this correctly
+                            let first = a.first().unwrap();
+                            let string = first.as_str().unwrap().to_string();
+                            om_terrain = string.clone();
+                            string == self.id
+                        },
+                        _ => panic!()
+                    }
                 };
             })
             .collect::<Vec<HashMap<String, Value>>>();
@@ -135,7 +150,7 @@ impl Load<MapEntity> for MapEntityLoader {
             }
         }
 
-        let palettes: Vec<MapObjectId> = serde_json::from_value(object.get("palettes").unwrap().clone()).unwrap();
+        let palettes: Vec<MapObjectId> = serde_json::from_value(object.get("palettes").unwrap_or(&Value::Array(Vec::new())).clone()).unwrap();
 
         let mut this = HashMap::new();
 
@@ -151,7 +166,6 @@ impl Load<MapEntity> for MapEntityLoader {
             palettes: compute_palettes(&this, &palettes),
         };
 
-
         let terrain = match object.get("terrain") {
             None => HashMap::new(),
             Some(t) => serde_json::from_value(t.clone()).unwrap()
@@ -162,12 +176,18 @@ impl Load<MapEntity> for MapEntityLoader {
             Some(f) => serde_json::from_value(f.clone()).unwrap()
         };
 
+        let fill: Option<TileId> = match object.get("fill_ter") {
+            None => None,
+            Some(v) => Some(TileId(v.as_str().unwrap().to_string()))
+        };
+
         return Ok(
             MapEntity {
                 map_type: MapEntityType::Default {
-                    om_terrain: mapgen_entity.get("om_terrain").unwrap().as_str().unwrap().to_string(),
+                    om_terrain,
                     weight: 100,
                 },
+                fill,
                 palettes,
                 computed_parameters,
                 tiles,

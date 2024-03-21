@@ -86,6 +86,9 @@ pub struct MapEntity {
     pub map_type: MapEntityType,
     pub tiles: HashMap<Coordinates, Tile>,
     pub size: Vec2,
+    
+    #[serde(skip)]
+    pub fill: Option<TileId>,
 
     #[serde(skip)]
     pub computed_parameters: ComputedParameters,
@@ -113,6 +116,7 @@ impl Default for MapEntity {
                 om_terrain: "unnamed_01".to_string(),
                 weight: 100
             },
+            fill: None,
             tiles: Default::default(),
             size: Vec2 { x: 24., y: 24. },
             computed_parameters: ComputedParameters { this: Default::default(), palettes: Default::default() },
@@ -151,6 +155,7 @@ impl MapEntity {
                 om_terrain: name,
                 weight: 100,
             },
+            fill: None,
             tiles: HashMap::new(),
             size,
             computed_parameters: ComputedParameters { this: Default::default(), palettes: Default::default() },
