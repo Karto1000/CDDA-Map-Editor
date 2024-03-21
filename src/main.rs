@@ -317,8 +317,8 @@ fn setup(
     let mut editor_data = editor_data_saver.load().unwrap();
 
     let loader = MapEntityLoader {
-        path: PathBuf::from(format!(r"{}/mapgen/abandoned_barn.json", CDDA_DIR)),
-        id: "desolatebarn".to_string(),
+        path: PathBuf::from(format!(r"{}/mapgen/house/house01.json", CDDA_DIR)),
+        id: "testing".to_string(),
     };
 
     let map_entity = loader.load().unwrap();

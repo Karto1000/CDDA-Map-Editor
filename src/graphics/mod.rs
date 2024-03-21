@@ -148,7 +148,7 @@ pub trait GetTexture: Send + Sync {
             None => {}
             Some(v) => {
                 // Add fill_ter terrain texture when terrain does not exist
-                if terrain.is_none() {
+                if terrain.is_none() && furniture.is_some() {
                     terrain = Some(self.get_texture_from_tile_id(project, coordinates, v).unwrap())
                 }
             }
@@ -212,59 +212,76 @@ impl LegacyTextures {
     }
 }
 
-fn get_sprite_from_sprite_type<'a>(
-    project: &Project,
-    coordinates: &Coordinates,
-    character: &char,
-    sprite_type: &'a SpriteType,
-) -> &'a Sprite {
-    return match sprite_type {
-        SpriteType::Single(s) => s,
-        SpriteType::Multitile { center, corner, t_connection, edge, end_piece, unconnected } => {
-            let tiles_around = project.map_entity.get_tiles_around(coordinates);
+macro_rules! define_sprite_from_sprite_type {
+    ($field: ident, $ident: ident) => {
+        fn $ident<'a>(
+            project: &Project,
+            coordinates: &Coordinates,
+            character: &char,
+            sprite_type: &'a SpriteType) -> &'a Sprite {
+            return match sprite_type {
+                SpriteType::Single(s) => s,
+                SpriteType::Multitile { center, corner, t_connection, edge, end_piece, unconnected } => {
+                    let tiles_around = project.map_entity.get_tiles_around(coordinates);
 
-            let is_tile_ontop_same_type = match tiles_around.get(0).unwrap().0 {
-                None => false,
-                Some(top) => top.character == *character
-            };
+                    // TODO handle errors
+                    let fill = project.map_entity.fill.as_ref().unwrap();
 
-            let is_tile_right_same_type = match tiles_around.get(1).unwrap().0 {
-                None => false,
-                Some(right) => right.character == *character
-            };
+                    macro_rules! match_tiles_around {
+                        ($name: ident, $num: expr) => {
+                           let $name = match tiles_around.get($num).unwrap().0 {
+                               None => false,
+                               Some(t)  => {
+                                   let ids = project.map_entity.get_ids(&t.character);
+                            
+                                    let is_same_character = t.character == *character;
+                                    let is_same_id = match &ids.$field {
+                                        None => false,
+                                        Some(t) => t == fill
+                                    };
+                                    
+                                    is_same_character || is_same_id || (ids.$field.is_none() && project.map_entity.get_ids(character).$field.is_none()) 
+                               }
+                           };
+                        }
+                    }
 
-            let is_tile_below_same_type = match tiles_around.get(2).unwrap().0 {
-                None => false,
-                Some(below) => below.character == *character
-            };
+                    match_tiles_around!(is_tile_ontop_same_type, 0);
+                    match_tiles_around!(is_tile_right_same_type, 1);
+                    match_tiles_around!(is_tile_below_same_type, 2);
+                    match_tiles_around!(is_tile_left_same_type, 3);
 
-            let is_tile_left_same_type = match tiles_around.get(3).unwrap().0 {
-                None => false,
-                Some(left) => left.character == *character
-            };
 
-            return match (is_tile_ontop_same_type, is_tile_right_same_type, is_tile_below_same_type, is_tile_left_same_type) {
-                // Some of the worst code i've ever written lol
-                (true, true, true, true) => &center,
-                (true, true, true, false) => &t_connection.west,
-                (true, true, false, true) => &t_connection.south,
-                (true, false, true, true) => &t_connection.east,
-                (false, true, true, true) => &t_connection.north,
-                (true, true, false, false) => &corner.south_west,
-                (true, false, false, true) => &corner.south_east,
-                (false, true, true, false) => &corner.north_west,
-                (false, false, true, true) => &corner.north_east,
-                (true, false, false, false) => &end_piece.south,
-                (false, true, false, false) => &end_piece.west,
-                (false, false, true, false) => &end_piece.north,
-                (false, false, false, true) => &end_piece.east,
-                (false, true, false, true) => &edge.east_west,
-                (true, false, true, false) => &edge.north_south,
-                (false, false, false, false) => &unconnected
+                    return match (is_tile_ontop_same_type, is_tile_right_same_type, is_tile_below_same_type, is_tile_left_same_type) {
+                        // Some of the worst code i've ever written lol
+                        (true, true, true, true) => &center,
+                        (true, true, true, false) => &t_connection.west,
+                        (true, true, false, true) => &t_connection.south,
+                        (true, false, true, true) => &t_connection.east,
+                        (false, true, true, true) => &t_connection.north,
+                        (true, true, false, false) => &corner.south_west,
+                        (true, false, false, true) => &corner.south_east,
+                        (false, true, true, false) => &corner.north_west,
+                        (false, false, true, true) => &corner.north_east,
+                        (true, false, false, false) => &end_piece.south,
+                        (false, true, false, false) => &end_piece.west,
+                        (false, false, true, false) => &end_piece.north,
+                        (false, false, false, true) => &end_piece.east,
+                        (false, true, false, true) => &edge.east_west,
+                        (true, false, true, false) => &edge.north_south,
+                        (false, false, false, false) => &unconnected
+                    };
+                }
             };
-        }
+        } 
     };
 }
+
+define_sprite_from_sprite_type!(terrain, get_terrain_sprite_from_sprite_type);
+define_sprite_from_sprite_type!(furniture, get_furniture_sprite_from_sprite_type);
+define_sprite_from_sprite_type!(item, get_item_sprite_from_sprite_type);
+define_sprite_from_sprite_type!(toilet, get_toilet_sprite_from_sprite_type);
+
 
 impl GetTexture for LegacyTextures {
     fn get_texture_from_tile_id(&self, project: &Project, coordinates: &Coordinates, id: &TileId) -> Option<&Sprite> {
@@ -273,7 +290,7 @@ impl GetTexture for LegacyTextures {
             Some(s) => s
         };
 
-        return Some(get_sprite_from_sprite_type(
+        return Some(get_terrain_sprite_from_sprite_type(
             project,
             coordinates,
             &' ',
@@ -291,7 +308,7 @@ impl GetTexture for LegacyTextures {
                         Some(s) => s
                     };
 
-                    return Some(get_sprite_from_sprite_type(
+                    return Some(get_terrain_sprite_from_sprite_type(
                         project,
                         coordinates,
                         character,
@@ -304,7 +321,7 @@ impl GetTexture for LegacyTextures {
                     Some(s) => s
                 };
 
-                return Some(get_sprite_from_sprite_type(
+                return Some(get_terrain_sprite_from_sprite_type(
                     project,
                     coordinates,
                     character,
@@ -324,7 +341,7 @@ impl GetTexture for LegacyTextures {
                         Some(s) => s
                     };
 
-                    return Some(get_sprite_from_sprite_type(
+                    return Some(get_furniture_sprite_from_sprite_type(
                         project,
                         coordinates,
                         character,
@@ -337,7 +354,7 @@ impl GetTexture for LegacyTextures {
                     Some(s) => s
                 };
 
-                return Some(get_sprite_from_sprite_type(
+                return Some(get_furniture_sprite_from_sprite_type(
                     project,
                     coordinates,
                     character,
@@ -356,7 +373,7 @@ impl GetTexture for LegacyTextures {
                     Some(s) => s
                 };
 
-                return Some(get_sprite_from_sprite_type(
+                return Some(get_item_sprite_from_sprite_type(
                     project,
                     coordinates,
                     character,
@@ -375,7 +392,7 @@ impl GetTexture for LegacyTextures {
                     Some(s) => s
                 };
 
-                return Some(get_sprite_from_sprite_type(
+                return Some(get_toilet_sprite_from_sprite_type(
                     project,
                     coordinates,
                     character,

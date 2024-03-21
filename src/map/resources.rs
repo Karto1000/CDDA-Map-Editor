@@ -25,7 +25,7 @@ impl ComputedParameters {
                         Some(v) => return Some(v)
                     }
                 }
-            },
+            }
             Some(v) => return Some(v)
         };
 
@@ -50,7 +50,7 @@ impl MapEntityType {
         match self {
             MapEntityType::Nested { ref mut nested_mapgen_id } => {
                 *nested_mapgen_id = name.clone()
-            },
+            }
             MapEntityType::Default { ref mut om_terrain, .. } => {
                 *om_terrain = name.clone()
             }
@@ -60,7 +60,7 @@ impl MapEntityType {
     pub fn get_name(&self) -> &String {
         return match self {
             MapEntityType::Nested { nested_mapgen_id } => nested_mapgen_id,
-            MapEntityType::Default { om_terrain, ..} => om_terrain
+            MapEntityType::Default { om_terrain, .. } => om_terrain
         };
     }
 }
@@ -86,7 +86,7 @@ pub struct MapEntity {
     pub map_type: MapEntityType,
     pub tiles: HashMap<Coordinates, Tile>,
     pub size: Vec2,
-    
+
     #[serde(skip)]
     pub fill: Option<TileId>,
 
@@ -114,7 +114,7 @@ impl Default for MapEntity {
         return Self {
             map_type: MapEntityType::Default {
                 om_terrain: "unnamed_01".to_string(),
-                weight: 100
+                weight: 100,
             },
             fill: None,
             tiles: Default::default(),
@@ -125,7 +125,7 @@ impl Default for MapEntity {
             items: Default::default(),
             place_nested: vec![],
             palettes: vec![],
-        }
+        };
     }
 }
 
@@ -171,7 +171,7 @@ impl MapEntity {
         let mut group = TileIdGroup::default();
 
         macro_rules! match_id {
-            ($id: ident, $path: expr) => {
+            ($id: ident, $path: expr, $computed_parameters: expr) => {
                 match $id {
                     MapObjectId::Single(v) => {
                         match v {
@@ -207,7 +207,7 @@ impl MapEntity {
                     }
                     MapObjectId::Nested(_) => { panic!("Not Implemented") }
                     MapObjectId::Param { param, fallback } => {
-                        $path = Some(TileId(self.computed_parameters.get_value(param).expect(format!("Parameter {} to exist", param).as_str()).clone()));
+                        $path = Some(TileId($computed_parameters.get_value(param).expect(format!("Parameter {} to exist", param).as_str()).clone()));
                     }
                     MapObjectId::Switch {switch, cases} => {
                         panic!("Not Implemented")
@@ -217,81 +217,57 @@ impl MapEntity {
         }
 
         if let Some(id) = self.terrain.get(character) {
-            match_id!(id, group.terrain);
+            match_id!(id, group.terrain, self.computed_parameters);
         }
 
         if let Some(id) = self.furniture.get(character) {
-            match_id!(id, group.furniture);
+            match_id!(id, group.furniture, self.computed_parameters);
         }
 
-        for palette_object_id in self.palettes.iter() {
-            let palette_id = match palette_object_id {
-                MapObjectId::Grouped(_) => {todo!()}
-                MapObjectId::Nested(_) => {todo!()}
-                MapObjectId::Param { .. } => {todo!()}
-                MapObjectId::Switch { .. } => {todo!()}
+        fn match_palette(map_entity: &MapEntity, group: &mut TileIdGroup, character: &char, palette: &MapObjectId) {
+            let palette_id = match palette {
+                MapObjectId::Grouped(_) => { todo!() }
+                MapObjectId::Nested(_) => { todo!() }
+                MapObjectId::Param { param, fallback } => { 
+                    TileId(map_entity.computed_parameters.get_value(param).unwrap().clone())
+                }
+                MapObjectId::Switch { .. } => { todo!() }
                 MapObjectId::Single(mw) => {
                     match mw {
                         MeabyWeighted::NotWeighted(i) => {
                             match i {
                                 Identifier::TileId(id) => {
-                                    id
+                                    id.clone()
                                 }
-                                Identifier::Parameter(_) => {todo!()}
+                                Identifier::Parameter(_) => { todo!() }
                             }
                         }
-                        MeabyWeighted::Weighted(_) => {todo!()}
+                        MeabyWeighted::Weighted(_) => { todo!() }
                     }
                 }
             };
-            
+
             let palette = ALL_PALETTES.get(&palette_id.0).unwrap();
-            
+
             if let Some(id) = palette.furniture.get(character) {
                 if group.furniture.is_none() {
-                    match_id!(id, group.furniture);
+                    match_id!(id, group.furniture, map_entity.computed_parameters);
                 }
             }
-        
+
             if let Some(id) = palette.terrain.get(character) {
                 if group.terrain.is_none() {
-                    match_id!(id, group.terrain);
+                    match_id!(id, group.terrain, map_entity.computed_parameters);
                 }
             }
-        
+
             for parent_palette in palette.palettes.iter() {
-                let id = match parent_palette {
-                    MapObjectId::Single(mw) => {
-                        match mw {
-                            MeabyWeighted::NotWeighted(v) => match v {
-                                Identifier::TileId(id) => id.clone(),
-                                Identifier::Parameter(_) => {todo!()}
-                            },
-                            _ => todo!()
-                        }
-                    },
-                    MapObjectId::Grouped(_) => {todo!()}
-                    MapObjectId::Nested(_) => {todo!()}
-                    MapObjectId::Param { param, fallback } => {
-                        TileId(self.computed_parameters.get_value(param).unwrap().clone())
-                    }
-                    MapObjectId::Switch { .. } => {todo!()}
-                };
-        
-                let p = ALL_PALETTES.get(&id.0).unwrap();
-        
-                if let Some(id) = p.furniture.get(character) {
-                    if group.furniture.is_none() {
-                        match_id!(id, group.furniture);
-                    }
-                }
-        
-                if let Some(id) = p.terrain.get(character) {
-                    if group.terrain.is_none() {
-                        match_id!(id, group.terrain);
-                    }
-                }
+                match_palette(map_entity, group, character, parent_palette);
             }
+        }
+
+        for palette_object_id in self.palettes.iter() {
+            match_palette(self, &mut group, character, palette_object_id);
         }
 
         return group;

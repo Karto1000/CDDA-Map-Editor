@@ -86,9 +86,9 @@ fn compute_palettes(parameters: &HashMap<String, String>, palettes: &Vec<MapObje
             palettes: compute_palettes(&this, &associated_palette.palettes),
         };
 
-        computed_palettes.insert(palette_id, computed_palette_parameters);
+        computed_palettes.insert(palette_id, computed_palette_parameters.clone());
 
-        info!("Computed Parameters for {:?}", palette)
+        info!("Computed Parameters for {:?} parameters: {:?}", palette, computed_palette_parameters)
     }
 
     return computed_palettes;
