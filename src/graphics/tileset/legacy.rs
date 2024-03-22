@@ -833,16 +833,6 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
             }
         }
 
-        // TODO: Add to test
-        for i in 0..19999 {
-            let texture = textures.get(&i);
-
-            match texture {
-                None => { warn!("No Texture with id {}", i) }
-                Some(_) => {}
-            }
-        }
-
         return Ok(textures);
     }
     fn load_fallback_textures(&self, image_resource: &mut ResMut<Assets<Image>>) -> Result<HashMap<String, Handle<Image>>, Error> {

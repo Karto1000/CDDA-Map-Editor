@@ -151,7 +151,7 @@ impl Default for TileIdGroup {
 impl MapEntity {
     pub fn new(name: String, size: Vec2) -> Self {
         return Self {
-            map_type: MapEntityType::Default {
+             map_type: MapEntityType::Default {
                 om_terrain: name,
                 weight: 100,
             },
@@ -229,7 +229,10 @@ impl MapEntity {
                 MapObjectId::Grouped(_) => { todo!() }
                 MapObjectId::Nested(_) => { todo!() }
                 MapObjectId::Param { param, fallback } => { 
-                    TileId(map_entity.computed_parameters.get_value(param).unwrap().clone())
+                    match map_entity.computed_parameters.get_value(param) {
+                        None => TileId(fallback.as_ref().unwrap().clone()),
+                        Some(v) => TileId(v.clone())
+                    }
                 }
                 MapObjectId::Switch { .. } => { todo!() }
                 MapObjectId::Single(mw) => {

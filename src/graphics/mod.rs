@@ -148,7 +148,7 @@ pub trait GetTexture: Send + Sync {
             None => {}
             Some(v) => {
                 // Add fill_ter terrain texture when terrain does not exist
-                if terrain.is_none() && furniture.is_some() {
+                if terrain.is_none() {
                     terrain = Some(self.get_texture_from_tile_id(project, coordinates, v).unwrap())
                 }
             }
