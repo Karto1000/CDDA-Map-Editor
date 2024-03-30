@@ -9,7 +9,7 @@ use serde::de::Visitor;
 use crate::common::io::Load;
 use crate::graphics::GetTexture;
 use crate::map::events::{ClearTiles, SpawnMapEntity, TileDeleteEvent, TilePlaceEvent, UpdateSpriteEvent};
-use crate::map::systems::{clear_tiles_reader, map_save_system, save_directory_picked, spawn_map_entity_reader, SpawnSprite};
+use crate::map::systems::{clear_tiles_reader, map_save_system, save_directory_picked, spawn_map_entity_reader, SpawnSprite, update_animated_sprites};
 
 pub(crate) mod systems;
 pub(crate) mod resources;
@@ -25,6 +25,7 @@ impl Plugin for MapPlugin {
         app.add_systems(Update, save_directory_picked);
         app.add_systems(Update, spawn_map_entity_reader);
         app.add_systems(Update, clear_tiles_reader);
+        app.add_systems(Update, update_animated_sprites);
 
         app.add_event::<TilePlaceEvent>();
         app.add_event::<SpawnSprite>();

@@ -135,6 +135,10 @@ pub struct TilesetTileDescriptor {
 
     #[serde(rename = "multitile")]
     is_multitile: Option<bool>,
+
+    #[serde(rename = "animated")]
+    is_animated: Option<bool>,
+
     additional_tiles: Option<Vec<AdditionalTile>>,
 }
 
@@ -877,8 +881,6 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
             let offset_y = group.sprite_offset_y.unwrap_or(0);
 
             for tile in group.tiles.iter() {
-                // TODO: Revisit
-                // Figure out what to do here
                 let get_main_fg: Option<Arc<dyn GetForeground>> = match &tile.fg {
                     None => { continue; }
                     Some(fg) => {
@@ -992,6 +994,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                         bg: get_main_bg.clone(),
                                         offset_x,
                                         offset_y,
+                                        is_animated: tile.is_animated.unwrap_or(false),
                                     }),
                                 );
                             }
@@ -1005,6 +1008,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                             bg: get_main_bg.clone(),
                                             offset_x,
                                             offset_y,
+                                            is_animated: tile.is_animated.unwrap_or(false),
                                         }),
                                     );
                                 }
@@ -1047,6 +1051,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                             bg: v.1,
                                             offset_x,
                                             offset_y,
+                                            is_animated: tile.is_animated.unwrap_or(false),
                                         })
                                     }
                                     "corner" => {
@@ -1056,7 +1061,8 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                             fg,
                                             bg,
                                         );
-                                        corner = Some(Corner::from((v.0, v.1, offset_x, offset_y)))
+                                        corner = Some(Corner::from((v.0, v.1, offset_x, offset_y, tile.is_animated.unwrap_or(false)
+                                        )))
                                     }
                                     "t_connection" => {
                                         let v = get_multi_fg_and_bg(
@@ -1065,7 +1071,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                             fg,
                                             bg,
                                         );
-                                        t_connection = Some(FullCardinal::from((v.0, v.1, offset_x, offset_y)));
+                                        t_connection = Some(FullCardinal::from((v.0, v.1, offset_x, offset_y, tile.is_animated.unwrap_or(false))));
                                     }
                                     "edge" => {
                                         let v = get_multi_fg_and_bg(
@@ -1074,7 +1080,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                             fg,
                                             bg,
                                         );
-                                        edge = Some(Edge::from((v.0, v.1, offset_x, offset_y)));
+                                        edge = Some(Edge::from((v.0, v.1, offset_x, offset_y, tile.is_animated.unwrap_or(false))));
                                     }
                                     "end_piece" => {
                                         let v = get_multi_fg_and_bg(
@@ -1083,7 +1089,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                             fg,
                                             bg,
                                         );
-                                        end_piece = Some(FullCardinal::from((v.0, v.1, offset_x, offset_y)));
+                                        end_piece = Some(FullCardinal::from((v.0, v.1, offset_x, offset_y, tile.is_animated.unwrap_or(false))));
                                     }
                                     "unconnected" => {
                                         let (get_fg, get_bg) = get_single_fg_and_bg(
@@ -1096,6 +1102,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                             bg: get_bg,
                                             offset_x,
                                             offset_y,
+                                            is_animated: tile.is_animated.unwrap_or(false),
                                         });
                                     }
                                     _ => { warn!("Got Unexpected id {} for fg {:?}", additional_tile.id, fg) }
@@ -1107,6 +1114,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                 bg: get_main_bg.clone(),
                                 offset_x: 0,
                                 offset_y: 0,
+                                is_animated: false,
                             };
 
                             assigned_textures.insert(

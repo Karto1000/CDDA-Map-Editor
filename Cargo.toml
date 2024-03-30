@@ -20,7 +20,8 @@ rustflags = ["-Z", "threads=8"]
 serde = { version = "1.0.195", features = ["default", "derive"] }
 serde_json = "1.0.111"
 either = { version = "1.9.0", features = ["serde"] }
-bevy = { version = "0.12.1", features = ["bevy_ui"] }
+chrono = "0.4.37"
+bevy = { version = "0.12.1", features = ["bevy_ui", "dynamic_linking"] }
 image = { version = "0.24.7", features = ["default"] }
 winit = { version = "0.28.7", features = ["default"] }
 bevy_file_dialog = "0.3.2"

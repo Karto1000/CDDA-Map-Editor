@@ -58,10 +58,10 @@ mod palettes;
 mod common;
 mod region_settings;
 
-pub const CDDA_DIR: &'static str = r"C:\DEV\SelfDEV\CDDA\CDDA-Map-Editor\saves";
+pub const CDDA_DIR: &'static str = r"C:\CDDA\testing";
 
 lazy_static! {
-    pub static ref ALL_PALETTES: HashMap<String, Palette> = PalettesLoader::new(PathBuf::from(format!(r"{}/palettes", CDDA_DIR))).load().unwrap();
+    pub static ref ALL_PALETTES: HashMap<String, Palette> = PalettesLoader::new(PathBuf::from(format!(r"{}/data/json/mapgen_palettes", CDDA_DIR))).load().unwrap();
 }
 
 #[derive(Component)]
@@ -276,7 +276,7 @@ fn main() {
         .add_plugins((GridPlugin {}, MapPlugin {}, TilePlugin {}, UiPlugin {}))
         .add_systems(Update, (
             update,
-            update_mouse_location,
+            // update_mouse_location,
             app_exit,
             switch_project,
             tile_despawn_reader,
@@ -306,8 +306,8 @@ fn setup(
 ) {
     commands.spawn(Camera2dBundle::default());
 
-    let tileset_loader = LegacyTilesetLoader::new(PathBuf::from(format!(r"{}/tileset/gfx/MSX++UnDeadPeopleEdition", CDDA_DIR)));
-    let region_settings_loader = RegionSettingsLoader::new(PathBuf::from(format!(r"{}/regional_map_settings.json", CDDA_DIR)), "default".to_string());
+    let tileset_loader = LegacyTilesetLoader::new(PathBuf::from(format!(r"{}/gfx/MSX++UnDeadPeopleEdition", CDDA_DIR)));
+    let region_settings_loader = RegionSettingsLoader::new(PathBuf::from(format!(r"{}/data/json/regional_map_settings.json", CDDA_DIR)), "default".to_string());
 
     let editor_data_saver = EditorDataSaver::new();
     let legacy_textures = LegacyTextures::new(tileset_loader, region_settings_loader, &mut r_images);
@@ -317,18 +317,14 @@ fn setup(
     let mut editor_data = editor_data_saver.load().unwrap();
 
     let loader = MapEntityLoader {
-        path: PathBuf::from(format!(r"{}/mapgen/house/house01.json", CDDA_DIR)),
-        id: "testing".to_string(),
+        path: PathBuf::from(format!(r"{}/data/json/mapgen/house/house01.json", CDDA_DIR)),
+        id: "house_01".to_string(),
     };
 
     let map_entity = loader.load().unwrap();
 
     let project: &mut Project = editor_data.get_current_project_mut().unwrap_or(&mut default_project);
     project.map_entity = map_entity;
-
-    // project.map_entity.terrain.insert('g', MapObjectId::from("t_grass"));
-    // project.map_entity.furniture.insert('g', MapObjectId::from("f_chair"));
-    // project.map_entity.add_palette(&palette);
 
     e_spawn_map_entity.send(SpawnMapEntity {
         map_entity: Arc::new(project.map_entity.clone())
@@ -367,24 +363,24 @@ fn setup(
         GridMarker {}
     ));
 
-    commands.spawn((
-        TextBundle::from_section(
-            "0, 0",
-            TextStyle {
-                font: asset_server.load("fonts/unifont.ttf"),
-                font_size: 24.0,
-                ..default()
-            },
-        )
-            .with_text_alignment(TextAlignment::Center)
-            .with_style(Style {
-                position_type: PositionType::Absolute,
-                top: Val::Px(5.0),
-                right: Val::Px(5.0),
-                ..default()
-            }),
-        MouseLocationTextMarker {}
-    ));
+    // commands.spawn((
+    //     TextBundle::from_section(
+    //         "0, 0",
+    //         TextStyle {
+    //             font: asset_server.load("fonts/unifont.ttf"),
+    //             font_size: 24.0,
+    //             ..default()
+    //         },
+    //     )
+    //         .with_text_alignment(TextAlignment::Center)
+    //         .with_style(Style {
+    //             position_type: PositionType::Absolute,
+    //             top: Val::Px(5.0),
+    //             right: Val::Px(5.0),
+    //             ..default()
+    //         }),
+    //     MouseLocationTextMarker {}
+    // ));
 
     commands.insert_resource(editor_data);
     commands.insert_resource(texture_resource);
@@ -424,21 +420,21 @@ fn update(
     }
 }
 
-fn update_mouse_location(
-    mut event_cursor: EventReader<CursorMoved>,
-    mut location_text: Query<(&mut Text, &MouseLocationTextMarker)>,
-    query_windows: Query<&Window, With<PrimaryWindow>>,
-    res_grid: Res<Grid>,
-) {
-    let mut text = location_text.single_mut();
-    let window = query_windows.single();
-    let xy = window.cursor_position().unwrap_or(Vec2::default()).xy();
-
-    for _ in event_cursor.read() {
-        let pos = ((xy + res_grid.offset) / res_grid.tile_size).floor();
-        text.0.sections[0].value = format!("{}, {}", pos.x, pos.y);
-    }
-}
+// fn update_mouse_location(
+//     mut event_cursor: EventReader<CursorMoved>,
+//     mut location_text: Query<(&mut Text, &MouseLocationTextMarker)>,
+//     query_windows: Query<&Window, With<PrimaryWindow>>,
+//     res_grid: Res<Grid>,
+// ) {
+//     let mut text = location_text.single_mut();
+//     let window = query_windows.single();
+//     let xy = window.cursor_position().unwrap_or(Vec2::default()).xy();
+// 
+//     for _ in event_cursor.read() {
+//         let pos = ((xy + res_grid.offset) / res_grid.tile_size).floor();
+//         text.0.sections[0].value = format!("{}, {}", pos.x, pos.y);
+//     }
+// }
 
 fn switch_project(
     mut e_switch_project: EventReader<SwitchProject>,

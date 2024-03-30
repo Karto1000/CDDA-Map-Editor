@@ -19,6 +19,7 @@ pub struct Sprite {
     pub bg: Option<Arc<dyn GetBackground>>,
     pub offset_x: i32,
     pub offset_y: i32,
+    pub is_animated: bool,
 }
 
 pub struct FullCardinal {
@@ -28,32 +29,37 @@ pub struct FullCardinal {
     pub west: Sprite,
 }
 
-impl From<(Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>, i32, i32)> for FullCardinal {
-    fn from(value: (Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>, i32, i32)) -> Self {
+impl From<(Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>, i32, i32, bool)> for FullCardinal {
+    fn from(value: (Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>, i32, i32, bool)) -> Self {
         return FullCardinal {
             north: Sprite {
                 fg: value.0.get(0).cloned(),
                 bg: value.1.clone(),
                 offset_x: value.2,
                 offset_y: value.3,
+                is_animated: value.4,
             },
             west: Sprite {
                 fg: value.0.get(1).cloned(),
                 bg: value.1.clone(),
                 offset_x: value.2,
                 offset_y: value.3,
+                is_animated: value.4,
             },
             south: Sprite {
                 fg: value.0.get(2).cloned(),
                 bg: value.1.clone(),
                 offset_x: value.2,
                 offset_y: value.3,
+                is_animated: value.4,
+
             },
             east: Sprite {
                 fg: value.0.get(3).cloned(),
                 bg: value.1,
                 offset_x: value.2,
                 offset_y: value.3,
+                is_animated: value.4,
             },
         };
     }
@@ -67,32 +73,36 @@ pub struct Corner {
     pub north_east: Sprite,
 }
 
-impl From<(Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>, i32, i32)> for Corner {
-    fn from(value: (Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>, i32, i32)) -> Self {
+impl From<(Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>, i32, i32, bool)> for Corner {
+    fn from(value: (Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>, i32, i32, bool)) -> Self {
         return Corner {
             north_west: Sprite {
                 fg: value.0.get(0).cloned(),
                 bg: value.1.clone(),
                 offset_x: value.2,
                 offset_y: value.3,
+                is_animated: value.4,
             },
             south_west: Sprite {
                 fg: value.0.get(1).cloned(),
                 bg: value.1.clone(),
                 offset_x: value.2,
                 offset_y: value.3,
+                is_animated: value.4,
             },
             south_east: Sprite {
                 fg: value.0.get(2).cloned(),
                 bg: value.1.clone(),
                 offset_x: value.2,
                 offset_y: value.3,
+                is_animated: value.4,
             },
             north_east: Sprite {
                 fg: value.0.get(3).cloned(),
                 bg: value.1.clone(),
                 offset_x: value.2,
                 offset_y: value.3,
+                is_animated: value.4,
             },
         };
     }
@@ -103,11 +113,23 @@ pub struct Edge {
     pub east_west: Sprite,
 }
 
-impl From<(Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>, i32, i32)> for Edge {
-    fn from(value: (Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>, i32, i32)) -> Self {
+impl From<(Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>, i32, i32, bool)> for Edge {
+    fn from(value: (Vec<Arc<dyn GetForeground>>, Option<Arc<dyn GetBackground>>, i32, i32, bool)) -> Self {
         return Self {
-            north_south: Sprite { fg: value.0.get(0).cloned(), bg: value.1.clone(), offset_x: value.2, offset_y: value.3 },
-            east_west: Sprite { fg: value.0.get(1).cloned(), bg: value.1.clone(), offset_x: value.2, offset_y: value.3 },
+            north_south: Sprite {
+                fg: value.0.get(0).cloned(),
+                bg: value.1.clone(),
+                offset_x: value.2,
+                offset_y: value.3,
+                is_animated: value.4,
+            },
+            east_west: Sprite {
+                fg: value.0.get(1).cloned(),
+                bg: value.1.clone(),
+                offset_x: value.2,
+                offset_y: value.3,
+                is_animated: value.4,
+            },
         };
     }
 }
@@ -200,6 +222,7 @@ impl LegacyTextures {
                     bg: None,
                     offset_x: 0,
                     offset_y: 0,
+                    is_animated: false
                 },
             );
         };

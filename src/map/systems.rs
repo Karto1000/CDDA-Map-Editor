@@ -5,7 +5,7 @@ use bevy::asset::Handle;
 use bevy::hierarchy::Children;
 use bevy::input::Input;
 use bevy::math::Vec3;
-use bevy::prelude::{Commands, default, Entity, Event, EventReader, EventWriter, Image, KeyCode, Query, Res, ResMut, SpriteBundle, Text, Transform, With};
+use bevy::prelude::{Commands, Component, default, Entity, Event, EventReader, EventWriter, Image, KeyCode, Query, Res, ResMut, SpriteBundle, Text, Transform, With};
 use bevy::text::TextSection;
 use bevy_file_dialog::{DialogFileSaved, FileDialogExt};
 
@@ -37,6 +37,12 @@ pub enum SpriteKind {
     Fallback(Sprite),
 }
 
+#[derive(Component, Debug)]
+pub struct Animated {
+    cooldown: u16,
+    last_update: u64,
+}
+
 impl SpriteKind {
     pub fn get_fg(&self) -> &Option<Arc<dyn GetForeground>> {
         return match self {
@@ -59,6 +65,9 @@ impl SpriteKind {
     }
 }
 
+#[derive(Component, Debug)]
+pub struct Layer(f32);
+
 pub fn spawn_sprite(
     mut commands: Commands,
     r_grid: Res<Grid>,
@@ -75,7 +84,8 @@ pub fn spawn_sprite(
         let bg = e.sprite_kind.get_bg();
 
         if fg.is_some() {
-            let fg_entity_commands = commands.spawn((
+            let layer = e.z as f32 + 1. + e.coordinates.y as f32 * 10.;
+            let mut fg_entity_commands = commands.spawn((
                 e.tile.clone(),
                 SpriteBundle {
                     texture: fg.as_ref().unwrap().get_sprite().clone(),
@@ -84,7 +94,7 @@ pub fn spawn_sprite(
                             // Spawn off-screen
                             x: -1000.0,
                             y: -1000.0,
-                            z: e.z as f32 + 1. + e.coordinates.y as f32 * 10.,
+                            z: layer,
                         },
                         scale: Vec3 {
                             x: r_grid.tile_size / r_grid.default_tile_size,
@@ -96,13 +106,17 @@ pub fn spawn_sprite(
                     ..default()
                 },
                 e.coordinates.clone(),
+                Layer(layer),
                 Offset::from(e.offset.clone())
             ));
 
             let tile = project.map_entity.tiles.get_mut(&e.coordinates).unwrap();
             match &e.sprite_kind {
                 SpriteKind::Item(_) => { panic!("Not Implemented") }
-                SpriteKind::Terrain(_) => {
+                SpriteKind::Terrain(sprite) => {
+                    if sprite.is_animated {
+                        fg_entity_commands.insert(Animated { cooldown: 1, last_update: (chrono::prelude::Utc::now().timestamp_millis() / 1000) as u64 });
+                    }
                     tile.terrain.fg_entity = Some(fg_entity_commands.id());
                 }
                 SpriteKind::Furniture(_) => {
@@ -137,6 +151,7 @@ pub fn spawn_sprite(
                     ..default()
                 },
                 e.coordinates.clone(),
+                Layer(e.z as f32),
                 Offset::from(e.offset.clone())
             ));
 
@@ -152,6 +167,64 @@ pub fn spawn_sprite(
                 SpriteKind::Toilet(_) => { panic!("Not Implemented") }
                 SpriteKind::Fallback(_) => { panic!("Not Implemented") }
             };
+        }
+    }
+}
+
+pub fn update_animated_sprites(
+    query: Query<(Entity, &Coordinates, &Animated, &Layer)>,
+    mut commands: Commands,
+    r_textures: Res<GraphicsResource>,
+    r_grid: Res<Grid>,
+    mut r_editor_data: ResMut<EditorData>,
+) {
+    let current_project = match r_editor_data.get_current_project_mut() {
+        None => return,
+        Some(p) => p
+    };
+
+    for (entity, cords, animated, layer) in query.iter() {
+        let tile = current_project.map_entity.tiles.get(cords).unwrap();
+        match r_textures.textures.get_terrain(current_project, &tile.character, cords) {
+            Some(terrain) => {
+                if (chrono::prelude::Utc::now().timestamp_millis() / 1000) as u64 - animated.last_update < animated.cooldown as u64 {
+                    return;
+                }
+
+                let fg = terrain.fg.as_ref().unwrap().get_sprite();
+
+                let mut entity_commands = commands.get_entity(entity).unwrap();
+                let fg_entity_commands = entity_commands
+                    .insert(
+                        SpriteBundle {
+                            texture: fg.clone(),
+                            transform: Transform {
+                                translation: Vec3 {
+                                    // Spawn off-screen
+                                    x: -1000.0,
+                                    y: -1000.0,
+                                    // TODO FIX
+                                    z: 5. as f32 + 1. + cords.y as f32 * 10.,
+                                },
+                                scale: Vec3 {
+                                    x: r_grid.tile_size / r_grid.default_tile_size,
+                                    y: r_grid.tile_size / r_grid.default_tile_size,
+                                    z: layer.0
+                                },
+                                ..default()
+                            },
+                            ..default()
+                        },
+                    )
+                    .remove::<Animated>()
+                    .insert(Animated {
+                        cooldown: animated.cooldown,
+                        last_update: (chrono::prelude::Utc::now().timestamp_millis() / 1000) as u64,
+                    });
+
+                current_project.map_entity.tiles.get_mut(cords).unwrap().terrain.fg_entity = Some(fg_entity_commands.id());
+            }
+            None => {}
         }
     }
 }
@@ -318,6 +391,10 @@ pub fn update_sprite_reader(
                                          ..default()
                                      },
                                     ..default()
+                                },
+                                Animated {
+                                    cooldown: 1,
+                                    last_update: (chrono::prelude::Utc::now().timestamp_millis() / 1000) as u64 
                                 },
                                 e.coordinates.clone(),
                                 Offset {x: $sprite.offset_x, y: $sprite.offset_y }
