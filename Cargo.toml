@@ -26,6 +26,7 @@ clap = { version = "4.5.4", features = ["color"] }
 either = { version = "1.9.0", features = ["serde"] }
 chrono = "0.4.37"
 bevy = { version = "0.13.1", features = ["bevy_ui", "dynamic_linking"] }
+bevy_egui = "0.26.0"
 image = { version = "0.25.1", features = ["default"] }
 winit = { version = "0.29.15", features = ["default"] }
 bevy_file_dialog = "0.5.0"

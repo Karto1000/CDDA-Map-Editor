@@ -42,7 +42,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use winit::window::Icon;
 
-use crate::common::{BufferedLogger, Coordinates, log_message_reader, LogMessage, MeabyWeighted, PRIMARY_COLOR, PRIMARY_COLOR_FADED, Weighted};
+use crate::common::{BufferedLogger, Coordinates, LogMessage, MeabyWeighted, PRIMARY_COLOR, PRIMARY_COLOR_FADED, Weighted};
 use crate::common::io::{Load, LoadError, Save, SaveError};
 use crate::graphics::{GraphicsResource, LegacyTextures};
 use crate::graphics::tileset::legacy::LegacyTilesetLoader;
@@ -302,7 +302,6 @@ fn main() {
         .add_plugins((GridPlugin {}, MapPlugin {}, TilePlugin {}, UiPlugin {}))
         .add_systems(Update, (
             update,
-            log_message_reader,
             // update_mouse_location,
             app_exit,
             switch_project,
@@ -422,7 +421,7 @@ fn setup_egui(
             color: Default::default(),
         },
         window_stroke: Stroke::NONE,
-        // override_text_color: Some(Color32::from_rgb(255, 255, 255)),
+        override_text_color: Some(Color32::from_rgb(255, 255, 255)),
         window_fill: Color32::from_rgb(
             (PRIMARY_COLOR.r() * 255.).to_u8().unwrap(),
             (PRIMARY_COLOR.g() * 255.).to_u8().unwrap(),

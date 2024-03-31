@@ -102,15 +102,6 @@ impl LogMessage {
 }
 
 
-pub fn log_message_reader(
-    mut e_send_log: EventReader<LogMessage>,
-    mut e_write_line: EventWriter<PrintConsoleLine>,
-) {
-    for event in e_send_log.read() {
-        e_write_line.send(PrintConsoleLine::new(StyledStr::from(cformat!(r#"<g>[{}] {}</g>"#, event.level.as_str(), event.message))));
-    }
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum MeabyMulti<T> {

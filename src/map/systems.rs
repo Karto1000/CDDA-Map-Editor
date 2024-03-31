@@ -11,7 +11,7 @@ use bevy_file_dialog::{DialogFileSaved, FileDialogExt};
 
 use crate::common::Coordinates;
 use crate::EditorData;
-use crate::graphics::{GraphicsResource, Sprite, TileSprite};
+use crate::graphics::{GraphicsResource, Sprite, SpriteState, TileSprite};
 use crate::graphics::tileset::legacy::{GetBackground, GetForeground};
 use crate::grid::resources::Grid;
 use crate::map::{TileDeleteEvent, TilePlaceEvent};
@@ -186,7 +186,7 @@ pub fn update_animated_sprites(
     for (entity, cords, animated, layer) in query.iter() {
         let tile = current_project.map_entity.tiles.get(cords).unwrap();
         match r_textures.textures.get_terrain(current_project, &tile.character, cords) {
-            Some(terrain) => {
+            SpriteState::Defined(terrain) => {
                 if (chrono::prelude::Utc::now().timestamp_millis() / 1000) as u64 - animated.last_update < animated.cooldown as u64 {
                     return;
                 }
@@ -209,7 +209,7 @@ pub fn update_animated_sprites(
                                 scale: Vec3 {
                                     x: r_grid.tile_size / r_grid.default_tile_size,
                                     y: r_grid.tile_size / r_grid.default_tile_size,
-                                    z: layer.0
+                                    z: layer.0,
                                 },
                                 ..default()
                             },
@@ -224,7 +224,8 @@ pub fn update_animated_sprites(
 
                 current_project.map_entity.tiles.get_mut(cords).unwrap().terrain.fg_entity = Some(fg_entity_commands.id());
             }
-            None => {}
+            SpriteState::TextureNotFound => {}
+            SpriteState::NotMapped => {}
         }
     }
 }

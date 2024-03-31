@@ -159,45 +159,68 @@ pub enum TileSprite<'a> {
     Empty,
 }
 
+pub enum SpriteState<'a> {
+    /// Sprite is explicitly defined in either map object or palette
+    Defined(&'a Sprite),
+    /// Sprites that are defined, but not found in textures
+    TextureNotFound,
+    /// When no mapping has been defined
+    NotMapped,
+}
+
 pub trait GetTexture: Send + Sync {
     fn get_textures(&self, project: &Project, character: &char, coordinates: &Coordinates) -> TileSprite {
-        let mut terrain = self.get_terrain(project, character, coordinates);
+        let terrain = self.get_terrain(project, character, coordinates);
         let furniture = self.get_furniture(project, character, coordinates);
         let items = self.get_item(project, character, coordinates);
         let toilets = self.get_toilets(project, character, coordinates);
 
-        match &project.map_entity.fill {
-            None => {}
-            Some(v) => {
-                // Add fill_ter terrain texture when terrain does not exist
-                if terrain.is_none() {
-                    terrain = Some(self.get_texture_from_tile_id(project, coordinates, v).unwrap())
+        let terrain_sprite: Option<&Sprite> = match terrain {
+            SpriteState::Defined(s) => Some(s),
+            SpriteState::TextureNotFound => Some(self.get_fallback_texture(character)),
+            SpriteState::NotMapped => {
+                match &project.map_entity.fill {
+                    None => None,
+                    Some(fill) => self.get_texture_from_tile_id(project, coordinates, fill)
                 }
             }
-        }
+        };
 
-        if terrain.is_none() && furniture.is_none() && items.is_none() && toilets.is_none() {
-            if project.map_entity.fill.is_none() {
-                return TileSprite::Empty;
-            }
+        let furniture_sprite: Option<&Sprite> = match furniture {
+            SpriteState::Defined(s) => Some(s),
+            SpriteState::TextureNotFound => Some(self.get_fallback_texture(character)),
+            SpriteState::NotMapped => None
+        };
 
-            // Return Default Texture
-            return TileSprite::Fallback(self.get_fallback_texture(character));
+        let items_sprite: Option<&Sprite> = match items {
+            SpriteState::Defined(s) => Some(s),
+            SpriteState::TextureNotFound => Some(self.get_fallback_texture(character)),
+            SpriteState::NotMapped => None
+        };
+
+        let toilets_sprite: Option<&Sprite> = match toilets {
+            SpriteState::Defined(s) => Some(s),
+            SpriteState::TextureNotFound => Some(self.get_fallback_texture(character)),
+            SpriteState::NotMapped => None
+        };
+
+        if terrain_sprite.is_none() && furniture_sprite.is_none() && items_sprite.is_none() && toilets_sprite.is_none() {
+            return TileSprite::Empty;
         }
 
         return TileSprite::Exists {
-            terrain,
-            furniture,
-            items,
-            toilets,
+            terrain: terrain_sprite,
+            furniture: furniture_sprite,
+            items: items_sprite,
+            toilets: toilets_sprite,
         };
     }
 
     fn get_texture_from_tile_id(&self, project: &Project, coordinates: &Coordinates, id: &TileId) -> Option<&Sprite>;
-    fn get_terrain(&self, project: &Project, character: &char, coordinates: &Coordinates) -> Option<&Sprite>;
-    fn get_furniture(&self, project: &Project, character: &char, coordinates: &Coordinates) -> Option<&Sprite>;
-    fn get_item(&self, project: &Project, character: &char, coordinates: &Coordinates) -> Option<&Sprite>;
-    fn get_toilets(&self, project: &Project, character: &char, coordinates: &Coordinates) -> Option<&Sprite>;
+    fn get_terrain(&self, project: &Project, character: &char, coordinates: &Coordinates) -> SpriteState;
+    fn get_furniture(&self, project: &Project, character: &char, coordinates: &Coordinates) -> SpriteState;
+    fn get_item(&self, project: &Project, character: &char, coordinates: &Coordinates) -> SpriteState;
+    fn get_toilets(&self, project: &Project, character: &char, coordinates: &Coordinates) -> SpriteState;
     fn get_fallback_texture(&self, character: &char) -> &Sprite;
 }
 
@@ -222,7 +245,7 @@ impl LegacyTextures {
                     bg: None,
                     offset_x: 0,
                     offset_y: 0,
-                    is_animated: false
+                    is_animated: false,
                 },
             );
         };
@@ -235,7 +258,7 @@ impl LegacyTextures {
     }
 }
 
-macro_rules! define_sprite_from_sprite_type {
+macro_rules! define_get_sprite_from_sprite_type {
     ($field: ident, $ident: ident) => {
         fn $ident<'a>(
             project: &Project,
@@ -300,10 +323,10 @@ macro_rules! define_sprite_from_sprite_type {
     };
 }
 
-define_sprite_from_sprite_type!(terrain, get_terrain_sprite_from_sprite_type);
-define_sprite_from_sprite_type!(furniture, get_furniture_sprite_from_sprite_type);
-define_sprite_from_sprite_type!(item, get_item_sprite_from_sprite_type);
-define_sprite_from_sprite_type!(toilet, get_toilet_sprite_from_sprite_type);
+define_get_sprite_from_sprite_type!(terrain, get_terrain_sprite_from_sprite_type);
+define_get_sprite_from_sprite_type!(furniture, get_furniture_sprite_from_sprite_type);
+define_get_sprite_from_sprite_type!(item, get_item_sprite_from_sprite_type);
+define_get_sprite_from_sprite_type!(toilet, get_toilet_sprite_from_sprite_type);
 
 
 impl GetTexture for LegacyTextures {
@@ -321,17 +344,17 @@ impl GetTexture for LegacyTextures {
         ));
     }
 
-    fn get_terrain(&self, project: &Project, character: &char, coordinates: &Coordinates) -> Option<&Sprite> {
-        match &project.map_entity.get_ids(character).terrain {
-            None => return None,
+    fn get_terrain(&self, project: &Project, character: &char, coordinates: &Coordinates) -> SpriteState {
+        return match &project.map_entity.get_ids(character).terrain {
+            None => SpriteState::NotMapped,
             Some(terrain) => {
                 if let Some(terrain) = self.region_settings.get_random_terrain_from_region(&terrain.0) {
                     let sprite_type = match self.textures.get(terrain) {
-                        None => return None,
+                        None => return SpriteState::TextureNotFound,
                         Some(s) => s
                     };
 
-                    return Some(get_terrain_sprite_from_sprite_type(
+                    return SpriteState::Defined(get_terrain_sprite_from_sprite_type(
                         project,
                         coordinates,
                         character,
@@ -340,31 +363,31 @@ impl GetTexture for LegacyTextures {
                 }
 
                 let sprite_type = match self.textures.get(terrain) {
-                    None => return None,
+                    None => return SpriteState::TextureNotFound,
                     Some(s) => s
                 };
 
-                return Some(get_terrain_sprite_from_sprite_type(
+                SpriteState::Defined(get_terrain_sprite_from_sprite_type(
                     project,
                     coordinates,
                     character,
                     sprite_type,
-                ));
+                ))
             }
         };
     }
 
-    fn get_furniture(&self, project: &Project, character: &char, coordinates: &Coordinates) -> Option<&Sprite> {
-        match &project.map_entity.get_ids(character).furniture {
-            None => return None,
+    fn get_furniture(&self, project: &Project, character: &char, coordinates: &Coordinates) -> SpriteState {
+        return match &project.map_entity.get_ids(character).furniture {
+            None => SpriteState::NotMapped,
             Some(furniture) => {
                 if let Some(furniture) = self.region_settings.get_random_furniture_from_region(&furniture.0) {
                     let sprite_type = match self.textures.get(furniture) {
-                        None => return None,
+                            None => return SpriteState::TextureNotFound,
                         Some(s) => s
                     };
 
-                    return Some(get_furniture_sprite_from_sprite_type(
+                    return SpriteState::Defined(get_furniture_sprite_from_sprite_type(
                         project,
                         coordinates,
                         character,
@@ -373,54 +396,54 @@ impl GetTexture for LegacyTextures {
                 }
 
                 let sprite_type = match self.textures.get(furniture) {
-                    None => return None,
+                    None => return SpriteState::TextureNotFound,
                     Some(s) => s
                 };
 
-                return Some(get_furniture_sprite_from_sprite_type(
+                SpriteState::Defined(get_furniture_sprite_from_sprite_type(
                     project,
                     coordinates,
                     character,
                     sprite_type,
-                ));
+                ))
             }
         };
     }
 
-    fn get_item(&self, project: &Project, character: &char, coordinates: &Coordinates) -> Option<&Sprite> {
-        match &project.map_entity.get_ids(character).item {
-            None => return None,
+    fn get_item(&self, project: &Project, character: &char, coordinates: &Coordinates) -> SpriteState {
+        return match &project.map_entity.get_ids(character).item {
+            None => SpriteState::NotMapped,
             Some(item) => {
                 let sprite_type = match self.textures.get(item) {
-                    None => return None,
+                    None => return SpriteState::TextureNotFound,
                     Some(s) => s
                 };
 
-                return Some(get_item_sprite_from_sprite_type(
+                SpriteState::Defined(get_item_sprite_from_sprite_type(
                     project,
                     coordinates,
                     character,
                     sprite_type,
-                ));
+                ))
             }
         };
     }
 
-    fn get_toilets(&self, project: &Project, character: &char, coordinates: &Coordinates) -> Option<&Sprite> {
-        match &project.map_entity.get_ids(character).toilet {
-            None => return None,
+    fn get_toilets(&self, project: &Project, character: &char, coordinates: &Coordinates) -> SpriteState {
+        return match &project.map_entity.get_ids(character).toilet {
+            None => SpriteState::NotMapped,
             Some(toilet) => {
                 let sprite_type = match self.textures.get(toilet) {
-                    None => return None,
+                    None => return SpriteState::TextureNotFound,
                     Some(s) => s
                 };
 
-                return Some(get_toilet_sprite_from_sprite_type(
+                SpriteState::Defined(get_toilet_sprite_from_sprite_type(
                     project,
                     coordinates,
                     character,
                     sprite_type,
-                ));
+                ))
             }
         };
     }
