@@ -1,6 +1,7 @@
 use bevy::asset::{AssetServer, Handle};
 use bevy::hierarchy::{BuildChildren, ChildBuilder};
 use bevy::prelude::{AlignItems, BackgroundColor, Bundle, ButtonBundle, Color, Commands, default, Display, Image, ImageBundle, JustifyContent, NodeBundle, Res, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val};
+use bevy::ui::PositionType;
 
 use crate::common::{PRIMARY_COLOR, PRIMARY_COLOR_FADED};
 use crate::ui::components::OriginalColor;
@@ -120,6 +121,7 @@ pub fn build_hotbar(commands: &mut Commands, asset_server: &Res<AssetServer>) {
     commands.spawn(
         NodeBundle {
             style: Style {
+                position_type: PositionType::Absolute,
                 width: Val::Percent(100.),
                 height: Val::Px(32.),
                 top: Val::Px(30.),

@@ -1,9 +1,14 @@
 use std::collections::HashMap;
 use std::fmt::Formatter;
 use std::ops::Add;
+use std::sync::{Arc, RwLock};
 
-use bevy::prelude::Color;
+use bevy::prelude::{Color, Event, EventReader, EventWriter};
 use bevy::prelude::Component;
+use bevy_console::PrintConsoleLine;
+use clap::builder::StyledStr;
+use color_print::cformat;
+use log::{Level, Log, Metadata, Record};
 use num::{Bounded, Num};
 use rand::{Rng, thread_rng};
 use rand::distributions::uniform::{SampleRange, SampleUniform};
@@ -17,6 +22,94 @@ pub const PRIMARY_COLOR_FADED: Color = Color::rgb(0.23, 0.25, 0.27);
 pub const PRIMARY_COLOR_SELECTED: Color = Color::rgb(0.63, 0.70, 0.76);
 pub const ERROR: Color = Color::rgba(0.79, 0.2, 0.21, 0.5);
 
+pub struct BufferedLogger {
+    pub log_queue: Arc<RwLock<Vec<LogMessage>>>,
+}
+
+impl BufferedLogger {
+    pub fn new() -> Self {
+        return Self {
+            log_queue: Arc::new(RwLock::new(Vec::new()))
+        };
+    }
+}
+
+impl Log for BufferedLogger {
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        true
+    }
+
+    fn log(&self, record: &Record) {
+        let mut guard = self.log_queue.write().unwrap();
+
+        match record.level() {
+            Level::Error => {
+                println!("{}", cformat!("<r>[ERROR]</r> {}", record.args().to_string()))
+            }
+            Level::Warn => {
+                println!("{}", cformat!("<y>[WARN]</y> {}", record.args().to_string()))
+            }
+            Level::Info => {
+                println!("{}", cformat!("<b>[INFO]</b> {}", record.args().to_string()))
+            }
+            Level::Debug => {
+                println!("{}", cformat!("<w>[DEBUG]</w> {}", record.args().to_string()))
+            }
+            Level::Trace => {}
+        }
+        guard.push(LogMessage::new(record.level(), record.args().to_string()));
+    }
+
+    fn flush(&self) {
+        let mut guard = self.log_queue.write().unwrap();
+        guard.clear();
+    }
+}
+
+#[derive(Event, Debug)]
+pub struct LogMessage {
+    pub level: Level,
+    pub message: String,
+}
+
+impl LogMessage {
+    pub fn new(level: Level, msg: String) -> Self {
+        return Self {
+            level,
+            message: msg,
+        };
+    }
+    pub fn info(msg: String) -> Self {
+        return Self {
+            level: Level::Info,
+            message: msg,
+        };
+    }
+
+    pub fn warning(msg: String) -> Self {
+        return Self {
+            level: Level::Warn,
+            message: msg,
+        };
+    }
+
+    pub fn error(msg: String) -> Self {
+        return Self {
+            level: Level::Error,
+            message: msg,
+        };
+    }
+}
+
+
+pub fn log_message_reader(
+    mut e_send_log: EventReader<LogMessage>,
+    mut e_write_line: EventWriter<PrintConsoleLine>,
+) {
+    for event in e_send_log.read() {
+        e_write_line.send(PrintConsoleLine::new(StyledStr::from(cformat!(r#"<g>[{}] {}</g>"#, event.level.as_str(), event.message))));
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
@@ -159,7 +252,7 @@ impl Add for Coordinates {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        return Self::new(self.x + rhs.x, self.y + rhs.y) ;
+        return Self::new(self.x + rhs.x, self.y + rhs.y);
     }
 }
 

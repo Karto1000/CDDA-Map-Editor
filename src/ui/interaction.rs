@@ -14,7 +14,7 @@ pub fn close_button_interaction(
 ) {
     for interaction in interaction_query.iter() {
         match interaction {
-            Interaction::Pressed => { exit.send(AppExit) }
+            Interaction::Pressed => { exit.send(AppExit); }
             _ => {}
         };
     }

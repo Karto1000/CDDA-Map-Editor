@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use bevy::asset::Handle;
 use bevy::hierarchy::Children;
-use bevy::input::Input;
+use bevy::input::ButtonInput;
 use bevy::math::Vec3;
 use bevy::prelude::{Commands, Component, default, Entity, Event, EventReader, EventWriter, Image, KeyCode, Query, Res, ResMut, SpriteBundle, Text, Transform, With};
 use bevy::text::TextSection;
@@ -230,11 +230,11 @@ pub fn update_animated_sprites(
 }
 
 pub fn map_save_system(
-    keys: Res<Input<KeyCode>>,
+    keys: Res<ButtonInput<KeyCode>>,
     r_editor_data: ResMut<EditorData>,
     mut commands: Commands,
 ) {
-    if keys.pressed(KeyCode::ControlLeft) && keys.just_pressed(KeyCode::S) {
+    if keys.pressed(KeyCode::ControlLeft) && keys.just_pressed(KeyCode::KeyS) {
         let current_project = r_editor_data.get_current_project().unwrap();
 
         match &current_project.save_state {
@@ -509,7 +509,7 @@ pub fn tile_spawn_reader(
                             z: 1,
                             offset: Offset { x: terrain.offset_x, y: terrain.offset_y },
                         }
-                    )
+                    );
                 }
 
                 if let Some(furniture) = furniture {
@@ -521,7 +521,7 @@ pub fn tile_spawn_reader(
                             z: 3,
                             offset: Offset { x: furniture.offset_x, y: furniture.offset_y },
                         }
-                    )
+                    );
                 }
             }
             TileSprite::Fallback(default) => {
@@ -533,7 +533,7 @@ pub fn tile_spawn_reader(
                         z: 1,
                         offset: Offset::default(),
                     }
-                )
+                );
             }
             TileSprite::Empty => {}
         }
@@ -551,7 +551,7 @@ pub fn tile_spawn_reader(
                                 tile: *t,
                                 coordinates,
                             }
-                        )
+                        );
                     }
                 }
             }
@@ -606,7 +606,7 @@ pub fn tile_despawn_reader(
                             tile: *t,
                             coordinates,
                         }
-                    )
+                    );
                 }
             }
         }
@@ -625,7 +625,7 @@ pub fn spawn_map_entity_reader(
                     coordinates: coords.clone(),
                     should_update_sprites: false,
                 }
-            )
+            );
         }
     }
 }

@@ -1,4 +1,4 @@
-use bevy::input::Input;
+use bevy::input::ButtonInput;
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::{EventReader, EventWriter, MouseButton, Query, Res, ResMut, Transform, Vec2Swizzles, Window, With, Without};
 use bevy::window::{PrimaryWindow, WindowResized};
@@ -46,7 +46,7 @@ pub fn tile_place_system(
     mut e_set_tile: EventWriter<TilePlaceEvent>,
     mut e_delete_tile: EventWriter<TileDeleteEvent>,
     mut r_place_info: ResMut<PlaceInfo>,
-    buttons: Res<Input<MouseButton>>,
+    buttons: Res<ButtonInput<MouseButton>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     r_grid: Res<Grid>,
     mut r_editor_data: ResMut<EditorData>,
@@ -108,7 +108,7 @@ pub fn tile_delete_system(
     mut res_editor_data: ResMut<EditorData>,
     mut e_delete_tile: EventWriter<TileDeleteEvent>,
     mut e_spawn_tile: EventWriter<TilePlaceEvent>,
-    buttons: Res<Input<MouseButton>>,
+    buttons: Res<ButtonInput<MouseButton>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     r_grid: Res<Grid>,
     res_captured: Res<IsCursorCaptured>,

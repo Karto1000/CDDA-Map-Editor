@@ -1,4 +1,4 @@
-use bevy::input::Input;
+use bevy::input::ButtonInput;
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::math::Vec2;
 use bevy::prelude::{Commands, CursorMoved, EventReader, KeyCode, MouseButton, Query, Res, ResMut, Transform, Vec2Swizzles, Window, With, Without};
@@ -64,7 +64,7 @@ pub fn grid_resize_system(
 
 pub fn drag_system(
     mut commands: Commands,
-    buttons: Res<Input<MouseButton>>,
+    buttons: Res<ButtonInput<MouseButton>>,
     mut cursor_motion: EventReader<CursorMoved>,
     mut res_grid: ResMut<Grid>,
     mut res_drag: ResMut<DragInfo>,

@@ -10,6 +10,7 @@ use std::sync::Arc;
 use anyhow::Error;
 use bevy::asset::{Assets, AssetServer, Handle};
 use bevy::prelude::{Image, Res, ResMut, Vec2};
+use bevy::render::render_asset::RenderAssetUsages;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use image::{ColorType, DynamicImage, EncodableLayout, GenericImageView, ImageBuffer, imageops, Rgb, Rgba};
 use image::io::Reader;
@@ -174,6 +175,7 @@ fn get_image_from_tileset(image: &DynamicImage, x: u32, y: u32, width: u32, heig
         TextureDimension::D2,
         tile_sprite.to_image().to_vec(),
         TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::all()
     );
 
     return image;
@@ -396,6 +398,7 @@ fn get_multi_fg_and_bg(
                     TextureDimension::D2,
                     new_image,
                     TextureFormat::Rgba8UnormSrgb,
+                    RenderAssetUsages::all()
                 );
 
                 let data: Arc<dyn GetForeground> = Arc::new(SingleForeground { sprite: assets.add(image) });

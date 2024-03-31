@@ -107,7 +107,7 @@ pub fn on_add_tab_button_click(
                     let name = om_terrain.clone();
 
                     r_editor_data.projects.push(project);
-                    e_spawn_tab.send(SpawnTab { name, index: r_editor_data.projects.len() as u32 - 1 })
+                    e_spawn_tab.send(SpawnTab { name, index: r_editor_data.projects.len() as u32 - 1 });
                 }
             }
         }
@@ -206,7 +206,7 @@ pub fn tab_clicked(
 
                 e_switch_project.send(SwitchProject {
                     index: tab.index
-                })
+                });
             }
             _ => {}
         }

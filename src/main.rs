@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::collections::HashMap;
 use std::default::Default;
 use std::fs;
@@ -8,36 +9,50 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::string::ToString;
 use std::sync::Arc;
+use std::time::Duration;
 
 use bevy::{prelude::*, window::PrimaryWindow};
 use bevy::app::{App, AppExit, PluginGroup};
 use bevy::asset::{Asset, AssetServer};
 use bevy::DefaultPlugins;
+use bevy::input::keyboard::KeyboardInput;
+use bevy::log::LogPlugin;
 use bevy::prelude::{Assets, Bundle, Camera2dBundle, Commands, Component, EventReader, Mesh, NonSend, Query, Res, ResMut, Resource, shape, Transform, TypePath, Vec2, Vec2Swizzles, Window, With, Without};
 use bevy::render::render_resource::{AsBindGroup, AsBindGroupShaderType};
-use bevy::sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle};
+use bevy::sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle, Mesh2dHandle};
 use bevy::utils::default;
-use bevy::window::{CursorMoved, WindowMode, WindowPlugin};
+use bevy::window::{CursorMoved, PresentMode, WindowMode, WindowPlugin, WindowResolution};
 use bevy::winit::WinitWindows;
+use bevy_console::{AddConsoleCommand, ConsoleCommand, ConsoleConfiguration, ConsolePlugin, ConsoleSet, PrintConsoleLine, reply};
+use bevy_console::clap::Parser;
 use bevy_file_dialog::FileDialogPlugin;
+use bevy_inspector_egui::{bevy_egui, egui};
+use bevy_inspector_egui::bevy_egui::{EguiContext, EguiContexts};
+use bevy_inspector_egui::egui::{Color32, epaint, FontData, FontFamily, Stroke};
+use bevy_inspector_egui::egui::epaint::Shadow;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
+use clap::builder::StyledStr;
+use color_print::cformat;
 use directories::ProjectDirs;
+use image::Rgba;
 use lazy_static::lazy_static;
+use log::{Level, LevelFilter, Log, Metadata, Record};
+use num::ToPrimitive;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use winit::window::Icon;
 
-use crate::common::{Coordinates, MeabyWeighted, Weighted};
+use crate::common::{BufferedLogger, Coordinates, log_message_reader, LogMessage, MeabyWeighted, PRIMARY_COLOR, PRIMARY_COLOR_FADED, Weighted};
 use crate::common::io::{Load, LoadError, Save, SaveError};
 use crate::graphics::{GraphicsResource, LegacyTextures};
 use crate::graphics::tileset::legacy::LegacyTilesetLoader;
 use crate::grid::{GridMarker, GridMaterial, GridPlugin};
 use crate::grid::resources::Grid;
 use crate::map::events::{ClearTiles, SpawnMapEntity};
-use crate::map::MapPlugin;
-use crate::map::systems::{set_tile_reader, spawn_sprite, tile_despawn_reader, tile_remove_reader, tile_spawn_reader, update_sprite_reader};
 use crate::map::loader::MapEntityLoader;
+use crate::map::MapPlugin;
 use crate::map::resources::MapEntity;
+use crate::map::systems::{set_tile_reader, spawn_sprite, tile_despawn_reader, tile_remove_reader, tile_spawn_reader, update_sprite_reader};
 use crate::palettes::{Identifier, MapObjectId, Palette};
 use crate::palettes::loader::PalettesLoader;
 use crate::project::resources::{Project, ProjectSaveState};
@@ -62,6 +77,7 @@ pub const CDDA_DIR: &'static str = r"C:\CDDA\testing";
 
 lazy_static! {
     pub static ref ALL_PALETTES: HashMap<String, Palette> = PalettesLoader::new(PathBuf::from(format!(r"{}/data/json/mapgen_palettes", CDDA_DIR))).load().unwrap();
+    pub static ref LOGGER: BufferedLogger = BufferedLogger::new();
 }
 
 #[derive(Component)]
@@ -69,7 +85,6 @@ pub struct MouseLocationTextMarker;
 
 #[derive(Resource)]
 pub struct IsCursorCaptured(bool);
-
 
 #[derive(Event)]
 pub struct SwitchProject {
@@ -255,19 +270,30 @@ impl Load<EditorData> for EditorDataSaver {
 }
 
 fn main() {
+    lazy_static::initialize(&LOGGER);
+    log::set_logger(LOGGER.deref()).unwrap();
+    log::set_max_level(LevelFilter::Info);
+
     App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
+        .add_plugins((DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "CDDA Map Editor".to_string(),
                 mode: WindowMode::BorderlessFullscreen,
                 ..Default::default()
             }),
             ..Default::default()
-        }))
+        }).disable::<LogPlugin>(), ConsolePlugin))
         .insert_resource(IsCursorCaptured(false))
-        .add_systems(Startup, setup)
+        .insert_resource(ConsoleConfiguration {
+            keys: vec![
+                // TODO: Localize
+                KeyCode::F1
+            ],
+            ..default()
+        })
+        .add_event::<LogMessage>()
+        .add_systems(Startup, (setup, setup_egui))
         .add_event::<SwitchProject>()
-        .add_plugins(WorldInspectorPlugin::new())
         .add_plugins(FileDialogPlugin::new()
             .with_save_file::<Project>()
             .with_load_file::<Project>()
@@ -276,6 +302,7 @@ fn main() {
         .add_plugins((GridPlugin {}, MapPlugin {}, TilePlugin {}, UiPlugin {}))
         .add_systems(Update, (
             update,
+            log_message_reader,
             // update_mouse_location,
             app_exit,
             switch_project,
@@ -302,6 +329,7 @@ fn setup(
     res_grid: Res<Grid>,
     mut e_spawn_map_entity: EventWriter<SpawnMapEntity>,
     mut e_spawn_tab: EventWriter<SpawnTab>,
+    mut e_log: EventWriter<LogMessage>,
     mut r_images: ResMut<Assets<Image>>,
 ) {
     commands.spawn(Camera2dBundle::default());
@@ -348,7 +376,7 @@ fn setup(
 
     commands.spawn((
         MaterialMesh2dBundle {
-            mesh: meshes.add(shape::Box::new(1., 1., 0.0).into()).into(),
+            mesh: Mesh2dHandle::from(meshes.add(Cuboid::new(1., 1., 0.0).mesh())),
             transform: Transform::from_xyz(0.0, 0.0, 1.0),
             material: materials.add(GridMaterial {
                 tile_size: res_grid.tile_size,
@@ -363,27 +391,45 @@ fn setup(
         GridMarker {}
     ));
 
-    // commands.spawn((
-    //     TextBundle::from_section(
-    //         "0, 0",
-    //         TextStyle {
-    //             font: asset_server.load("fonts/unifont.ttf"),
-    //             font_size: 24.0,
-    //             ..default()
-    //         },
-    //     )
-    //         .with_text_alignment(TextAlignment::Center)
-    //         .with_style(Style {
-    //             position_type: PositionType::Absolute,
-    //             top: Val::Px(5.0),
-    //             right: Val::Px(5.0),
-    //             ..default()
-    //         }),
-    //     MouseLocationTextMarker {}
-    // ));
-
     commands.insert_resource(editor_data);
     commands.insert_resource(texture_resource);
+}
+
+fn setup_egui(
+    mut contexts: EguiContexts,
+) {
+    let mut fonts = egui::FontDefinitions::empty();
+    fonts.font_data.insert(
+        "unifont".to_string(),
+        FontData::from_static(include_bytes!("../assets/fonts/unifont.ttf")),
+    );
+
+    fonts.families
+        .entry(FontFamily::Proportional)
+        .or_default()
+        .insert(0, "unifont".to_string());
+
+    fonts.families
+        .entry(FontFamily::Monospace)
+        .or_default()
+        .insert(0, "unifont".to_string());
+
+    contexts.ctx_mut().set_fonts(fonts);
+    contexts.ctx_mut().set_visuals(egui::Visuals {
+        window_rounding: 0.0.into(),
+        window_shadow: Shadow {
+            extrusion: 0.0,
+            color: Default::default(),
+        },
+        window_stroke: Stroke::NONE,
+        // override_text_color: Some(Color32::from_rgb(255, 255, 255)),
+        window_fill: Color32::from_rgb(
+            (PRIMARY_COLOR.r() * 255.).to_u8().unwrap(),
+            (PRIMARY_COLOR.g() * 255.).to_u8().unwrap(),
+            (PRIMARY_COLOR.b() * 255.).to_u8().unwrap(),
+        ),
+        ..default()
+    });
 }
 
 fn update(
@@ -393,7 +439,13 @@ fn update(
     q_windows: Query<&Window, With<PrimaryWindow>>,
     mut grid_material: ResMut<Assets<GridMaterial>>,
     r_data: Res<EditorData>,
+    mut e_write_line: EventWriter<PrintConsoleLine>
 ) {
+    for log in LOGGER.log_queue.read().unwrap().iter() {
+        e_write_line.send(PrintConsoleLine::new(StyledStr::from(cformat!(r#"<g>[{}] {}</g>"#, log.level.as_str(), log.message))));
+    }
+    LOGGER.log_queue.write().unwrap().clear();
+    
     let project = match r_data.get_current_project() {
         None => return,
         Some(p) => p
@@ -419,22 +471,6 @@ fn update(
         transform.translation.y = (window.resolution.height() / 2. - (res_grid.tile_size + (sprite_offset.y as f32 * (res_grid.tile_size / res_grid.default_tile_size))) / 2.) + (res_grid.offset.y - coordinates.y as f32 * res_grid.tile_size);
     }
 }
-
-// fn update_mouse_location(
-//     mut event_cursor: EventReader<CursorMoved>,
-//     mut location_text: Query<(&mut Text, &MouseLocationTextMarker)>,
-//     query_windows: Query<&Window, With<PrimaryWindow>>,
-//     res_grid: Res<Grid>,
-// ) {
-//     let mut text = location_text.single_mut();
-//     let window = query_windows.single();
-//     let xy = window.cursor_position().unwrap_or(Vec2::default()).xy();
-// 
-//     for _ in event_cursor.read() {
-//         let pos = ((xy + res_grid.offset) / res_grid.tile_size).floor();
-//         text.0.sections[0].value = format!("{}, {}", pos.x, pos.y);
-//     }
-// }
 
 fn switch_project(
     mut e_switch_project: EventReader<SwitchProject>,

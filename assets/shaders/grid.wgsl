@@ -1,11 +1,11 @@
 #import bevy_pbr::forward_io::VertexOutput
 
-@group(1) @binding(0) var<uniform> tile_size: f32;
-@group(1) @binding(1) var<uniform> offset: vec2<f32>;
-@group(1) @binding(2) var<uniform> mouse_pos: vec2<f32>;
-@group(1) @binding(3) var<uniform> map_size: vec2<f32>;
-@group(1) @binding(4) var<uniform> is_cursor_captured: i32;
-@group(1) @binding(5) var<uniform> scale_factor: f32;
+@group(2) @binding(0) var<uniform> tile_size: f32;
+@group(2) @binding(1) var<uniform> offset: vec2<f32>;
+@group(2) @binding(2) var<uniform> mouse_pos: vec2<f32>;
+@group(2) @binding(3) var<uniform> map_size: vec2<f32>;
+@group(2) @binding(4) var<uniform> is_cursor_captured: i32;
+@group(2) @binding(5) var<uniform> scale_factor: f32;
 
 @fragment
 fn fragment(output: VertexOutput) -> @location(0) vec4<f32> {
