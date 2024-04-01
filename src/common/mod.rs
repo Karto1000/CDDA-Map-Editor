@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
-use std::ops::Add;
+use std::ops::{Add, DerefMut};
 use std::sync::{Arc, RwLock};
 
 use bevy::prelude::{Color, Event};
 use bevy::prelude::Component;
 use color_print::cformat;
+use lazy_static::lazy_static;
 use log::{Level, Log, Metadata, Record};
 use num::{Bounded, Num};
 use rand::{Rng, SeedableRng, thread_rng};
@@ -22,6 +23,10 @@ pub const PRIMARY_COLOR: Color = Color::rgb(0.19, 0.21, 0.23);
 pub const PRIMARY_COLOR_FADED: Color = Color::rgb(0.23, 0.25, 0.27);
 pub const PRIMARY_COLOR_SELECTED: Color = Color::rgb(0.63, 0.70, 0.76);
 pub const ERROR: Color = Color::rgba(0.79, 0.2, 0.21, 0.5);
+
+lazy_static! {
+    pub static ref RANDOM: Arc<RwLock<StdRng>> = Arc::new(RwLock::new(StdRng::seed_from_u64(1)));
+}
 
 pub struct BufferedLogger {
     pub log_queue: Arc<RwLock<Vec<LogMessage>>>,
@@ -127,14 +132,16 @@ impl<T: Debug> GetRandom<T> for Vec<Weighted<T>> {
     fn get_random_weighted(&self) -> Option<&T> {
         if self.len() == 0 { return None; }
 
-        let mut rng = StdRng::seed_from_u64(1);
-        let dist = WeightedIndex::new(self.iter().map(|w| match w.weight {
-            // TODO: Figure out what to do when all weights are 0
-            0 => 0.1,
-            _ => w.weight as f32
+        let dist = WeightedIndex::new(self.iter().map(|w| {
+            match w.weight {
+                // TODO: Figure out what to do when all weights are 0
+                0 => 1.,
+                _ => w.weight as f32
+            }
         }).collect::<Vec<f32>>().as_slice()).unwrap();
-
-        return match self.get(dist.sample(&mut rng)) {
+        let mut lock = RANDOM.write().unwrap();
+        
+        return match self.get(dist.sample(lock.deref_mut())) {
             None => None,
             Some(v) => Some(&v.value)
         };
@@ -145,13 +152,13 @@ impl<T> GetRandom<T> for Vec<MeabyWeighted<T>> {
     fn get_random_weighted(&self) -> Option<&T> {
         if self.len() == 0 { return None; }
 
-        let mut rng = StdRng::seed_from_u64(1);
         let dist = WeightedIndex::new(self.iter().map(|mw| match mw {
             MeabyWeighted::NotWeighted(_) => 1.,
             MeabyWeighted::Weighted(w) => w.weight as f32
         }).collect::<Vec<f32>>().as_slice()).unwrap();
-
-        return match self.get(dist.sample(&mut rng)) {
+        let mut lock = RANDOM.write().unwrap();
+        
+        return match self.get(dist.sample(lock.deref_mut())) {
             None => None,
             Some(v) => match v {
                 MeabyWeighted::NotWeighted(nw) => Some(nw),
@@ -165,11 +172,12 @@ impl<K> GetRandom<K> for HashMap<K, u32> {
     fn get_random_weighted(&self) -> Option<&K> {
         if self.is_empty() { return None; }
 
-        let mut rng = StdRng::seed_from_u64(1);
         let dist = WeightedIndex::new(self.values().map(|v| *v as f32).collect::<Vec<f32>>()).unwrap();
 
         let items = self.keys().collect::<Vec<&K>>();
-        return Some(items[dist.sample(&mut rng)]);
+        let mut lock = RANDOM.write().unwrap();
+        
+        return Some(items[dist.sample(lock.deref_mut())]);
     }
 }
 

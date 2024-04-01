@@ -181,7 +181,7 @@ pub trait GetTexture: Send + Sync {
             SpriteState::NotMapped => {
                 match &project.map_entity.fill {
                     None => None,
-                    Some(fill) => self.get_texture_from_tile_id(project, coordinates, fill)
+                    Some(fill) => self.get_terrain_texture_from_tile_id(project, coordinates, fill)
                 }
             }
         };
@@ -216,7 +216,7 @@ pub trait GetTexture: Send + Sync {
         };
     }
 
-    fn get_texture_from_tile_id(&self, project: &Project, coordinates: &Coordinates, id: &TileId) -> Option<&Sprite>;
+    fn get_terrain_texture_from_tile_id(&self, project: &Project, coordinates: &Coordinates, id: &TileId) -> Option<&Sprite>;
     fn get_terrain(&self, project: &Project, character: &char, coordinates: &Coordinates) -> SpriteState;
     fn get_furniture(&self, project: &Project, character: &char, coordinates: &Coordinates) -> SpriteState;
     fn get_item(&self, project: &Project, character: &char, coordinates: &Coordinates) -> SpriteState;
@@ -258,35 +258,47 @@ impl LegacyTextures {
     }
 }
 
+// TODO: Remove this macro and replace it with the define_get_sprite_from_sprite_type_and_tile_id macro
 macro_rules! define_get_sprite_from_sprite_type {
-    ($field: ident, $ident: ident) => {
+    ($field: ident, $ident: ident, $is_terrain: literal) => {
         fn $ident<'a>(
             project: &Project,
             coordinates: &Coordinates,
             character: &char,
-            sprite_type: &'a SpriteType) -> &'a Sprite {
+            sprite_type: &'a SpriteType,
+        ) -> &'a Sprite {
             return match sprite_type {
                 SpriteType::Single(s) => s,
                 SpriteType::Multitile { center, corner, t_connection, edge, end_piece, unconnected } => {
                     let tiles_around = project.map_entity.get_tiles_around(coordinates);
-
-                    // TODO handle errors
-                    let fill = project.map_entity.fill.as_ref().unwrap();
+                    let field_this = project.map_entity.get_ids(character).$field;
 
                     macro_rules! match_tiles_around {
                         ($name: ident, $num: expr) => {
                            let $name = match tiles_around.get($num).unwrap().0 {
                                None => false,
                                Some(t)  => {
-                                   let ids = project.map_entity.get_ids(&t.character);
-                            
+                                    let field_around = project.map_entity.get_ids(&t.character).$field;
                                     let is_same_character = t.character == *character;
-                                    let is_same_id = match &ids.$field {
-                                        None => false,
-                                        Some(t) => t == fill
+
+                                    let is_this_filled = match (&field_this, &project.map_entity.fill) {
+                                        (None, Some(_)) => $is_terrain,
+                                        (_, _) => false
                                     };
-                                    
-                                    is_same_character || is_same_id || (ids.$field.is_none() && project.map_entity.get_ids(character).$field.is_none()) 
+
+                                    let is_around_filled = match(&field_around, &project.map_entity.fill) {
+                                        (None, Some(_)) => $is_terrain,
+                                        (_, _) => false
+                                    };
+
+                                    let is_same_id = match (&field_around, &field_this) {
+                                        (Some(around), Some(this)) => *around == *this,
+                                        (None, Some(this)) => is_around_filled && this == project.map_entity.fill.as_ref().unwrap(),
+                                        (Some(around), None) => is_this_filled && around == project.map_entity.fill.as_ref().unwrap(),
+                                        (None, None) => is_this_filled && is_around_filled
+                                    };
+
+                                    is_same_character || is_same_id
                                }
                            };
                         }
@@ -323,23 +335,100 @@ macro_rules! define_get_sprite_from_sprite_type {
     };
 }
 
-define_get_sprite_from_sprite_type!(terrain, get_terrain_sprite_from_sprite_type);
-define_get_sprite_from_sprite_type!(furniture, get_furniture_sprite_from_sprite_type);
-define_get_sprite_from_sprite_type!(item, get_item_sprite_from_sprite_type);
-define_get_sprite_from_sprite_type!(toilet, get_toilet_sprite_from_sprite_type);
+define_get_sprite_from_sprite_type!(terrain, get_terrain_sprite_from_sprite_type, true);
+define_get_sprite_from_sprite_type!(furniture, get_furniture_sprite_from_sprite_type, false);
+define_get_sprite_from_sprite_type!(item, get_item_sprite_from_sprite_type, false);
+define_get_sprite_from_sprite_type!(toilet, get_toilet_sprite_from_sprite_type, false);
 
+// TODO: Rename this
+macro_rules! define_get_sprite_from_sprite_type_and_tile_id {
+    ($field: ident, $ident: ident, $is_terrain: literal) => {
+        fn $ident<'a>(
+            project: &Project,
+            coordinates: &Coordinates,
+            tile_id: Option<&TileId>,
+            sprite_type: &'a SpriteType,
+        ) -> &'a Sprite {
+            return match sprite_type {
+                SpriteType::Single(s) => s,
+                SpriteType::Multitile { center, corner, t_connection, edge, end_piece, unconnected } => {
+                    let tiles_around = project.map_entity.get_tiles_around(coordinates);
+
+                    macro_rules! match_tiles_around {
+                        ($name: ident, $num: expr) => {
+                           let $name = match tiles_around.get($num).unwrap().0 {
+                               None => false,
+                               Some(t)  => {
+                                    let field_around = project.map_entity.get_ids(&t.character).$field;
+
+                                    let is_this_filled = match (&tile_id, &project.map_entity.fill) {
+                                        (None, Some(_)) => $is_terrain,
+                                        (_, _) => false
+                                    };
+
+                                    let is_around_filled = match(&field_around, &project.map_entity.fill) {
+                                        (None, Some(_)) => $is_terrain,
+                                        (_, _) => false
+                                    };
+
+                                    let is_same_id = match (&field_around, tile_id) {
+                                        (Some(around), Some(this)) => *around == *this,
+                                        (None, Some(this)) => is_around_filled && this == project.map_entity.fill.as_ref().unwrap(),
+                                        (Some(around), None) => is_this_filled && around == project.map_entity.fill.as_ref().unwrap(),
+                                        (None, None) => is_this_filled && is_around_filled
+                                    };
+
+                                    is_same_id
+                               }
+                           };
+                        }
+                    }
+
+                    match_tiles_around!(is_tile_ontop_same_type, 0);
+                    match_tiles_around!(is_tile_right_same_type, 1);
+                    match_tiles_around!(is_tile_below_same_type, 2);
+                    match_tiles_around!(is_tile_left_same_type, 3);
+
+
+                    return match (is_tile_ontop_same_type, is_tile_right_same_type, is_tile_below_same_type, is_tile_left_same_type) {
+                        // Some of the worst code i've ever written lol
+                        (true, true, true, true) => &center,
+                        (true, true, true, false) => &t_connection.west,
+                        (true, true, false, true) => &t_connection.south,
+                        (true, false, true, true) => &t_connection.east,
+                        (false, true, true, true) => &t_connection.north,
+                        (true, true, false, false) => &corner.south_west,
+                        (true, false, false, true) => &corner.south_east,
+                        (false, true, true, false) => &corner.north_west,
+                        (false, false, true, true) => &corner.north_east,
+                        (true, false, false, false) => &end_piece.south,
+                        (false, true, false, false) => &end_piece.west,
+                        (false, false, true, false) => &end_piece.north,
+                        (false, false, false, true) => &end_piece.east,
+                        (false, true, false, true) => &edge.east_west,
+                        (true, false, true, false) => &edge.north_south,
+                        (false, false, false, false) => &unconnected
+                    };
+                }
+            };
+        } 
+    };
+}
+
+define_get_sprite_from_sprite_type_and_tile_id!(terrain, get_terrain_sprite_from_sprite_type_and_tile_id, true);
 
 impl GetTexture for LegacyTextures {
-    fn get_texture_from_tile_id(&self, project: &Project, coordinates: &Coordinates, id: &TileId) -> Option<&Sprite> {
+    fn get_terrain_texture_from_tile_id(&self, project: &Project, coordinates: &Coordinates, id: &TileId) -> Option<&Sprite> {
         let sprite_type = match self.textures.get(id) {
             None => return None,
             Some(s) => s
         };
 
-        return Some(get_terrain_sprite_from_sprite_type(
+        // TODO: Refactor this mess
+        return Some(get_terrain_sprite_from_sprite_type_and_tile_id(
             project,
             coordinates,
-            &' ',
+            Some(id),
             sprite_type,
         ));
     }
