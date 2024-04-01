@@ -1,17 +1,18 @@
 use std::collections::HashMap;
-use std::fmt::Formatter;
+use std::fmt::{Debug, Formatter};
 use std::ops::Add;
 use std::sync::{Arc, RwLock};
 
-use bevy::prelude::{Color, Event, EventReader, EventWriter};
+use bevy::prelude::{Color, Event};
 use bevy::prelude::Component;
-use bevy_console::PrintConsoleLine;
-use clap::builder::StyledStr;
 use color_print::cformat;
 use log::{Level, Log, Metadata, Record};
 use num::{Bounded, Num};
-use rand::{Rng, thread_rng};
+use rand::{Rng, SeedableRng, thread_rng};
+use rand::distributions::Distribution;
 use rand::distributions::uniform::{SampleRange, SampleUniform};
+use rand::distributions::WeightedIndex;
+use rand::rngs::StdRng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::Visitor;
 
@@ -122,26 +123,40 @@ pub trait GetRandom<T> {
     fn get_random_weighted(&self) -> Option<&T>;
 }
 
-impl<T> GetRandom<T> for Vec<Weighted<T>> {
+impl<T: Debug> GetRandom<T> for Vec<Weighted<T>> {
     fn get_random_weighted(&self) -> Option<&T> {
-        let mut rng = thread_rng();
-        let random_index: usize = rng.gen_range(0..self.len());
-        // TODO Take weights into account
-        let weighted = self.get(random_index).unwrap();
-        return Some(&weighted.value);
+        if self.len() == 0 { return None; }
+
+        let mut rng = StdRng::seed_from_u64(1);
+        let dist = WeightedIndex::new(self.iter().map(|w| match w.weight {
+            // TODO: Figure out what to do when all weights are 0
+            0 => 0.1,
+            _ => w.weight as f32
+        }).collect::<Vec<f32>>().as_slice()).unwrap();
+
+        return match self.get(dist.sample(&mut rng)) {
+            None => None,
+            Some(v) => Some(&v.value)
+        };
     }
 }
 
 impl<T> GetRandom<T> for Vec<MeabyWeighted<T>> {
     fn get_random_weighted(&self) -> Option<&T> {
-        let mut rng = thread_rng();
-        let random_index: usize = rng.gen_range(0..self.len());
-        // TODO Take weights into account
-        let random_id = self.get(random_index).unwrap();
+        if self.len() == 0 { return None; }
 
-        return match random_id {
-            MeabyWeighted::Weighted(w) => Some(&w.value),
-            MeabyWeighted::NotWeighted(v) => Some(&v)
+        let mut rng = StdRng::seed_from_u64(1);
+        let dist = WeightedIndex::new(self.iter().map(|mw| match mw {
+            MeabyWeighted::NotWeighted(_) => 1.,
+            MeabyWeighted::Weighted(w) => w.weight as f32
+        }).collect::<Vec<f32>>().as_slice()).unwrap();
+
+        return match self.get(dist.sample(&mut rng)) {
+            None => None,
+            Some(v) => match v {
+                MeabyWeighted::NotWeighted(nw) => Some(nw),
+                MeabyWeighted::Weighted(w) => Some(&w.value)
+            }
         };
     }
 }
@@ -150,12 +165,11 @@ impl<K> GetRandom<K> for HashMap<K, u32> {
     fn get_random_weighted(&self) -> Option<&K> {
         if self.is_empty() { return None; }
 
-        let mut rng = thread_rng();
-        let keys: Vec<&K> = self.keys().collect();
-        let random_index = rng.gen_range(0..keys.len());
+        let mut rng = StdRng::seed_from_u64(1);
+        let dist = WeightedIndex::new(self.values().map(|v| *v as f32).collect::<Vec<f32>>()).unwrap();
 
-        // TODO Take weights into account
-        return Some(keys.get(random_index).unwrap().clone());
+        let items = self.keys().collect::<Vec<&K>>();
+        return Some(items[dist.sample(&mut rng)]);
     }
 }
 

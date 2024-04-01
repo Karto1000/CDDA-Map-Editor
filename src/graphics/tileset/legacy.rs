@@ -89,7 +89,8 @@ const FALLBACK_TILE_MAPPING: &'static [(&'static str, u32)] = &[
     ("_", 94),
     ("`", 95),
     ("{", 122),
-    ("}", 124)
+    ("}", 124),
+    ("|", 178)
 ];
 
 #[derive(Debug)]
@@ -175,7 +176,7 @@ fn get_image_from_tileset(image: &DynamicImage, x: u32, y: u32, width: u32, heig
         TextureDimension::D2,
         tile_sprite.to_image().to_vec(),
         TextureFormat::Rgba8UnormSrgb,
-        RenderAssetUsages::all()
+        RenderAssetUsages::all(),
     );
 
     return image;
@@ -398,7 +399,7 @@ fn get_multi_fg_and_bg(
                     TextureDimension::D2,
                     new_image,
                     TextureFormat::Rgba8UnormSrgb,
-                    RenderAssetUsages::all()
+                    RenderAssetUsages::all(),
                 );
 
                 let data: Arc<dyn GetForeground> = Arc::new(SingleForeground { sprite: assets.add(image) });
