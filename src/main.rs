@@ -73,7 +73,7 @@ mod palettes;
 mod common;
 mod region_settings;
 
-pub const CDDA_DIR: &'static str = r"C:\CDDA\testing";
+pub const CDDA_DIR: &'static str = r"C:\DEV\SelfDEV\CDDA\CDDA-Map-Editor\saves";
 
 lazy_static! {
     pub static ref ALL_PALETTES: HashMap<String, Palette> = PalettesLoader::new(PathBuf::from(format!(r"{}/data/json/mapgen_palettes", CDDA_DIR))).load().unwrap();
@@ -344,8 +344,8 @@ fn setup(
     let mut editor_data = editor_data_saver.load().unwrap();
 
     let loader = MapEntityLoader {
-        path: PathBuf::from(format!(r"{}/data/json/mapgen/house/house01.json", CDDA_DIR)),
-        id: "house_01".to_string(),
+        path: PathBuf::from(format!(r"{}/data/json/mapgen/mall/mall_ground.json", CDDA_DIR)),
+        id: "mall_a_1".to_string(),
     };
 
     let map_entity = loader.load().unwrap();

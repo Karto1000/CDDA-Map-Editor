@@ -3,18 +3,18 @@ use std::path::PathBuf;
 
 use bevy::math::Vec2;
 use bevy::prelude::Resource;
-use log::info;
+use log::{debug, info};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Error, Value};
 
 use crate::ALL_PALETTES;
 use crate::common::{Coordinates, MeabyMulti, MeabyNumberRange, MeabyWeighted, TileId};
 use crate::common::io::{Load, LoadError};
+use crate::map::resources::ComputedParameters;
 use crate::map::resources::MapEntity;
+use crate::map::resources::MapEntityType;
 use crate::palettes::{Identifier, Item, MapGenValue, MapObjectId, PaletteId, ParameterType};
 use crate::tiles::components::Tile;
-use crate::map::resources::ComputedParameters;
-use crate::map::resources::MapEntityType;
 
 pub type ParameterId = String;
 
@@ -82,27 +82,48 @@ fn compute_palettes(parameters: &HashMap<String, String>, palettes: &Vec<MapObje
 
 impl Load<MapEntity> for MapEntityLoader {
     fn load(&self) -> Result<MapEntity, LoadError> {
-        let mut om_terrain = "".to_string();
-        
+        let om_terrain = self.id.to_string();
+
         let objects = serde_json::from_str::<Vec<HashMap<String, Value>>>(std::fs::read_to_string(&self.path).unwrap().as_str()).unwrap();
+        let mut om_based_size = Vec2::new(24., 24.);
+        
         let filtered_objects = objects
             .into_iter()
             .filter(|o| {
                 return match o.get("om_terrain") {
                     None => false,
-                    Some(s) => match s {
-                        Value::String(s) => {
-                            om_terrain = s.clone();
-                            s.clone() == self.id
-                        },
-                        Value::Array(a) => {
-                            // TODO actually implement this correctly
-                            let first = a.first().unwrap();
-                            let string = first.as_str().unwrap().to_string();
-                            om_terrain = string.clone();
-                            string == self.id
-                        },
-                        _ => panic!()
+                    Some(s) => match serde_json::from_value::<MapObjectId>(s.clone()) {
+                        Ok(id) => {
+                            match id {
+                                MapObjectId::Grouped(group) => {
+                                    group.iter().map(|mw| match mw.value() {
+                                        Identifier::TileId(id) => id,
+                                        Identifier::Parameter(_) => todo!()
+                                    }).any(|v| v.0 == self.id)
+                                }
+                                MapObjectId::Nested(nested) => {
+                                    // Each om_terrain id in a nested vec equals to 24 tiles
+                                    // Each nested vec in the parent vec equals to 24 tiles
+                                    om_based_size.x = 24. * nested.first().unwrap().len() as f32;
+                                    om_based_size.y = 24. * nested.len() as f32;
+                                    
+                                    nested.iter().flatten().map(|mw| match mw.value() {
+                                        Identifier::TileId(id) => id,
+                                        Identifier::Parameter(_) => todo!()
+                                    }).any(|v| v.0 == self.id)
+                                }
+                                MapObjectId::Single(id) => {
+                                    let tile_id = match id.value() {
+                                        Identifier::TileId(id) => id,
+                                        Identifier::Parameter(_) => { todo!() }
+                                    };
+
+                                    tile_id.0 == self.id
+                                }
+                                _ => todo!()
+                            }
+                        }
+                        Err(_) => { todo!() }
                     }
                 };
             })
@@ -110,7 +131,6 @@ impl Load<MapEntity> for MapEntityLoader {
 
         let mapgen_entity = filtered_objects.first().unwrap();
         let object = mapgen_entity.get("object").unwrap();
-
 
         let parameters = match object.get("parameters") {
             None => HashMap::new(),
@@ -121,10 +141,17 @@ impl Load<MapEntity> for MapEntityLoader {
 
         let mut tiles = HashMap::new();
 
-        let size = Vec2::new(
-            rows.get(0).unwrap().as_str().len() as f32,
-            rows.len() as f32,
-        );
+        let size = match object.get("mapgensize") {
+            None => om_based_size,
+            Some(v) => match v {
+                Value::Array(a) => Vec2::new(
+                    a.first().unwrap().as_f64().unwrap() as f32, 
+                    a.last().unwrap().as_f64().unwrap() as f32
+                ),
+                _ => panic!()
+            }
+        }; 
+        info!("Loaded Map Object Size: {}", size);
 
         for (row, tile) in rows.iter().enumerate() {
             // to_string returns quotes so we use as_str

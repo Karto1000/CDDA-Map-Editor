@@ -226,6 +226,15 @@ pub enum MeabyWeighted<T> {
     Weighted(Weighted<T>),
 }
 
+impl<T> MeabyWeighted<T> {
+    pub fn value(&self) -> &T {
+        return match self {
+            MeabyWeighted::NotWeighted(v) => v,
+            MeabyWeighted::Weighted(w) => &w.value
+        }
+    }
+}
+
 
 pub struct CoordinatesVisitor;
 

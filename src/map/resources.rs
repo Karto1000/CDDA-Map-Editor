@@ -114,7 +114,7 @@ impl Default for MapEntity {
         return Self {
             map_type: MapEntityType::Default {
                 om_terrain: "unnamed_01".to_string(),
-                weight: 100,
+                weight: 1000,
             },
             fill: None,
             tiles: Default::default(),
