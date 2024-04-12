@@ -36,33 +36,21 @@ impl ComputedParameters {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum MapEntityType {
-    Nested {
+    NestedMapgen {
         nested_mapgen_id: String,
     },
     Default {
         om_terrain: String,
         weight: u32,
     },
-}
-
-impl MapEntityType {
-    pub fn set_name(&mut self, name: String) {
-        match self {
-            MapEntityType::Nested { ref mut nested_mapgen_id } => {
-                *nested_mapgen_id = name.clone()
-            }
-            MapEntityType::Default { ref mut om_terrain, .. } => {
-                *om_terrain = name.clone()
-            }
-        }
-    }
-
-    pub fn get_name(&self) -> &String {
-        return match self {
-            MapEntityType::Nested { nested_mapgen_id } => nested_mapgen_id,
-            MapEntityType::Default { om_terrain, .. } => om_terrain
-        };
-    }
+    Multi {
+        om_terrain: Vec<String>,
+        weight: u32,
+    },
+    Nested {
+        om_terrain: Vec<Vec<String>>,
+        weight: u32,
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug, Resource, Clone)]
@@ -151,7 +139,7 @@ impl Default for TileIdGroup {
 impl MapEntity {
     pub fn new(name: String, size: Vec2) -> Self {
         return Self {
-             map_type: MapEntityType::Default {
+            map_type: MapEntityType::Default {
                 om_terrain: name,
                 weight: 100,
             },
@@ -228,7 +216,7 @@ impl MapEntity {
             let palette_id = match palette {
                 MapObjectId::Grouped(_) => { todo!() }
                 MapObjectId::Nested(_) => { todo!() }
-                MapObjectId::Param { param, fallback } => { 
+                MapObjectId::Param { param, fallback } => {
                     match map_entity.computed_parameters.get_value(param) {
                         None => TileId(fallback.as_ref().unwrap().clone()),
                         Some(v) => TileId(v.clone())

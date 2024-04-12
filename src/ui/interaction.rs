@@ -30,7 +30,12 @@ pub fn save_button_interaction(
         Some(p) => p
     };
 
-    let filename = format!("{}.map", project.map_entity.map_type.get_name());
+    let filename = match &project.map_entity.map_type {
+        MapEntityType::NestedMapgen { .. } => todo!(),
+        MapEntityType::Default { om_terrain, .. } => om_terrain.clone(),
+        MapEntityType::Multi { .. } => todo!(),
+        MapEntityType::Nested { .. } => "Nested_TODO".to_string()
+    };
 
     for interaction in interaction_query.iter() {
         match interaction {
@@ -97,10 +102,12 @@ pub fn file_loaded_reader(
         let project = serde_json::from_slice::<Project>(event.contents.as_slice()).unwrap();
 
         let name = match &project.map_entity.map_type {
-            MapEntityType::Nested { .. } => {panic!("Not Implemented")}
+            MapEntityType::NestedMapgen { .. } => {todo!()}
             MapEntityType::Default { om_terrain, .. } => {
                 om_terrain.clone()
             }
+            MapEntityType::Multi { .. } => {todo!()}
+            MapEntityType::Nested { .. } => {todo!()}
         };
 
         e_spawn_tab.send(SpawnTab {

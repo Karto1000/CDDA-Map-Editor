@@ -51,7 +51,7 @@ use crate::grid::resources::Grid;
 use crate::map::events::{ClearTiles, SpawnMapEntity};
 use crate::map::loader::MapEntityLoader;
 use crate::map::MapPlugin;
-use crate::map::resources::MapEntity;
+use crate::map::resources::{MapEntity, MapEntityType};
 use crate::map::systems::{set_tile_reader, spawn_sprite, tile_despawn_reader, tile_remove_reader, tile_spawn_reader, update_sprite_reader};
 use crate::palettes::{Identifier, MapObjectId, Palette};
 use crate::palettes::loader::PalettesLoader;
@@ -162,10 +162,17 @@ impl Save<EditorData> for EditorDataSaver {
                 ProjectSaveState::AutoSaved(val) => ProjectSaveState::AutoSaved(val.clone()),
                 ProjectSaveState::Saved(val) => ProjectSaveState::Saved(val.clone()),
                 ProjectSaveState::NotSaved => {
-                    info!("autosaving {}", project.map_entity.map_type.get_name().clone());
+                    let filename = match &project.map_entity.map_type {
+                        MapEntityType::NestedMapgen { .. } => todo!(),
+                        MapEntityType::Default { om_terrain, .. } => om_terrain,
+                        MapEntityType::Multi { .. } => todo!(),
+                        MapEntityType::Nested { .. } => todo!()
+                    };
+
+                    info!("autosaving {}", filename);
                     let project_saver = ProjectSaver { directory: Box::from(data_dir) };
                     project_saver.save(project).unwrap();
-                    ProjectSaveState::AutoSaved(data_dir.join(format!("auto_save_{}.map", project.map_entity.map_type.get_name().clone())))
+                    ProjectSaveState::AutoSaved(data_dir.join(format!("auto_save_{}.map", filename)))
                 }
             }
         }).collect();
@@ -358,7 +365,14 @@ fn setup(
     });
 
     for (i, project) in editor_data.projects.iter().enumerate() {
-        e_spawn_tab.send(SpawnTab { name: project.map_entity.map_type.get_name().clone(), index: i as u32 });
+        let name = match &project.map_entity.map_type {
+            MapEntityType::NestedMapgen { .. } => todo!(),
+            MapEntityType::Default { om_terrain, .. } => om_terrain.clone(),
+            MapEntityType::Multi { .. } => todo!(),
+            MapEntityType::Nested { om_terrain, .. } => "Nested_TODO".to_string()
+        };
+        
+        e_spawn_tab.send(SpawnTab { name, index: i as u32 });
     }
 
     let (icon_rgba, icon_width, icon_height) = {
@@ -438,13 +452,13 @@ fn update(
     q_windows: Query<&Window, With<PrimaryWindow>>,
     mut grid_material: ResMut<Assets<GridMaterial>>,
     r_data: Res<EditorData>,
-    mut e_write_line: EventWriter<PrintConsoleLine>
+    mut e_write_line: EventWriter<PrintConsoleLine>,
 ) {
     for log in LOGGER.log_queue.read().unwrap().iter() {
         e_write_line.send(PrintConsoleLine::new(StyledStr::from(cformat!(r#"<g>[{}] {}</g>"#, log.level.as_str(), log.message))));
     }
     LOGGER.log_queue.write().unwrap().clear();
-    
+
     let project = match r_data.get_current_project() {
         None => return,
         Some(p) => p

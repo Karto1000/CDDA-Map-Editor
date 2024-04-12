@@ -16,6 +16,7 @@ use crate::graphics::tileset::legacy::{GetBackground, GetForeground};
 use crate::grid::resources::Grid;
 use crate::map::{TileDeleteEvent, TilePlaceEvent};
 use crate::map::events::{ClearTiles, SpawnMapEntity, UpdateSpriteEvent};
+use crate::map::resources::MapEntityType;
 use crate::project::resources::{Project, ProjectSaveState};
 use crate::tiles::components::{Offset, Tile};
 use crate::ui::tabs::components::Tab;
@@ -265,7 +266,7 @@ pub fn save_directory_picked(
 
     for event in e_file_saved.read() {
         current_project.save_state = ProjectSaveState::Saved(event.path.clone());
-        current_project.map_entity.map_type.set_name(event.path.file_name().unwrap().to_str().unwrap().to_string());
+
 
         // Edit the file name in the saved file because we can't know the file name in advance
         let content = fs::read_to_string(&event.path).unwrap();
@@ -312,7 +313,11 @@ pub fn save_directory_picked(
             }
         }
 
-        current_project.map_entity.map_type.set_name(project_name);
+        match &mut current_project.map_entity.map_type {
+            MapEntityType::Default { ref mut om_terrain, .. } => *om_terrain = project_name,
+            _ => todo!()
+        };
+
         entity.save_state = ProjectSaveState::Saved(event.path.clone());
 
         // Remove the original file and Save it back and overwrite the original file

@@ -94,7 +94,7 @@ pub fn on_add_tab_button_click(
             let mut project = Project::default();
 
             match project.map_entity.map_type {
-                MapEntityType::Nested { .. } => { panic!("Not Implemente") }
+                MapEntityType::NestedMapgen { .. } => { todo!() }
                 MapEntityType::Default { ref mut om_terrain, .. } => {
                     let amount_of_unnamed = r_editor_data.projects.iter()
                         .filter(|p| p.save_state == ProjectSaveState::NotSaved)
@@ -109,6 +109,8 @@ pub fn on_add_tab_button_click(
                     r_editor_data.projects.push(project);
                     e_spawn_tab.send(SpawnTab { name, index: r_editor_data.projects.len() as u32 - 1 });
                 }
+                MapEntityType::Multi { .. } => { todo!() }
+                MapEntityType::Nested { .. } => { todo!() }
             }
         }
         _ => {}
