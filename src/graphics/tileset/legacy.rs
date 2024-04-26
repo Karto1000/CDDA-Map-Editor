@@ -25,6 +25,7 @@ use crate::common::{GetRandom, MeabyMulti, MeabyWeighted, TileId, Weighted};
 use crate::common::io::{Load, LoadError};
 use crate::graphics::{Corner, Edge, FullCardinal, Sprite, SpriteType};
 use crate::graphics::tileset::TilesetLoader;
+use crate::graphics::tileset::{GetForeground, GetBackground};
 
 const TILESET_INFO_NAME: &'static str = "tileset.txt";
 const AMOUNT_OF_SPRITES_PER_ROW: u32 = 16;
@@ -466,10 +467,6 @@ impl LegacyTilesetLoader {
     }
 }
 
-pub trait GetForeground: Send + Sync {
-    fn get_sprite(&self) -> &Handle<Image>;
-}
-
 pub struct WeightedForeground {
     weighted_sprites: Vec<Weighted<Handle<Image>>>,
 }
@@ -498,9 +495,6 @@ impl GetForeground for SingleForeground {
     }
 }
 
-pub trait GetBackground: Send + Sync {
-    fn get_sprite(&self) -> &Handle<Image>;
-}
 
 pub struct WeightedBackground {
     weighted_sprites: Vec<Weighted<Handle<Image>>>,

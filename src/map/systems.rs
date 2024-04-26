@@ -12,7 +12,7 @@ use bevy_file_dialog::{DialogFileSaved, FileDialogExt};
 use crate::common::Coordinates;
 use crate::EditorData;
 use crate::graphics::{GraphicsResource, Sprite, SpriteState, TileSprite};
-use crate::graphics::tileset::legacy::{GetBackground, GetForeground};
+use crate::graphics::tileset::{GetBackground, GetForeground};
 use crate::grid::resources::Grid;
 use crate::map::{TileDeleteEvent, TilePlaceEvent};
 use crate::map::events::{ClearTiles, SpawnMapEntity, UpdateSpriteEvent};

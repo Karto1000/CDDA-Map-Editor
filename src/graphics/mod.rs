@@ -5,8 +5,8 @@ use bevy::prelude::{Assets, Image, ResMut, Resource};
 
 use crate::common::{Coordinates, GetRandom, TileId};
 use crate::common::io::Load;
-use crate::graphics::tileset::legacy::{GetBackground, GetForeground, LegacyTileset, SingleForeground};
-use crate::graphics::tileset::TilesetLoader;
+use crate::graphics::tileset::legacy::{LegacyTileset, SingleForeground};
+use crate::graphics::tileset::{GetBackground, GetForeground, TilesetLoader};
 use crate::project::resources::Project;
 use crate::region_settings::RegionSettings;
 
