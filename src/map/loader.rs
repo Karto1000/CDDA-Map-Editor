@@ -14,7 +14,7 @@ use crate::common::io::{Load, LoadError};
 use crate::map::resources::ComputedParameters;
 use crate::map::resources::MapEntity;
 use crate::map::resources::MapEntityType;
-use crate::palettes::{Identifier, Item, MapGenValue, MapObjectId, PaletteId, ParameterType};
+use crate::palettes::{MeabyParam, Item, MapGenValue, MapObjectId, PaletteId, ParameterType};
 use crate::tiles::components::Tile;
 
 pub type ParameterId = String;
@@ -31,7 +31,7 @@ pub struct Parameter {
     pub default: MapGenValue,
 }
 
-fn compute_palettes(parameters: &HashMap<String, String>, palettes: &Vec<MapObjectId>) -> HashMap<PaletteId, ComputedParameters> {
+fn compute_palettes(parameters: &HashMap<String, String>, palettes: &Vec<MapObjectId<MeabyParam>>) -> HashMap<PaletteId, ComputedParameters> {
     let mut computed_palettes = HashMap::new();
 
     for palette in palettes.iter() {
@@ -49,10 +49,10 @@ fn compute_palettes(parameters: &HashMap<String, String>, palettes: &Vec<MapObje
                 match o {
                     MeabyWeighted::NotWeighted(i) => {
                         match i {
-                            Identifier::TileId(i) => {
-                                i.0.clone()
+                            MeabyParam::TileId(i) => {
+                                i.clone()
                             }
-                            Identifier::Parameter(_) => { todo!() }
+                            MeabyParam::Parameter(_) => { todo!() }
                         }
                     }
                     MeabyWeighted::Weighted(_) => { todo!() }
@@ -65,7 +65,7 @@ fn compute_palettes(parameters: &HashMap<String, String>, palettes: &Vec<MapObje
         let mut this = HashMap::new();
 
         for (name, parameter) in associated_palette.parameters.iter() {
-            this.insert(name.clone(), parameter.default.get_value().0);
+            this.insert(name.clone(), parameter.default.get_value());
         }
 
         let computed_palette_parameters = ComputedParameters {
@@ -93,14 +93,11 @@ impl Load<MapEntity> for MapEntityLoader {
             .find(|o| {
                 return match o.get("om_terrain") {
                     None => false,
-                    Some(s) => match serde_json::from_value::<MapObjectId>(s.clone()) {
+                    Some(s) => match serde_json::from_value::<MapObjectId<String>>(s.clone()) {
                         Ok(id) => {
                             match id {
                                 MapObjectId::Grouped(group) => {
-                                    let ids: Vec<String> = group.iter().map(|mw| match mw.value() {
-                                        Identifier::TileId(id) => id.0.clone(),
-                                        Identifier::Parameter(_) => todo!()
-                                    }).collect();
+                                    let ids: Vec<String> = group.iter().map(|mw| mw.value().clone()).collect();
 
                                     let any_matches = ids.iter().any(|id| *id == self.id);
 
@@ -121,18 +118,15 @@ impl Load<MapEntity> for MapEntityLoader {
                                     om_based_size.x = 24. * nested.first().unwrap().len() as f32;
                                     om_based_size.y = 24. * nested.len() as f32;
 
-                                    let any_matches = nested.iter().flatten().map(|mw| match mw.value() {
-                                        Identifier::TileId(id) => id,
-                                        Identifier::Parameter(_) => todo!()
-                                    }).any(|v| v.0 == self.id);
+                                    let any_matches = nested.iter().flatten().map(|mw| mw.value()).any(|v| v.clone() == self.id);
 
                                     if any_matches {
                                         map_type = Some(
                                             MapEntityType::Nested {
-                                                om_terrain: nested.iter().map(|v| v.iter().map(|mw| match mw.value() {
-                                                    Identifier::TileId(id) => id.0.clone(),
-                                                    Identifier::Parameter(_) => todo!()
-                                                }).collect()).collect(),
+                                                om_terrain: nested.iter()
+                                                    .map(|v| v.iter()
+                                                        .map(|mw| mw.value().clone()).collect())
+                                                    .collect(),
                                                 weight: 100,
                                             }
                                         )
@@ -141,17 +135,12 @@ impl Load<MapEntity> for MapEntityLoader {
                                     any_matches
                                 }
                                 MapObjectId::Single(id) => {
-                                    let tile_id = match id.value() {
-                                        Identifier::TileId(id) => id,
-                                        Identifier::Parameter(_) => { todo!() }
-                                    };
-
-                                    let any_matches = tile_id.0 == self.id;
+                                    let any_matches = id.value().clone() == self.id;
 
                                     if any_matches {
                                         map_type = Some(
                                             MapEntityType::Default {
-                                                om_terrain: tile_id.0.clone(),
+                                                om_terrain: id.value().clone(),
                                                 weight: 100,
                                             }
                                         )
@@ -201,14 +190,14 @@ impl Load<MapEntity> for MapEntityLoader {
             }
         }
 
-        let palettes: Vec<MapObjectId> = serde_json::from_value(object.get("palettes").unwrap_or(&Value::Array(Vec::new())).clone()).unwrap();
+        let palettes: Vec<MapObjectId<MeabyParam>> = serde_json::from_value(object.get("palettes").unwrap_or(&Value::Array(Vec::new())).clone()).unwrap();
 
         let mut this = HashMap::new();
 
         for (parameter_id, parameter) in parameters.iter() {
             this.insert(
                 parameter_id.clone(),
-                parameter.default.get_value().0,
+                parameter.default.get_value(),
             );
         }
 
@@ -229,7 +218,7 @@ impl Load<MapEntity> for MapEntityLoader {
 
         let fill: Option<TileId> = match object.get("fill_ter") {
             None => None,
-            Some(v) => Some(TileId(v.as_str().unwrap().to_string()))
+            Some(v) => Some(String::from(v.as_str().unwrap().to_string()))
         };
 
         return Ok(

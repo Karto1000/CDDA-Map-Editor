@@ -437,7 +437,7 @@ impl GetTexture for LegacyTextures {
         return match &project.map_entity.get_ids(character).terrain {
             None => SpriteState::NotMapped,
             Some(terrain) => {
-                if let Some(terrain) = self.region_settings.get_random_terrain_from_region(&terrain.0) {
+                if let Some(terrain) = self.region_settings.get_random_terrain_from_region(&terrain) {
                     let sprite_type = match self.textures.get(terrain) {
                         None => return SpriteState::TextureNotFound,
                         Some(s) => s
@@ -470,7 +470,7 @@ impl GetTexture for LegacyTextures {
         return match &project.map_entity.get_ids(character).furniture {
             None => SpriteState::NotMapped,
             Some(furniture) => {
-                if let Some(furniture) = self.region_settings.get_random_furniture_from_region(&furniture.0) {
+                if let Some(furniture) = self.region_settings.get_random_furniture_from_region(&furniture) {
                     let sprite_type = match self.textures.get(furniture) {
                             None => return SpriteState::TextureNotFound,
                         Some(s) => s

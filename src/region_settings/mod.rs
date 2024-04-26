@@ -36,7 +36,7 @@ impl RegionSettings {
             let picked = terrain.get_random_weighted().unwrap();
 
             // Regions can have region ids themselves
-            return match self.get_random_terrain_from_region(&picked.0) {
+            return match self.get_random_terrain_from_region(&picked) {
                 Some(t) => Some(t),
                 None => Some(picked)
             };
@@ -50,7 +50,7 @@ impl RegionSettings {
             let picked = furniture.get_random_weighted().unwrap();
 
             // Regions can have region ids themselves
-            return match self.get_random_furniture_from_region(&picked.0) {
+            return match self.get_random_furniture_from_region(&picked) {
                 Some(t) => Some(t),
                 None => Some(picked)
             };

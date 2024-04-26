@@ -53,7 +53,7 @@ use crate::map::loader::MapEntityLoader;
 use crate::map::MapPlugin;
 use crate::map::resources::{MapEntity, MapEntityType};
 use crate::map::systems::{set_tile_reader, spawn_sprite, tile_despawn_reader, tile_remove_reader, tile_spawn_reader, update_sprite_reader};
-use crate::palettes::{Identifier, MapObjectId, Palette};
+use crate::palettes::{MeabyParam, Palette};
 use crate::palettes::loader::PalettesLoader;
 use crate::project::resources::{Project, ProjectSaveState};
 use crate::project::saver::ProjectSaver;

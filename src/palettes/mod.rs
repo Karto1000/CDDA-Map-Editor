@@ -1,11 +1,9 @@
 use std::collections::HashMap;
-use std::process::id;
 
 use rand::Rng;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
-use crate::ALL_PALETTES;
 use crate::common::{GetRandom, ItemId, MeabyNumberRange, MeabyWeighted, TileId};
 use crate::common::MeabyMulti;
 
@@ -37,7 +35,7 @@ impl MapGenValue {
         match self {
             MapGenValue::Simple(_) => { panic!() }
             MapGenValue::Distribution { distribution } => {
-                return TileId { 0: distribution.get_random_weighted().unwrap().to_string() };
+                return distribution.get_random_weighted().unwrap().to_string()
             }
             MapGenValue::Param { .. } => { panic!() }
             MapGenValue::Switch { .. } => { panic!() }
@@ -78,28 +76,22 @@ pub struct ParameterReference {
 
 #[derive(Deserialize, Clone, Serialize, Debug)]
 #[serde(untagged)]
-pub enum Identifier {
+pub enum MeabyParam {
     TileId(TileId),
     Parameter(ParameterReference),
 }
 
 #[derive(Deserialize, Clone, Serialize, Debug)]
 #[serde(untagged)]
-pub enum MapObjectId {
-    Grouped(Vec<MeabyWeighted<Identifier>>),
-    Nested(Vec<Vec<MeabyWeighted<Identifier>>>),
+pub enum MapObjectId<T> {
+    Grouped(Vec<MeabyWeighted<T>>),
+    Nested(Vec<Vec<MeabyWeighted<T>>>),
     Param { param: String, fallback: Option<String> },
     Switch {
         switch: Switch,
-        cases: HashMap<String, String>,
+        cases: HashMap<String, T>,
     },
-    Single(MeabyWeighted<Identifier>),
-}
-
-impl From<&'static str> for MapObjectId {
-    fn from(value: &'static str) -> Self {
-        return Self::Single(MeabyWeighted::NotWeighted(Identifier::TileId(TileId { 0: value.to_string() })));
-    }
+    Single(MeabyWeighted<T>),
 }
 
 #[derive(Deserialize, Clone, Serialize, Debug, Eq, Hash, PartialEq)]
@@ -169,7 +161,7 @@ pub enum Item {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum ParentPalette {
-    NotComputed(MapObjectId),
+    NotComputed(MapObjectId<MeabyParam>),
     Computed(Palette),
 }
 
@@ -179,7 +171,7 @@ pub struct Palette {
 
     #[serde(default)]
     #[serde(skip_serializing)]
-    pub palettes: Vec<MapObjectId>,
+    pub palettes: Vec<MapObjectId<MeabyParam>>,
 
     #[serde(default)]
     #[serde(skip_serializing)]
@@ -187,11 +179,11 @@ pub struct Palette {
 
     #[serde(default)]
     #[serde(skip_serializing)]
-    pub terrain: HashMap<char, MapObjectId>,
+    pub terrain: HashMap<char, MapObjectId<MeabyParam>>,
 
     #[serde(default)]
     #[serde(skip_serializing)]
-    pub furniture: HashMap<char, MapObjectId>,
+    pub furniture: HashMap<char, MapObjectId<MeabyParam>>,
 
     #[serde(default)]
     #[serde(skip_serializing)]

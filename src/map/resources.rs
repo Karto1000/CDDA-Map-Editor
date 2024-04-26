@@ -5,7 +5,7 @@ use crate::common::{Coordinates, MeabyMulti, MeabyNumberRange, MeabyWeighted, Ti
 use crate::map::loader::ParameterId;
 use crate::palettes::{Item, MapObjectId, PaletteId};
 use crate::tiles::components::Tile;
-use crate::{ALL_PALETTES, Identifier};
+use crate::{ALL_PALETTES, MeabyParam};
 use crate::Weighted;
 use crate::common::GetRandom;
 
@@ -82,10 +82,10 @@ pub struct MapEntity {
     pub computed_parameters: ComputedParameters,
 
     #[serde(default)]
-    pub terrain: HashMap<char, MapObjectId>,
+    pub terrain: HashMap<char, MapObjectId<MeabyParam>>,
 
     #[serde(default)]
-    pub furniture: HashMap<char, MapObjectId>,
+    pub furniture: HashMap<char, MapObjectId<MeabyParam>>,
 
     #[serde(default)]
     pub items: HashMap<char, MeabyMulti<Item>>,
@@ -94,7 +94,7 @@ pub struct MapEntity {
     pub place_nested: Vec<PlaceNested>,
 
     #[serde(default)]
-    pub palettes: Vec<MapObjectId>,
+    pub palettes: Vec<MapObjectId<MeabyParam>>,
 }
 
 impl Default for MapEntity {
@@ -165,18 +165,16 @@ impl MapEntity {
                         match v {
                             MeabyWeighted::NotWeighted(v) => {
                                 let id = match v {
-                                    Identifier::TileId(id) => id,
-                                    Identifier::Parameter(parameter) => {
-                                        panic!("Not Implemented 1")
-                                    }
+                                    MeabyParam::TileId(id) => id,
+                                    MeabyParam::Parameter(parameter) => todo!()
                                 };
                                 $path = Some(id.clone());
                             }
-                            MeabyWeighted::Weighted(_) => { panic!("Not Implemented") }
+                            MeabyWeighted::Weighted(_) => todo!()
                         }
                     }
                     MapObjectId::Grouped(g) => {
-                        let final_group: Vec<Weighted<Identifier>> = g.iter().map(|mw| {
+                        let final_group: Vec<Weighted<MeabyParam>> = g.iter().map(|mw| {
                             match mw {
                                 MeabyWeighted::NotWeighted(v) => Weighted::new(v.clone(), 1),
                                 MeabyWeighted::Weighted(w) => w.clone()
@@ -185,21 +183,17 @@ impl MapEntity {
 
                         let random_sprite = final_group.get_random_weighted().unwrap();
                         let id = match &random_sprite {
-                            Identifier::TileId(id) => id,
-                            Identifier::Parameter(parameter) => {
-                                panic!("Not Implemented")
-                            }
+                            MeabyParam::TileId(id) => id,
+                            MeabyParam::Parameter(parameter) => todo!()
                         };
 
                         $path = Some(id.clone());
                     }
-                    MapObjectId::Nested(_) => { panic!("Not Implemented") }
+                    MapObjectId::Nested(_) => todo!(),
                     MapObjectId::Param { param, fallback } => {
-                        $path = Some(TileId($computed_parameters.get_value(param).expect(format!("Parameter {} to exist", param).as_str()).clone()));
+                        $path = Some($computed_parameters.get_value(param).expect(format!("Parameter {} to exist", param).as_str()).clone());
                     }
-                    MapObjectId::Switch {switch, cases} => {
-                        panic!("Not Implemented")
-                    }
+                    MapObjectId::Switch {switch, cases} => todo!(),
                 }
             }
         }
@@ -212,14 +206,14 @@ impl MapEntity {
             match_id!(id, group.furniture, self.computed_parameters);
         }
 
-        fn match_palette(map_entity: &MapEntity, group: &mut TileIdGroup, character: &char, palette: &MapObjectId) {
+        fn match_palette(map_entity: &MapEntity, group: &mut TileIdGroup, character: &char, palette: &MapObjectId<MeabyParam>) {
             let palette_id = match palette {
                 MapObjectId::Grouped(_) => { todo!() }
                 MapObjectId::Nested(_) => { todo!() }
                 MapObjectId::Param { param, fallback } => {
                     match map_entity.computed_parameters.get_value(param) {
-                        None => TileId(fallback.as_ref().unwrap().clone()),
-                        Some(v) => TileId(v.clone())
+                        None => fallback.as_ref().unwrap().clone(),
+                        Some(v) => v.clone()
                     }
                 }
                 MapObjectId::Switch { .. } => { todo!() }
@@ -227,10 +221,10 @@ impl MapEntity {
                     match mw {
                         MeabyWeighted::NotWeighted(i) => {
                             match i {
-                                Identifier::TileId(id) => {
+                                MeabyParam::TileId(id) => {
                                     id.clone()
                                 }
-                                Identifier::Parameter(_) => { todo!() }
+                                MeabyParam::Parameter(_) => { todo!() }
                             }
                         }
                         MeabyWeighted::Weighted(_) => { todo!() }
@@ -238,7 +232,7 @@ impl MapEntity {
                 }
             };
 
-            let palette = ALL_PALETTES.get(&palette_id.0).unwrap();
+            let palette = ALL_PALETTES.get(&palette_id).unwrap();
 
             if let Some(id) = palette.furniture.get(character) {
                 if group.furniture.is_none() {

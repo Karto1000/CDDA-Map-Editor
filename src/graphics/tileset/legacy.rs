@@ -992,7 +992,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                             MeabyMulti::Single(v) => {
                                 debug!("Loaded tile {:?}", v);
                                 assigned_textures.insert(
-                                    TileId { 0: v.clone() },
+                                    v.clone(),
                                     SpriteType::Single(Sprite {
                                         fg: get_main_fg.clone(),
                                         bg: get_main_bg.clone(),
@@ -1006,7 +1006,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                 for value in v.iter() {
                                     debug!("Loaded tile {:?}", value);
                                     assigned_textures.insert(
-                                        TileId { 0: value.clone() },
+                                        value.clone(),
                                         SpriteType::Single(Sprite {
                                             fg: get_main_fg.clone(),
                                             bg: get_main_bg.clone(),
@@ -1122,7 +1122,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                             };
 
                             assigned_textures.insert(
-                                TileId { 0: id.clone() },
+                                id.clone(),
                                 SpriteType::Multitile {
                                     center: center.unwrap_or(default_sprite.clone()),
                                     corner: corner.unwrap_or(Corner {

@@ -19,6 +19,7 @@ use serde::de::Visitor;
 
 pub(crate) mod io;
 
+pub type TileId = String;
 pub const PRIMARY_COLOR: Color = Color::rgb(0.19, 0.21, 0.23);
 pub const PRIMARY_COLOR_FADED: Color = Color::rgb(0.23, 0.25, 0.27);
 pub const PRIMARY_COLOR_SELECTED: Color = Color::rgb(0.63, 0.70, 0.76);
@@ -115,14 +116,6 @@ pub enum MeabyMulti<T> {
     Single(T),
 }
 
-#[derive(Serialize, Deserialize, Eq, Hash, PartialEq, Clone, Debug)]
-pub struct TileId(pub String);
-
-impl From<&'static str> for TileId {
-    fn from(value: &'static str) -> Self {
-        return Self { 0: value.to_string() };
-    }
-}
 
 pub trait GetRandom<T> {
     fn get_random_weighted(&self) -> Option<&T>;
