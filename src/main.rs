@@ -1,49 +1,41 @@
 use std::any::Any;
 use std::collections::HashMap;
 use std::default::Default;
-use std::fs;
-use std::fs::File;
 use std::io::Write;
 use std::ops::Deref;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::string::ToString;
 use std::sync::Arc;
-use std::time::Duration;
 
 use bevy::{prelude::*, window::PrimaryWindow};
 use bevy::app::{App, AppExit, PluginGroup};
 use bevy::asset::{Asset, AssetServer};
 use bevy::DefaultPlugins;
-use bevy::input::keyboard::KeyboardInput;
 use bevy::log::LogPlugin;
-use bevy::prelude::{Assets, Bundle, Camera2dBundle, Commands, Component, EventReader, Mesh, NonSend, Query, Res, ResMut, Resource, shape, Transform, TypePath, Vec2, Vec2Swizzles, Window, With, Without};
+use bevy::prelude::{Assets, Bundle, Camera2dBundle, Commands, Component, EventReader, Mesh, NonSend, Query, Res, ResMut, Resource, Transform, TypePath, Vec2, Vec2Swizzles, Window, With};
 use bevy::render::render_resource::{AsBindGroup, AsBindGroupShaderType};
 use bevy::sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle, Mesh2dHandle};
 use bevy::utils::default;
-use bevy::window::{CursorMoved, PresentMode, WindowMode, WindowPlugin, WindowResolution};
+use bevy::window::{WindowMode, WindowPlugin};
 use bevy::winit::WinitWindows;
-use bevy_console::{AddConsoleCommand, ConsoleCommand, ConsoleConfiguration, ConsolePlugin, ConsoleSet, PrintConsoleLine, reply};
+use bevy_console::{AddConsoleCommand, ConsoleConfiguration, ConsolePlugin, PrintConsoleLine};
 use bevy_console::clap::Parser;
 use bevy_file_dialog::FileDialogPlugin;
-use bevy_inspector_egui::{bevy_egui, egui};
-use bevy_inspector_egui::bevy_egui::{EguiContext, EguiContexts};
-use bevy_inspector_egui::egui::{Color32, epaint, FontData, FontFamily, Stroke};
+use bevy_inspector_egui::bevy_egui::EguiContexts;
+use bevy_inspector_egui::egui;
+use bevy_inspector_egui::egui::{Color32, FontData, FontFamily, Stroke};
 use bevy_inspector_egui::egui::epaint::Shadow;
-use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use clap::builder::StyledStr;
 use color_print::cformat;
-use directories::ProjectDirs;
-use image::Rgba;
 use lazy_static::lazy_static;
-use log::{Level, LevelFilter, Log, Metadata, Record};
+use log::{LevelFilter, Log};
 use num::ToPrimitive;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Map, Value};
 use winit::window::Icon;
 
-use crate::common::{BufferedLogger, Coordinates, LogMessage, MeabyWeighted, PRIMARY_COLOR, PRIMARY_COLOR_FADED, Weighted};
-use crate::common::io::{Load, LoadError, Save, SaveError};
+use crate::common::{BufferedLogger, Coordinates, LogMessage, PRIMARY_COLOR};
+use crate::common::io::{Load, Save};
 use crate::graphics::{GraphicsResource, LegacyTextures};
 use crate::graphics::tileset::legacy::LegacyTilesetLoader;
 use crate::grid::{GridMarker, GridMaterial, GridPlugin};
@@ -51,12 +43,11 @@ use crate::grid::resources::Grid;
 use crate::map::events::{ClearTiles, SpawnMapEntity};
 use crate::map::loader::MapEntityLoader;
 use crate::map::MapPlugin;
-use crate::map::resources::{MapEntity, MapEntityType};
+use crate::map::resources::{MapEntity, Single};
 use crate::map::systems::{set_tile_reader, spawn_sprite, tile_despawn_reader, tile_remove_reader, tile_spawn_reader, update_sprite_reader};
-use crate::palettes::{MeabyParam, Palette};
 use crate::palettes::loader::PalettesLoader;
+use crate::palettes::Palette;
 use crate::project::resources::{Project, ProjectSaveState};
-use crate::project::saver::ProjectSaver;
 use crate::region_settings::loader::RegionSettingsLoader;
 use crate::tiles::components::{Offset, Tile};
 use crate::tiles::TilePlugin;
@@ -73,7 +64,7 @@ mod palettes;
 mod common;
 mod region_settings;
 
-pub const CDDA_DIR: &'static str = r"C:\DEV\SelfDEV\CDDA\CDDA-Map-Editor\saves";
+pub const CDDA_DIR: &'static str = r"C:\CDDA\testing";
 
 lazy_static! {
     pub static ref ALL_PALETTES: HashMap<String, Palette> = PalettesLoader::new(PathBuf::from(format!(r"{}/data/json/mapgen_palettes", CDDA_DIR))).load().unwrap();
@@ -110,13 +101,14 @@ impl EditorData {
 
 impl Default for EditorData {
     fn default() -> Self {
-        let map: MapEntity = MapEntity::new(
-            "unnamed".into(),
-            Vec2::new(24., 24.),
-        );
+        let map: Single = Single {
+            om_terrain: "unnamed".to_string(),
+            tile_selection: Default::default(),
+            tiles: Default::default(),
+        };
 
         let project = Project {
-            map_entity: map,
+            map_entity: MapEntity::Single(map),
             save_state: ProjectSaveState::NotSaved,
         };
 
@@ -125,154 +117,6 @@ impl Default for EditorData {
             projects: vec![project],
             history: vec![],
         };
-    }
-}
-
-pub struct EditorDataSaver;
-
-impl EditorDataSaver {
-    pub fn new() -> Self {
-        return Self {};
-    }
-}
-
-impl Save<EditorData> for EditorDataSaver {
-    fn save(&self, value: &EditorData) -> Result<(), SaveError> {
-        let dir = match ProjectDirs::from_path("CDDA Map Editor".into()) {
-            None => { return Err(SaveError::DirectoryNotFound("".into())); }
-            Some(d) => d
-        };
-
-        let data_dir = dir.data_local_dir();
-
-        if !data_dir.exists() { fs::create_dir_all(data_dir).unwrap(); }
-
-        let mut file = File::options()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(data_dir.join("data.json"))
-            .unwrap();
-
-        let mut converted = serde_json::to_value(value).unwrap();
-        let data = converted.as_object_mut().unwrap();
-
-        let open_projects: Vec<ProjectSaveState> = value.projects.iter().map(|project| {
-            match &project.save_state {
-                ProjectSaveState::AutoSaved(val) => ProjectSaveState::AutoSaved(val.clone()),
-                ProjectSaveState::Saved(val) => ProjectSaveState::Saved(val.clone()),
-                ProjectSaveState::NotSaved => {
-                    let filename = match &project.map_entity.map_type {
-                        MapEntityType::NestedMapgen { .. } => todo!(),
-                        MapEntityType::Default { om_terrain, .. } => om_terrain,
-                        MapEntityType::Multi { .. } => todo!(),
-                        MapEntityType::Nested { .. } => todo!()
-                    };
-
-                    info!("autosaving {}", filename);
-                    let project_saver = ProjectSaver { directory: Box::from(data_dir) };
-                    project_saver.save(project).unwrap();
-                    ProjectSaveState::AutoSaved(data_dir.join(format!("auto_save_{}.map", filename)))
-                }
-            }
-        }).collect();
-
-        data.insert("open_projects".into(), serde_json::to_value(open_projects).unwrap());
-
-        data.remove("projects".into());
-        data.remove("current_project_index".into());
-
-        file.write_all(serde_json::to_string(data).unwrap().as_bytes()).unwrap();
-
-        return Ok(());
-    }
-}
-
-impl Load<EditorData> for EditorDataSaver {
-    fn load(&self) -> Result<EditorData, LoadError> {
-        let dir = match ProjectDirs::from_path("CDDA Map Editor".into()) {
-            None => { return Err(LoadError::DirectoryNotFound); }
-            Some(d) => d
-        };
-
-        let data_dir = dir.data_local_dir();
-
-        if !data_dir.exists() { fs::create_dir_all(data_dir).unwrap(); }
-
-        let contents = match fs::read_to_string(data_dir.join("data.json")) {
-            Err(_) => return Ok(EditorData {
-                ..default()
-            }),
-            Ok(f) => f
-        };
-
-        let value: Map<String, Value> = serde_json::from_str(contents.as_str())
-            .expect("Valid Json");
-
-        let history_array: Vec<ProjectSaveState> = value
-            .get("history")
-            .expect("history Field")
-            .as_array()
-            .expect("Valid Array")
-            .iter()
-            .map(|v| serde_json::from_value::<ProjectSaveState>(v.clone()).unwrap())
-            .collect();
-
-        let projects_array: Vec<Project> = value
-            .get("open_projects")
-            .expect("open_projects field")
-            .as_array()
-            .expect("Valid array")
-            .iter()
-            .map(|v| {
-                let state = serde_json::from_value::<ProjectSaveState>(v.clone()).unwrap();
-
-                return match state {
-                    ProjectSaveState::Saved(path) => {
-                        match fs::read_to_string(path.clone()) {
-                            Ok(s) => {
-                                let mut project: Project = serde_json::from_str(s.as_str()).expect("Valid Project");
-
-                                info!("Loaded Saved Project at Path {:?}", path);
-
-                                Some(project)
-                            }
-                            Err(_) => {
-                                log::warn!("Could not Load Saved Project at path {:?}", path);
-                                None
-                            }
-                        }
-                    }
-                    ProjectSaveState::AutoSaved(path) => {
-                        match fs::read_to_string(path.clone()) {
-                            Ok(s) => {
-                                let project: Project = serde_json::from_str(s.as_str()).expect("Valid Project");
-
-                                info!("Loaded Auto saved Project at Path {:?}", path);
-
-                                Some(project)
-                            }
-                            Err(_) => {
-                                log::warn!("Could not Load Not Saved Project at path {:?}", path);
-                                Some(Project::default())
-                            }
-                        }
-                    }
-                    ProjectSaveState::NotSaved => {
-                        log::warn!("Could not open Project because it was not saved");
-                        return None;
-                    }
-                };
-            })
-            .filter(|v| v.is_some())
-            .map(|v| v.unwrap())
-            .collect();
-
-        return Ok(EditorData {
-            current_project_index: 0,
-            projects: projects_array,
-            history: history_array,
-        });
     }
 }
 
@@ -309,8 +153,6 @@ fn main() {
         .add_plugins((GridPlugin {}, MapPlugin {}, TilePlugin {}, UiPlugin {}))
         .add_systems(Update, (
             update,
-            // update_mouse_location,
-            app_exit,
             switch_project,
             tile_despawn_reader,
             apply_deferred,
@@ -343,19 +185,18 @@ fn setup(
     let tileset_loader = LegacyTilesetLoader::new(PathBuf::from(format!(r"{}/gfx/MSX++UnDeadPeopleEdition", CDDA_DIR)));
     let region_settings_loader = RegionSettingsLoader::new(PathBuf::from(format!(r"{}/data/json/regional_map_settings.json", CDDA_DIR)), "default".to_string());
 
-    let editor_data_saver = EditorDataSaver::new();
     let legacy_textures = LegacyTextures::new(tileset_loader, region_settings_loader, &mut r_images);
     let texture_resource = GraphicsResource::new(Box::new(legacy_textures));
 
     let mut default_project = Project::default();
-    let mut editor_data = editor_data_saver.load().unwrap();
 
     let loader = MapEntityLoader {
-        path: PathBuf::from(format!(r"{}/data/json/mapgen/mall/mall_ground.json", CDDA_DIR)),
-        id: "mall_a_1".to_string(),
+        path: PathBuf::from(format!(r"{}/data/json/mapgen/house/house01.json", CDDA_DIR)),
+        id: "house_01".to_string(),
     };
 
-    let map_entity = loader.load().unwrap();
+    let mut editor_data = EditorData::default();
+    let map_entity = MapEntity::Single(loader.load().unwrap());
 
     let project: &mut Project = editor_data.get_current_project_mut().unwrap_or(&mut default_project);
     project.map_entity = map_entity;
@@ -365,13 +206,11 @@ fn setup(
     });
 
     for (i, project) in editor_data.projects.iter().enumerate() {
-        let name = match &project.map_entity.map_type {
-            MapEntityType::NestedMapgen { .. } => todo!(),
-            MapEntityType::Default { om_terrain, .. } => om_terrain.clone(),
-            MapEntityType::Multi { .. } => todo!(),
-            MapEntityType::Nested { om_terrain, .. } => "Nested_TODO".to_string()
+        let name = match &project.map_entity {
+            MapEntity::Single(s) => s.om_terrain.clone(),
+            _ => todo!()
         };
-        
+
         e_spawn_tab.send(SpawnTab { name, index: i as u32 });
     }
 
@@ -396,7 +235,7 @@ fn setup(
                 offset: Vec2::default(),
                 mouse_pos: Default::default(),
                 is_cursor_captured: 0,
-                map_size: editor_data.get_current_project().unwrap().map_entity.size,
+                map_size: editor_data.get_current_project().unwrap().map_entity.size(),
                 scale_factor: 1.,
             }),
             ..default()
@@ -470,13 +309,13 @@ fn update(
     grid_material.1.offset = res_grid.offset;
     grid_material.1.tile_size = res_grid.tile_size;
     grid_material.1.mouse_pos = window.cursor_position().unwrap_or(Vec2::default());
-    grid_material.1.map_size = project.map_entity.size;
+    grid_material.1.map_size = project.map_entity.size();
     // Weird way to do this but bevy does not let me pass a bool as a uniform for some reason
     grid_material.1.is_cursor_captured = match res_cursor.0 {
         true => 1,
         false => 0
     };
-    grid_material.1.scale_factor = window.resolution.scale_factor() as f32;
+    grid_material.1.scale_factor = window.resolution.scale_factor();
 
     for (mut transform, coordinates, sprite_offset) in tiles.iter_mut() {
         //                                              < CENTER TO TOP LEFT >                                  < ALIGN ON GRID >
@@ -501,15 +340,5 @@ fn switch_project(
         });
 
         r_editor_data.current_project_index = switch_project.index;
-    }
-}
-
-fn app_exit(
-    mut e_exit: EventReader<AppExit>,
-    res_editor_data: Res<EditorData>,
-) {
-    for _ in e_exit.read() {
-        let save_data_saver = EditorDataSaver {};
-        save_data_saver.save(&res_editor_data).unwrap();
     }
 }

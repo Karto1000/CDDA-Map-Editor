@@ -4,7 +4,7 @@ use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Changed, Color,
 
 use crate::{EditorData, SwitchProject};
 use crate::common::{PRIMARY_COLOR, PRIMARY_COLOR_FADED, PRIMARY_COLOR_SELECTED};
-use crate::map::resources::MapEntityType;
+use crate::map::resources::MapEntity;
 use crate::project::resources::{Project, ProjectSaveState};
 use crate::ui::components::{HoverEffect, ToggleEffect};
 use crate::ui::hotbar::components::TopHotbarMarker;
@@ -93,24 +93,22 @@ pub fn on_add_tab_button_click(
         Interaction::Pressed => {
             let mut project = Project::default();
 
-            match project.map_entity.map_type {
-                MapEntityType::NestedMapgen { .. } => { todo!() }
-                MapEntityType::Default { ref mut om_terrain, .. } => {
+            match project.map_entity {
+                MapEntity::Single(ref mut s) => {
                     let amount_of_unnamed = r_editor_data.projects.iter()
                         .filter(|p| p.save_state == ProjectSaveState::NotSaved)
-                        .map(|p| om_terrain.clone())
+                        .map(|p| s.om_terrain.clone())
                         .filter(|n| n.contains("unnamed"))
                         .count();
 
-                    *om_terrain = format!("unnamed{}", amount_of_unnamed).to_string();
+                    s.om_terrain = format!("unnamed{}", amount_of_unnamed).to_string();
 
-                    let name = om_terrain.clone();
+                    let name = s.om_terrain.clone();
 
                     r_editor_data.projects.push(project);
                     e_spawn_tab.send(SpawnTab { name, index: r_editor_data.projects.len() as u32 - 1 });
                 }
-                MapEntityType::Multi { .. } => { todo!() }
-                MapEntityType::Nested { .. } => { todo!() }
+                 _ => todo!()
             }
         }
         _ => {}

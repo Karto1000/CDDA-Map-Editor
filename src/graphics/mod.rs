@@ -179,7 +179,7 @@ pub trait GetTexture: Send + Sync {
             SpriteState::Defined(s) => Some(s),
             SpriteState::TextureNotFound => Some(self.get_fallback_texture(character)),
             SpriteState::NotMapped => {
-                match &project.map_entity.fill {
+                match &project.map_entity.object().fill_ter {
                     None => None,
                     Some(fill) => self.get_terrain_texture_from_tile_id(project, coordinates, fill)
                 }
@@ -281,20 +281,20 @@ macro_rules! define_get_sprite_from_sprite_type {
                                     let field_around = project.map_entity.get_ids(&t.character).$field;
                                     let is_same_character = t.character == *character;
 
-                                    let is_this_filled = match (&field_this, &project.map_entity.fill) {
+                                    let is_this_filled = match (&field_this, &project.map_entity.object().fill_ter) {
                                         (None, Some(_)) => $is_terrain,
                                         (_, _) => false
                                     };
 
-                                    let is_around_filled = match(&field_around, &project.map_entity.fill) {
+                                    let is_around_filled = match(&field_around, &project.map_entity.object().fill_ter) {
                                         (None, Some(_)) => $is_terrain,
                                         (_, _) => false
                                     };
 
                                     let is_same_id = match (&field_around, &field_this) {
                                         (Some(around), Some(this)) => *around == *this,
-                                        (None, Some(this)) => is_around_filled && this == project.map_entity.fill.as_ref().unwrap(),
-                                        (Some(around), None) => is_this_filled && around == project.map_entity.fill.as_ref().unwrap(),
+                                        (None, Some(this)) => is_around_filled && this == project.map_entity.object().fill_ter.as_ref().unwrap(),
+                                        (Some(around), None) => is_this_filled && around == project.map_entity.object().fill_ter.as_ref().unwrap(),
                                         (None, None) => is_this_filled && is_around_filled
                                     };
 
@@ -361,20 +361,20 @@ macro_rules! define_get_sprite_from_sprite_type_and_tile_id {
                                Some(t)  => {
                                     let field_around = project.map_entity.get_ids(&t.character).$field;
 
-                                    let is_this_filled = match (&tile_id, &project.map_entity.fill) {
+                                    let is_this_filled = match (&tile_id, &project.map_entity.object().fill_ter) {
                                         (None, Some(_)) => $is_terrain,
                                         (_, _) => false
                                     };
 
-                                    let is_around_filled = match(&field_around, &project.map_entity.fill) {
+                                    let is_around_filled = match(&field_around, &project.map_entity.object().fill_ter) {
                                         (None, Some(_)) => $is_terrain,
                                         (_, _) => false
                                     };
 
                                     let is_same_id = match (&field_around, tile_id) {
                                         (Some(around), Some(this)) => *around == *this,
-                                        (None, Some(this)) => is_around_filled && this == project.map_entity.fill.as_ref().unwrap(),
-                                        (Some(around), None) => is_this_filled && around == project.map_entity.fill.as_ref().unwrap(),
+                                        (None, Some(this)) => is_around_filled && this == project.map_entity.object().fill_ter.as_ref().unwrap(),
+                                        (Some(around), None) => is_this_filled && around == project.map_entity.object().fill_ter.as_ref().unwrap(),
                                         (None, None) => is_this_filled && is_around_filled
                                     };
 
