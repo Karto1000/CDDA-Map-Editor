@@ -7,7 +7,7 @@ use directories::ProjectDirs;
 use serde_json::{Map, Value};
 use crate::common::io::{Load, LoadError, Save, SaveError};
 use crate::editor_data::EditorData;
-use crate::map::resources::MapEntityType;
+use crate::map::resources::MapEntity;
 use crate::project::resources::{Project, ProjectSaveState};
 use crate::project::saver::ProjectSaver;
 
@@ -44,11 +44,10 @@ impl Save<EditorData> for EditorDataSaver {
                 ProjectSaveState::AutoSaved(val) => ProjectSaveState::AutoSaved(val.clone()),
                 ProjectSaveState::Saved(val) => ProjectSaveState::Saved(val.clone()),
                 ProjectSaveState::NotSaved => {
-                    let filename = match &project.map_entity.map_type {
-                        MapEntityType::NestedMapgen { .. } => todo!(),
-                        MapEntityType::Default { om_terrain, .. } => om_terrain,
-                        MapEntityType::Multi { .. } => todo!(),
-                        MapEntityType::Nested { .. } => "NESTED_TODO"
+                    let filename = match &project.map_entity {
+                        MapEntity::Single(s) => s.om_terrain.clone(),
+                        MapEntity::Multi(_) => todo!(),
+                        MapEntity::Nested(_) => "NESTED_TODO".to_string()
                     };
 
                     info!("autosaving {}", filename);
@@ -150,7 +149,6 @@ impl Load<EditorData> for EditorDataSaver {
         return Ok(EditorData {
             current_project_index: 0,
             projects: projects_array,
-            // TODO: Implement
             history: Default::default(),
             config: Default::default(),
         });

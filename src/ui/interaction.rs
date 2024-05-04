@@ -1,9 +1,9 @@
 use bevy::app::AppExit;
 use bevy::prelude::{Changed, Commands, EventReader, EventWriter, Interaction, Query, Res, ResMut, With};
 use bevy_file_dialog::{DialogFileLoaded, FileDialogExt};
+use crate::editor_data::EditorData;
 
-use crate::EditorData;
-use crate::map::resources::{MapEntity, MapEntityType};
+use crate::map::resources::MapEntity;
 use crate::project::resources::{Project, ProjectSaveState};
 use crate::ui::hotbar::components::{CloseIconMarker, ImportIconMarker, OpenIconMarker, SaveIconMarker};
 use crate::ui::tabs::events::SpawnTab;
@@ -30,11 +30,10 @@ pub fn save_button_interaction(
         Some(p) => p
     };
 
-    let filename = match &project.map_entity.map_type {
-        MapEntityType::NestedMapgen { .. } => todo!(),
-        MapEntityType::Default { om_terrain, .. } => om_terrain.clone(),
-        MapEntityType::Multi { .. } => todo!(),
-        MapEntityType::Nested { .. } => "Nested_TODO".to_string()
+    let filename = match &project.map_entity {
+        MapEntity::Single(s) => s.om_terrain.clone(),
+        MapEntity::Multi(_) => todo!(),
+        MapEntity::Nested(_) => "Nested_TODO".to_string()
     };
 
     for interaction in interaction_query.iter() {
@@ -101,13 +100,10 @@ pub fn file_loaded_reader(
 
         let project = serde_json::from_slice::<Project>(event.contents.as_slice()).unwrap();
 
-        let name = match &project.map_entity.map_type {
-            MapEntityType::NestedMapgen { .. } => {todo!()}
-            MapEntityType::Default { om_terrain, .. } => {
-                om_terrain.clone()
-            }
-            MapEntityType::Multi { .. } => {todo!()}
-            MapEntityType::Nested { .. } => {todo!()}
+        let name = match &project.map_entity {
+            MapEntity::Single(s) => s.om_terrain.clone(),
+            MapEntity::Multi(_) => todo!(),
+            MapEntity::Nested(_) => todo!()
         };
 
         e_spawn_tab.send(SpawnTab {

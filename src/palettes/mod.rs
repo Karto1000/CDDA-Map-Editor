@@ -84,14 +84,14 @@ pub enum MeabyParam {
 #[derive(Deserialize, Clone, Serialize, Debug)]
 #[serde(untagged)]
 pub enum MapObjectId<T> {
-    Grouped(Vec<MeabyWeighted<T>>),
-    Nested(Vec<Vec<MeabyWeighted<T>>>),
+    Grouped(Vec<T>),
+    Nested(Vec<Vec<T>>),
     Param { param: String, fallback: Option<String> },
     Switch {
         switch: Switch,
         cases: HashMap<String, T>,
     },
-    Single(MeabyWeighted<T>),
+    Single(T),
 }
 
 #[derive(Deserialize, Clone, Serialize, Debug, Eq, Hash, PartialEq)]
@@ -179,11 +179,11 @@ pub struct Palette {
 
     #[serde(default)]
     #[serde(skip_serializing)]
-    pub terrain: HashMap<char, MapObjectId<MeabyParam>>,
+    pub terrain: HashMap<char, MapObjectId<MeabyWeighted<MeabyParam>>>,
 
     #[serde(default)]
     #[serde(skip_serializing)]
-    pub furniture: HashMap<char, MapObjectId<MeabyParam>>,
+    pub furniture: HashMap<char, MapObjectId<MeabyWeighted<MeabyParam>>>,
 
     #[serde(default)]
     #[serde(skip_serializing)]

@@ -1,9 +1,8 @@
-
 use std::default::Default;
 use std::io::Write;
 use std::ops::Deref;
 use std::path::PathBuf;
-
+use std::str::FromStr;
 use std::string::ToString;
 use std::sync::Arc;
 
@@ -12,15 +11,16 @@ use bevy::app::{App, AppExit, PluginGroup};
 use bevy::asset::{AssetServer, AsyncReadExt};
 use bevy::DefaultPlugins;
 use bevy::log::LogPlugin;
-use bevy::prelude::{Assets, Camera2dBundle, Commands, Component, EventReader, Mesh, NonSend, Query, Res, ResMut, Resource, Transform, Vec2, Window, With};
 
-use bevy::sprite::{Material2dPlugin, MaterialMesh2dBundle, Mesh2dHandle};
+
+use bevy::prelude::{Assets, Bundle, Camera2dBundle, Commands, Component, EventReader, Mesh, NonSend, Query, Res, ResMut, Resource, Transform, TypePath, Vec2, Vec2Swizzles, Window, With};
+use bevy::render::render_resource::{AsBindGroup, AsBindGroupShaderType};
+use bevy::sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle, Mesh2dHandle};
 use bevy::utils::default;
-
 use bevy::window::{WindowMode, WindowPlugin};
 use bevy::winit::WinitWindows;
-use bevy_console::{ConsoleConfiguration, ConsolePlugin, PrintConsoleLine};
-
+use bevy_console::{AddConsoleCommand, ConsoleConfiguration, ConsolePlugin, PrintConsoleLine};
+use bevy_console::clap::Parser;
 use bevy_file_dialog::FileDialogPlugin;
 use bevy_inspector_egui::bevy_egui::EguiContexts;
 use bevy_inspector_egui::egui;
@@ -29,25 +29,28 @@ use bevy_inspector_egui::egui::epaint::Shadow;
 use clap::builder::StyledStr;
 use color_print::cformat;
 use imageproc::drawing::Canvas;
+use crate::common::{Weighted};
+use crate::editor_data::io::EditorDataSaver;
 use lazy_static::lazy_static;
-use log::{LevelFilter};
+use log::{LevelFilter, Log};
 use num::ToPrimitive;
-
+use serde::{Deserialize, Serialize};
 use winit::window::Icon;
 
-use crate::common::{BufferedLogger, Coordinates, LogMessage, PRIMARY_COLOR, Weighted};
+use crate::common::{BufferedLogger, Coordinates, LogMessage, PRIMARY_COLOR};
 use crate::common::io::{Load, Save};
 use crate::editor_data::EditorData;
-use crate::editor_data::io::EditorDataSaver;
 use crate::graphics::{GraphicsResource, LegacyTextures};
 use crate::graphics::tileset::legacy::LegacyTilesetLoader;
 use crate::map::events::{ClearTiles, SpawnMapEntity};
 use crate::map::loader::MapEntityLoader;
 use crate::map::MapPlugin;
-use crate::map::resources::MapEntityType;
-use crate::map::systems::{set_tile_reader, spawn_sprite, tile_despawn_reader, tile_remove_reader, tile_spawn_reader, update_sprite_reader};
 use crate::palettes::MeabyParam;
-use crate::project::resources::Project;
+use crate::map::resources::{MapEntity, Single};
+use crate::map::systems::{set_tile_reader, spawn_sprite, tile_despawn_reader, tile_remove_reader, tile_spawn_reader, update_sprite_reader};
+use crate::palettes::loader::PalettesLoader;
+use crate::palettes::Palette;
+use crate::project::resources::{Project, ProjectSaveState};
 use crate::region_settings::loader::RegionSettingsLoader;
 use crate::tiles::components::{Offset, Tile};
 use crate::tiles::TilePlugin;
@@ -80,6 +83,8 @@ pub struct IsCursorCaptured(bool);
 pub struct SwitchProject {
     pub index: u32,
 }
+
+
 
 fn main() {
     lazy_static::initialize(&LOGGER);
@@ -117,7 +122,6 @@ fn main() {
         .add_plugins((GridPlugin {}, MapPlugin {}, TilePlugin {}, UiPlugin {}))
         .add_systems(Update, (
             update,
-            app_exit,
             switch_project,
             tile_despawn_reader,
             apply_deferred,
@@ -170,24 +174,23 @@ fn setup(
         id: "mall_a_1".to_string(),
         cdda_data: &editor_data.config.cdda_data.as_ref().unwrap().clone(),
     };
-
-    let map_entity = loader.load().unwrap();
+    
+    let map_entity = MapEntity::Nested(loader.load().unwrap());
 
     let mut project = Project::default();
-    project.map_entity = map_entity;
-
-    e_spawn_map_entity.send(SpawnMapEntity {
-        map_entity: Arc::new(project.map_entity.clone())
-    });
-
+    project.map_entity = map_entity.clone();
+    
     editor_data.projects.push(project);
 
+    e_spawn_map_entity.send(SpawnMapEntity {
+        map_entity: Arc::new(map_entity)
+    });
+
     for (i, project) in editor_data.projects.iter().enumerate() {
-        let name = match &project.map_entity.map_type {
-            MapEntityType::NestedMapgen { .. } => todo!(),
-            MapEntityType::Default { om_terrain, .. } => om_terrain.clone(),
-            MapEntityType::Multi { .. } => todo!(),
-            MapEntityType::Nested { .. } => "Nested_TODO".to_string()
+        let name = match &project.map_entity {
+            MapEntity::Single(s) => s.om_terrain.clone(),
+            MapEntity::Nested(_) => "Nested_TODO".to_string(),
+            _ => todo!()
         };
 
         e_spawn_tab.send(SpawnTab { name, index: i as u32 });
@@ -214,7 +217,7 @@ fn setup(
                 offset: Vec2::default(),
                 mouse_pos: Default::default(),
                 is_cursor_captured: 0,
-                map_size: editor_data.get_current_project().unwrap().map_entity.size,
+                map_size: editor_data.get_current_project().unwrap().map_entity.size(),
                 scale_factor: 1.,
             }),
             ..default()
@@ -288,8 +291,8 @@ fn update(
     grid_material.1.offset = res_grid.offset;
     grid_material.1.tile_size = res_grid.tile_size;
     grid_material.1.mouse_pos = window.cursor_position().unwrap_or(Vec2::default());
-    grid_material.1.map_size = project.map_entity.size;
-    // Weird way to do this, but bevy does not let me pass a bool as a uniform for some reason
+    grid_material.1.map_size = project.map_entity.size();
+    // Weird way to do this but bevy does not let me pass a bool as a uniform for some reason
     grid_material.1.is_cursor_captured = match res_cursor.0 {
         true => 1,
         false => 0
@@ -319,15 +322,5 @@ fn switch_project(
         });
 
         r_editor_data.current_project_index = switch_project.index;
-    }
-}
-
-fn app_exit(
-    mut e_exit: EventReader<AppExit>,
-    res_editor_data: Res<EditorData>,
-) {
-    for _ in e_exit.read() {
-        let save_data_saver = EditorDataSaver {};
-        save_data_saver.save(&res_editor_data).unwrap();
     }
 }

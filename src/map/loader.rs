@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fs::read_to_string;
 use std::path::PathBuf;
 
 use bevy::math::Vec2;
@@ -11,9 +12,8 @@ use serde_json::{Value};
 use crate::common::{Coordinates, MeabyWeighted, TileId};
 use crate::common::io::{Load, LoadError};
 use crate::editor_data::CDDAData;
-use crate::map::resources::ComputedParameters;
+use crate::map::resources::{ComputedParameters, Multi, Nested, Single, TileSelection};
 use crate::map::resources::MapEntity;
-use crate::map::resources::MapEntityType;
 use crate::palettes::{MeabyParam, MapGenValue, MapObjectId, PaletteId, ParameterType};
 use crate::tiles::components::Tile;
 
@@ -50,17 +50,12 @@ fn compute_palettes(
                 }
             }
             MapObjectId::Switch { .. } => { todo!() }
-            MapObjectId::Single(o) => {
-                match o {
-                    MeabyWeighted::NotWeighted(i) => {
-                        match i {
-                            MeabyParam::TileId(i) => {
-                                i.clone()
-                            }
-                            MeabyParam::Parameter(_) => { todo!() }
-                        }
+            MapObjectId::Single(mp) => {
+                match mp {
+                    MeabyParam::TileId(i) => {
+                        i.clone()
                     }
-                    MeabyWeighted::Weighted(_) => { todo!() }
+                    MeabyParam::Parameter(_) => { todo!() }
                 }
             }
         };
@@ -86,12 +81,9 @@ fn compute_palettes(
     return computed_palettes;
 }
 
-impl<'a> Load<MapEntity> for MapEntityLoader<'a> {
-    fn load(&self) -> Result<MapEntity, LoadError> {
-        let mut map_type: Option<MapEntityType> = None;
-
+impl Load<Single> for MapEntityLoader<'_> {
+    fn load(&self) -> Result<Single, LoadError> {
         let objects = serde_json::from_str::<Vec<HashMap<String, Value>>>(std::fs::read_to_string(&self.path).unwrap().as_str()).unwrap();
-        let mut om_based_size = Vec2::new(24., 24.);
 
         let mapgen_entity = objects
             .into_iter()
@@ -101,59 +93,11 @@ impl<'a> Load<MapEntity> for MapEntityLoader<'a> {
                     Some(s) => match serde_json::from_value::<MapObjectId<String>>(s.clone()) {
                         Ok(id) => {
                             match id {
-                                MapObjectId::Grouped(group) => {
-                                    let ids: Vec<String> = group.iter().map(|mw| mw.value().clone()).collect();
-
-                                    let any_matches = ids.iter().any(|id| *id == self.id);
-
-                                    if any_matches {
-                                        map_type = Some(
-                                            MapEntityType::Multi {
-                                                om_terrain: ids,
-                                                weight: 100,
-                                            }
-                                        )
-                                    }
-
-                                    any_matches
-                                }
-                                MapObjectId::Nested(nested) => {
-                                    // Each om_terrain id in a nested vec equals to 24 tiles
-                                    // Each nested vec in the parent vec equals to 24 tiles
-                                    om_based_size.x = 24. * nested.first().unwrap().len() as f32;
-                                    om_based_size.y = 24. * nested.len() as f32;
-
-                                    let any_matches = nested.iter().flatten().map(|mw| mw.value()).any(|v| v.clone() == self.id);
-
-                                    if any_matches {
-                                        map_type = Some(
-                                            MapEntityType::Nested {
-                                                om_terrain: nested.iter()
-                                                    .map(|v| v.iter()
-                                                        .map(|mw| mw.value().clone()).collect())
-                                                    .collect(),
-                                                weight: 100,
-                                            }
-                                        )
-                                    }
-
-                                    any_matches
-                                }
                                 MapObjectId::Single(id) => {
-                                    let any_matches = id.value().clone() == self.id;
-
-                                    if any_matches {
-                                        map_type = Some(
-                                            MapEntityType::Default {
-                                                om_terrain: id.value().clone(),
-                                                weight: 100,
-                                            }
-                                        )
-                                    }
-
+                                    let any_matches = id.clone() == self.id;
                                     any_matches
                                 }
-                                _ => todo!()
+                                _ => false
                             }
                         }
                         Err(_) => { todo!() }
@@ -162,28 +106,16 @@ impl<'a> Load<MapEntity> for MapEntityLoader<'a> {
             })
             .unwrap();
 
+        let om_terrain = mapgen_entity.get("om_terrain").unwrap();
         let object = mapgen_entity.get("object").unwrap();
-
+        let rows: Vec<String> = serde_json::from_value(object.get("rows").unwrap().clone()).unwrap();
         let parameters = match object.get("parameters") {
             None => HashMap::new(),
             Some(v) => serde_json::from_value::<HashMap<ParameterId, Parameter>>(v.clone()).unwrap()
         };
-
-        let rows: Vec<String> = serde_json::from_value(object.get("rows").unwrap().clone()).unwrap();
+        let palettes: Vec<MapObjectId<MeabyParam>> = serde_json::from_value(object.get("palettes").unwrap_or(&Value::Array(Vec::new())).clone()).unwrap();
 
         let mut tiles = HashMap::new();
-
-        let size = match object.get("mapgensize") {
-            None => om_based_size,
-            Some(v) => match v {
-                Value::Array(a) => Vec2::new(
-                    a.first().unwrap().as_f64().unwrap() as f32,
-                    a.last().unwrap().as_f64().unwrap() as f32,
-                ),
-                _ => panic!()
-            }
-        };
-        info!("Loaded Map Object Size: {}", size);
 
         for (row, tile) in rows.iter().enumerate() {
             // to_string returns quotes so we use as_str
@@ -194,8 +126,6 @@ impl<'a> Load<MapEntity> for MapEntityLoader<'a> {
                 );
             }
         }
-
-        let palettes: Vec<MapObjectId<MeabyParam>> = serde_json::from_value(object.get("palettes").unwrap_or(&Value::Array(Vec::new())).clone()).unwrap();
 
         let mut this = HashMap::new();
 
@@ -226,18 +156,110 @@ impl<'a> Load<MapEntity> for MapEntityLoader<'a> {
             Some(v) => Some(String::from(v.as_str().unwrap().to_string()))
         };
 
+        info!("Loaded Single Mapgen Object {}", om_terrain);
+
         return Ok(
-            MapEntity {
-                map_type: map_type.unwrap(),
-                fill,
-                palettes,
-                computed_parameters,
+            Single {
+                om_terrain: om_terrain.to_string(),
+                tile_selection: TileSelection {
+                    fill_ter: fill,
+                    computed_parameters,
+                    palettes,
+                    terrain,
+                    furniture,
+                },
                 tiles,
-                size,
-                terrain,
-                furniture,
-                items: Default::default(),
-                place_nested: vec![],
+            }
+        );
+    }
+}
+
+impl Load<Multi> for MapEntityLoader<'_> {
+    fn load(&self) -> Result<Multi, LoadError> {
+        todo!()
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct CDDAMapgenObject {
+    fill_ter: Option<String>,
+    rows: Vec<String>,
+    palettes: Vec<MapObjectId<MeabyParam>>,
+
+    terrain: Option<HashMap<char, MapObjectId<MeabyWeighted<MeabyParam>>>>,
+    furniture: Option<HashMap<char, MapObjectId<MeabyWeighted<MeabyParam>>>>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct CDDANestedMapgenObject {
+    om_terrain: Vec<Vec<String>>,
+    method: String,
+    #[serde(rename = "type")]
+    om_type: String,
+    parameters: Option<HashMap<ParameterId, Parameter>>,
+    object: CDDAMapgenObject,
+}
+
+impl Load<Nested> for MapEntityLoader<'_> {
+    fn load(&self) -> Result<Nested, LoadError> {
+        let objects: Vec<CDDANestedMapgenObject> = serde_json::from_str::<Vec<Value>>(read_to_string(&self.path).unwrap().as_str())
+            .unwrap()
+            .into_iter()
+            .filter_map(|hm| {
+                return match serde_json::from_value(hm) {
+                    Err(e) => None,
+                    Ok(v) => Some(v)
+                };
+            })
+            .collect();
+
+        // TODO: Handle
+        let entity = objects.first().unwrap();
+
+        let mut tiles = HashMap::new();
+
+        for (row, tile) in entity.object.rows.iter().enumerate() {
+            // to_string returns quotes, so we use as_str
+            for (column, char) in tile.as_str().chars().enumerate() {
+                tiles.insert(
+                    Coordinates::new(column as i32, row as i32),
+                    Tile::from(char),
+                );
+            }
+        }
+
+        let mut this = HashMap::new();
+
+        let terrain = entity.object.terrain.clone().unwrap_or(HashMap::new());
+        let furniture = entity.object.furniture.clone().unwrap_or(HashMap::new());
+        let parameters = entity.parameters.clone().unwrap_or(HashMap::new());
+
+        for (parameter_id, parameter) in parameters.iter() {
+            this.insert(
+                parameter_id.clone(),
+                parameter.default.get_value(),
+            );
+        }
+
+        let computed_parameters = ComputedParameters {
+            this: this.clone(),
+            palettes: compute_palettes(self.cdda_data, &this, &entity.object.palettes),
+        };
+
+        info!("Loaded Nested Om Mapgen Object {:?}", entity.om_terrain);
+
+        return Ok(
+            Nested {
+                row_size: entity.om_terrain.get(0).unwrap().len(),
+                om_terrain: entity.om_terrain.iter().flatten().map(|s| s.clone()).collect(),
+                tile_selection: TileSelection {
+                    fill_ter: entity.object.fill_ter.clone(),
+                    computed_parameters,
+                    palettes: entity.object.palettes.clone(),
+                    terrain,
+                    furniture,
+                },
+                tiles,
             }
         );
     }

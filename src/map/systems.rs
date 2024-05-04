@@ -3,21 +3,16 @@ use std::fs;
 use std::sync::Arc;
 
 use bevy::asset::Handle;
-use bevy::hierarchy::Children;
-use bevy::input::ButtonInput;
 use bevy::math::Vec3;
-use bevy::prelude::{Commands, Component, default, Entity, Event, EventReader, EventWriter, Image, KeyCode, Query, Res, ResMut, SpriteBundle, Text, Transform, With};
-use bevy::text::TextSection;
-use bevy_file_dialog::{DialogFileSaved, FileDialogExt};
+use bevy::prelude::{Commands, Component, default, Entity, Event, EventReader, EventWriter, Image, Query, Res, ResMut, SpriteBundle, Transform, With};
+use log::{info, warn};
 
 use crate::common::Coordinates;
-use crate::EditorData;
+use crate::editor_data::EditorData;
 use crate::graphics::{GraphicsResource, Sprite, SpriteState, TileSprite};
 use crate::graphics::tileset::{GetBackground, GetForeground};
 use crate::map::{TileDeleteEvent, TilePlaceEvent};
 use crate::map::events::{ClearTiles, SpawnMapEntity, UpdateSpriteEvent};
-use crate::map::resources::MapEntityType;
-use crate::project::resources::{Project, ProjectSaveState};
 use crate::tiles::components::{Offset, Tile};
 use crate::ui::grid::resources::Grid;
 use crate::ui::tabs::components::Tab;
@@ -112,7 +107,7 @@ pub fn spawn_sprite(
                 Offset::from(e.offset.clone())
             ));
 
-            let tile = project.map_entity.tiles.get_mut(&e.coordinates).unwrap();
+            let tile = project.map_entity.tiles_mut().get_mut(&e.coordinates).unwrap();
             match &e.sprite_kind {
                 SpriteKind::Item(_) => { panic!("Not Implemented") }
                 SpriteKind::Terrain(sprite) => {
@@ -157,7 +152,7 @@ pub fn spawn_sprite(
                 Offset::from(e.offset.clone())
             ));
 
-            let tile = project.map_entity.tiles.get_mut(&e.coordinates).unwrap();
+            let tile = project.map_entity.tiles_mut().get_mut(&e.coordinates).unwrap();
             match &e.sprite_kind {
                 SpriteKind::Item(_) => { panic!("Not Implemented") }
                 SpriteKind::Terrain(_) => {
@@ -193,7 +188,13 @@ pub fn update_animated_sprites(
     let mut fg_entities_to_set = HashMap::new();
 
     for (entity, cords, animated, layer) in query.iter() {
-        let tile = current_project.map_entity.tiles.get(cords).unwrap();
+        let tile = match current_project.map_entity.tiles().get(cords) {
+            None => {
+                warn!("Tile at cords {:?} does not exist even though query matched tile", cords);
+                continue;
+            }
+            Some(t) => t
+        };
         match r_textures.textures.get_terrain(current_project, &cdda_data, &tile.character, cords) {
             SpriteState::Defined(terrain) => {
                 if (chrono::prelude::Utc::now().timestamp_millis() / 1000) as u64 - animated.last_update < animated.cooldown as u64 {
@@ -244,102 +245,7 @@ pub fn update_animated_sprites(
     };
 
     for (cords, entity) in fg_entities_to_set.into_iter() {
-        current_project_mut.map_entity.tiles.get_mut(cords).unwrap().terrain.fg_entity = Some(entity);
-    }
-}
-
-pub fn map_save_system(
-    keys: Res<ButtonInput<KeyCode>>,
-    r_editor_data: ResMut<EditorData>,
-    mut commands: Commands,
-) {
-    if keys.pressed(KeyCode::ControlLeft) && keys.just_pressed(KeyCode::KeyS) {
-        let current_project = r_editor_data.get_current_project().unwrap();
-
-        match &current_project.save_state {
-            ProjectSaveState::Saved(p) => {
-                fs::write(p, serde_json::to_string(&current_project).unwrap().into_bytes()).unwrap();
-            }
-            _ => {
-                commands.dialog()
-                    .set_file_name("unnamed.map")
-                    .save_file::<Project>(serde_json::to_string(&current_project).unwrap().into_bytes());
-            }
-        }
-    }
-}
-
-pub fn save_directory_picked(
-    mut res_editor_data: ResMut<EditorData>,
-    mut e_file_saved: EventReader<DialogFileSaved<Project>>,
-    q_tabs: Query<(Entity, &Tab, &Children)>,
-    mut q_text: Query<&mut Text>,
-) {
-    let project_index = res_editor_data.current_project_index;
-    let current_project = match res_editor_data.get_current_project_mut() {
-        None => return,
-        Some(p) => p
-    };
-
-    for event in e_file_saved.read() {
-        current_project.save_state = ProjectSaveState::Saved(event.path.clone());
-
-
-        // Edit the file name in the saved file because we can't know the file name in advance
-        let content = fs::read_to_string(&event.path).unwrap();
-        let mut entity: Project = serde_json::from_str(content.as_str()).unwrap();
-
-        // This is probably some of the weirdest code i've ever written
-        let file_name_string = event.path
-            .file_name()
-            .clone()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string();
-
-        let reversed_string = file_name_string
-            .chars()
-            .rev()
-            .map(|c| c.to_string())
-            .collect::<Vec<String>>()
-            .join("");
-
-        let project_name = reversed_string
-            // Remove the extension with the dot
-            .splitn(2, ".")
-            .last()
-            .unwrap()
-            .chars()
-            .rev()
-            .map(|c| c.to_string())
-            .collect::<Vec<String>>()
-            .join("");
-
-        for (_, tab, children) in q_tabs.iter() {
-            if tab.index != project_index { continue; }
-
-            for child in children.iter() {
-                let mut text = match q_text.get_mut(*child) {
-                    Ok(t) => t,
-                    Err(_) => { continue; }
-                };
-
-                text.sections.clear();
-                text.sections.push(TextSection::from(project_name.clone()));
-            }
-        }
-
-        match &mut current_project.map_entity.map_type {
-            MapEntityType::Default { ref mut om_terrain, .. } => *om_terrain = project_name,
-            _ => todo!()
-        };
-
-        entity.save_state = ProjectSaveState::Saved(event.path.clone());
-
-        // Remove the original file and Save it back and overwrite the original file
-        fs::remove_file(&event.path).unwrap();
-        fs::write(&event.path, serde_json::to_string(&entity).unwrap().into_bytes()).unwrap();
+        current_project_mut.map_entity.tiles_mut().get_mut(cords).unwrap().terrain.fg_entity = Some(entity);
     }
 }
 
@@ -353,7 +259,7 @@ pub fn set_tile_reader(
     };
 
     for e in e_set_tile.read() {
-        project.map_entity.tiles.insert(
+        project.map_entity.tiles_mut().insert(
             e.coordinates.clone(),
             e.tile,
         );
@@ -370,7 +276,7 @@ pub fn tile_remove_reader(
     };
 
     for e in e_delete_tile.read() {
-        project.map_entity.tiles.remove(&e.coordinates);
+        project.map_entity.tiles_mut().remove(&e.coordinates);
     }
 }
 
@@ -429,7 +335,7 @@ pub fn update_sprite_reader(
                                 Offset {x: $sprite.offset_x, y: $sprite.offset_y }
                             ));
 
-                            let tile = project.map_entity.tiles.get_mut(&e.coordinates).unwrap();
+                            let tile = project.map_entity.tiles_mut().get_mut(&e.coordinates).unwrap();
                             tile.$sprite_type.fg_entity = Some(fg_entity_commands.id());
                         }
                         Some(i) => {
@@ -470,7 +376,7 @@ pub fn update_sprite_reader(
                                 Offset {x: $sprite.offset_x, y: $sprite.offset_y }
                             ));
 
-                            let tile = project.map_entity.tiles.get_mut(&e.coordinates).unwrap();
+                            let tile = project.map_entity.tiles_mut().get_mut(&e.coordinates).unwrap();
                             tile.$sprite_type.bg_entity = Some(bg_entity_commands.id());
                         }
                         Some(i) => match q_sprite.get_mut(i) {
@@ -525,7 +431,6 @@ pub fn tile_spawn_reader(
         None => { return; }
         Some(p) => { p }
     };
-
 
     for e in e_tile_place.read() {
         let sprites = r_textures.textures.get_textures(project, &cdda_data, &e.tile.character, &e.coordinates);
@@ -650,7 +555,7 @@ pub fn spawn_map_entity_reader(
     mut e_tile_place: EventWriter<TilePlaceEvent>,
 ) {
     for event in e_spawn_map_entity.read() {
-        for (coords, tile) in event.map_entity.tiles.iter() {
+        for (coords, tile) in event.map_entity.tiles().iter() {
             e_tile_place.send(
                 TilePlaceEvent {
                     tile: tile.clone(),

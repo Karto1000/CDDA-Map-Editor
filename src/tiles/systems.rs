@@ -3,8 +3,9 @@ use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::{EventReader, EventWriter, MouseButton, Query, Res, ResMut, Transform, Vec2Swizzles, Window, With, Without};
 use bevy::window::{PrimaryWindow, WindowResized};
 
-use crate::{EditorData, IsCursorCaptured};
+use crate::{IsCursorCaptured};
 use crate::common::Coordinates;
+use crate::editor_data::EditorData;
 use crate::ui::grid::GridMarker;
 use crate::ui::grid::resources::Grid;
 use crate::map::events::{TileDeleteEvent, TilePlaceEvent};
@@ -79,14 +80,14 @@ pub fn tile_place_system(
             ((xy.y + r_grid.offset.y) / r_grid.tile_size).floor() as i32,
         );
 
-        if tile_cords.x >= project.map_entity.size.x as i32 ||
-            tile_cords.y >= project.map_entity.size.y as i32 ||
+        if tile_cords.x >= project.map_entity.size().x as i32 ||
+            tile_cords.y >= project.map_entity.size().y as i32 ||
             tile_cords.x < 0 ||
             tile_cords.y < 0 {
             return;
         }
 
-        let existing_tile = project.map_entity.tiles.get(&tile_cords);
+        let existing_tile = project.map_entity.tiles().get(&tile_cords);
         if let Some(existing_tile) = existing_tile {
             // Overwrite empty characters
             if existing_tile.character != ' ' { return; }
@@ -133,7 +134,7 @@ pub fn tile_delete_system(
             ((xy.y + r_grid.offset.y) / r_grid.tile_size).floor() as i32,
         );
 
-        let tile = match project.map_entity.tiles.get(&tile_cords) {
+        let tile = match project.map_entity.tiles().get(&tile_cords) {
             None => { return; }
             Some(t) => t
         };
