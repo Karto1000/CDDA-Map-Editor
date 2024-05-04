@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fs::read_to_string;
 use std::path::PathBuf;
 
 use bevy::math::Vec2;
@@ -44,17 +45,12 @@ fn compute_palettes(parameters: &HashMap<String, String>, palettes: &Vec<MapObje
                 }
             }
             MapObjectId::Switch { .. } => { todo!() }
-            MapObjectId::Single(o) => {
-                match o {
-                    MeabyWeighted::NotWeighted(i) => {
-                        match i {
-                            MeabyParam::TileId(i) => {
-                                i.clone()
-                            }
-                            MeabyParam::Parameter(_) => { todo!() }
-                        }
+            MapObjectId::Single(mp) => {
+                match mp {
+                    MeabyParam::TileId(i) => {
+                        i.clone()
                     }
-                    MeabyWeighted::Weighted(_) => { todo!() }
+                    MeabyParam::Parameter(_) => { todo!() }
                 }
             }
         };
@@ -93,7 +89,7 @@ impl Load<Single> for MapEntityLoader {
                         Ok(id) => {
                             match id {
                                 MapObjectId::Single(id) => {
-                                    let any_matches = id.value().clone() == self.id;
+                                    let any_matches = id.clone() == self.id;
                                     any_matches
                                 }
                                 _ => false
@@ -154,7 +150,7 @@ impl Load<Single> for MapEntityLoader {
             None => None,
             Some(v) => Some(String::from(v.as_str().unwrap().to_string()))
         };
-        
+
         info!("Loaded Single Mapgen Object {}", om_terrain);
 
         return Ok(
@@ -179,8 +175,90 @@ impl Load<Multi> for MapEntityLoader {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct CDDAMapgenObject {
+    fill_ter: Option<String>,
+    rows: Vec<String>,
+    palettes: Vec<MapObjectId<MeabyParam>>,
+
+    terrain: Option<HashMap<char, MapObjectId<MeabyWeighted<MeabyParam>>>>,
+    furniture: Option<HashMap<char, MapObjectId<MeabyWeighted<MeabyParam>>>>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct CDDANestedMapgenObject {
+    om_terrain: Vec<Vec<String>>,
+    method: String,
+    #[serde(rename = "type")]
+    om_type: String,
+    parameters: Option<HashMap<ParameterId, Parameter>>,
+    object: CDDAMapgenObject,
+}
+
 impl Load<Nested> for MapEntityLoader {
     fn load(&self) -> Result<Nested, LoadError> {
-        todo!()
+        let objects: Vec<CDDANestedMapgenObject> = serde_json::from_str::<Vec<Value>>(read_to_string(&self.path).unwrap().as_str())
+            .unwrap()
+            .into_iter()
+            .filter_map(|hm| {
+                return match serde_json::from_value(hm) {
+                    Err(e) => {
+                        println!("{:?}", e);
+                        None
+                    }
+                    Ok(v) => Some(v)
+                };
+            })
+            .collect();
+
+        // TODO: Handle
+        let entity = objects.first().unwrap();
+
+        let mut tiles = HashMap::new();
+
+        for (row, tile) in entity.object.rows.iter().enumerate() {
+            // to_string returns quotes so we use as_str
+            for (column, char) in tile.as_str().chars().enumerate() {
+                tiles.insert(
+                    Coordinates::new(column as i32, row as i32),
+                    Tile::from(char),
+                );
+            }
+        }
+
+        let mut this = HashMap::new();
+
+        let terrain = entity.object.terrain.clone().unwrap_or(HashMap::new());
+        let furniture = entity.object.furniture.clone().unwrap_or(HashMap::new());
+        let parameters = entity.parameters.clone().unwrap_or(HashMap::new());
+
+        for (parameter_id, parameter) in parameters.iter() {
+            this.insert(
+                parameter_id.clone(),
+                parameter.default.get_value(),
+            );
+        }
+
+        let computed_parameters = ComputedParameters {
+            this: this.clone(),
+            palettes: compute_palettes(&this, &entity.object.palettes),
+        };
+
+        info!("Loaded Nested Om Mapgen Object {:?}", entity.om_terrain);
+
+        return Ok(
+            Nested {
+                row_size: entity.om_terrain.get(0).unwrap().len(),
+                om_terrain: entity.om_terrain.iter().flatten().map(|s| s.clone()).collect(),
+                tile_selection: TileSelection {
+                    fill_ter: entity.object.fill_ter.clone(),
+                    computed_parameters,
+                    palettes: entity.object.palettes.clone(),
+                    terrain,
+                    furniture,
+                },
+                tiles,
+            }
+        );
     }
 }

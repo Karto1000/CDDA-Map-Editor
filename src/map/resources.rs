@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use bevy::prelude::Resource;
 use bevy::prelude::Vec2;
 use serde::{Deserialize, Serialize};
-use crate::ALL_PALETTES;
 
-use crate::common::{Coordinates, MeabyWeighted, TileId, Weighted, GetRandom};
+use crate::ALL_PALETTES;
+use crate::common::{Coordinates, GetRandom, MeabyWeighted, TileId, Weighted};
 use crate::map::loader::ParameterId;
 use crate::palettes::{MapObjectId, MeabyParam, PaletteId};
 use crate::tiles::components::Tile;
@@ -41,8 +41,8 @@ pub struct TileSelection {
     pub fill_ter: Option<TileId>,
 
     pub palettes: Vec<MapObjectId<MeabyParam>>,
-    pub terrain: HashMap<char, MapObjectId<MeabyParam>>,
-    pub furniture: HashMap<char, MapObjectId<MeabyParam>>,
+    pub terrain: HashMap<char, MapObjectId<MeabyWeighted<MeabyParam>>>,
+    pub furniture: HashMap<char, MapObjectId<MeabyWeighted<MeabyParam>>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -123,11 +123,9 @@ impl MapEntity {
 
     pub fn size(&self) -> Vec2 {
         return match self {
-            MapEntity::Single(s) => {
-                Vec2::new(24., 24.)
-            }
-            MapEntity::Multi(_) => todo!(),
-            MapEntity::Nested(_) => todo!()
+            MapEntity::Single(_) => Vec2::new(24., 24.),
+            MapEntity::Multi(_) => Vec2::new(24., 24.),
+            MapEntity::Nested(n) => Vec2::new(n.om_terrain.len() as f32, n.row_size as f32)
         };
     }
 
@@ -193,17 +191,12 @@ impl MapEntity {
                     }
                 }
                 MapObjectId::Switch { .. } => { todo!() }
-                MapObjectId::Single(mw) => {
-                    match mw {
-                        MeabyWeighted::NotWeighted(i) => {
-                            match i {
-                                MeabyParam::TileId(id) => {
-                                    id.clone()
-                                }
-                                MeabyParam::Parameter(_) => { todo!() }
-                            }
+                MapObjectId::Single(mp) => {
+                    match mp {
+                        MeabyParam::TileId(id) => {
+                            id.clone()
                         }
-                        MeabyWeighted::Weighted(_) => { todo!() }
+                        MeabyParam::Parameter(_) => { todo!() }
                     }
                 }
             };
@@ -252,7 +245,7 @@ pub struct Multi {
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Nested {
-    pub rows: i32,
+    pub row_size: usize,
     pub om_terrain: Vec<String>,
     pub tile_selection: TileSelection,
     pub tiles: HashMap<Coordinates, Tile>,

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use bevy::asset::Handle;
 use bevy::math::Vec3;
 use bevy::prelude::{Commands, Component, default, Entity, Event, EventReader, EventWriter, Image, Query, Res, ResMut, SpriteBundle, Transform, With};
+use log::warn;
 
 use crate::common::Coordinates;
 use crate::EditorData;
@@ -177,7 +178,13 @@ pub fn update_animated_sprites(
     };
 
     for (entity, cords, animated, layer) in query.iter() {
-        let tile = current_project.map_entity.tiles().get(cords).unwrap();
+        let tile = match current_project.map_entity.tiles().get(cords) {
+            None => {
+                warn!("Tile at cords {:?} does not exist even though query matched tile", cords);
+                continue;
+            }
+            Some(t) => t
+        };
         match r_textures.textures.get_terrain(current_project, &tile.character, cords) {
             SpriteState::Defined(terrain) => {
                 if (chrono::prelude::Utc::now().timestamp_millis() / 1000) as u64 - animated.last_update < animated.cooldown as u64 {

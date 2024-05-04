@@ -191,12 +191,12 @@ fn setup(
     let mut default_project = Project::default();
 
     let loader = MapEntityLoader {
-        path: PathBuf::from(format!(r"{}/data/json/mapgen/house/house01.json", CDDA_DIR)),
-        id: "house_01".to_string(),
+        path: PathBuf::from(format!(r"{}/data/json/mapgen/prison/prison.json", CDDA_DIR)),
+        id: "prison_1_1".to_string(),
     };
 
     let mut editor_data = EditorData::default();
-    let map_entity = MapEntity::Single(loader.load().unwrap());
+    let map_entity = MapEntity::Nested(loader.load().unwrap());
 
     let project: &mut Project = editor_data.get_current_project_mut().unwrap_or(&mut default_project);
     project.map_entity = map_entity;
@@ -208,6 +208,7 @@ fn setup(
     for (i, project) in editor_data.projects.iter().enumerate() {
         let name = match &project.map_entity {
             MapEntity::Single(s) => s.om_terrain.clone(),
+            MapEntity::Nested(_) => "Nested_TODO".to_string(),
             _ => todo!()
         };
 

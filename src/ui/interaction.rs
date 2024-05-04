@@ -33,7 +33,7 @@ pub fn save_button_interaction(
     let filename = match &project.map_entity {
         MapEntity::Single(s) => s.om_terrain.clone(),
         MapEntity::Multi(_) => todo!(),
-        MapEntity::Nested(_) => todo!()
+        MapEntity::Nested(_) => "Nested_TODO".to_string()
     };
 
     for interaction in interaction_query.iter() {
