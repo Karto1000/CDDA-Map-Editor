@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 use std::sync::Arc;
 
@@ -13,12 +14,12 @@ use crate::common::Coordinates;
 use crate::EditorData;
 use crate::graphics::{GraphicsResource, Sprite, SpriteState, TileSprite};
 use crate::graphics::tileset::{GetBackground, GetForeground};
-use crate::grid::resources::Grid;
 use crate::map::{TileDeleteEvent, TilePlaceEvent};
 use crate::map::events::{ClearTiles, SpawnMapEntity, UpdateSpriteEvent};
 use crate::map::resources::MapEntityType;
 use crate::project::resources::{Project, ProjectSaveState};
 use crate::tiles::components::{Offset, Tile};
+use crate::ui::grid::resources::Grid;
 use crate::ui::tabs::components::Tab;
 
 #[derive(Event)]
@@ -179,14 +180,21 @@ pub fn update_animated_sprites(
     r_grid: Res<Grid>,
     mut r_editor_data: ResMut<EditorData>,
 ) {
-    let current_project = match r_editor_data.get_current_project_mut() {
+    let cdda_data = match &r_editor_data.config.cdda_data {
+        None => return,
+        Some(d) => d
+    };
+
+    let current_project = match r_editor_data.get_current_project() {
         None => return,
         Some(p) => p
     };
 
+    let mut fg_entities_to_set = HashMap::new();
+
     for (entity, cords, animated, layer) in query.iter() {
         let tile = current_project.map_entity.tiles.get(cords).unwrap();
-        match r_textures.textures.get_terrain(current_project, &tile.character, cords) {
+        match r_textures.textures.get_terrain(current_project, &cdda_data, &tile.character, cords) {
             SpriteState::Defined(terrain) => {
                 if (chrono::prelude::Utc::now().timestamp_millis() / 1000) as u64 - animated.last_update < animated.cooldown as u64 {
                     return;
@@ -223,11 +231,20 @@ pub fn update_animated_sprites(
                         last_update: (chrono::prelude::Utc::now().timestamp_millis() / 1000) as u64,
                     });
 
-                current_project.map_entity.tiles.get_mut(cords).unwrap().terrain.fg_entity = Some(fg_entity_commands.id());
+                fg_entities_to_set.insert(cords, fg_entity_commands.id());
             }
             SpriteState::TextureNotFound => {}
             SpriteState::NotMapped => {}
         }
+    }
+
+    let current_project_mut = match r_editor_data.get_current_project_mut() {
+        None => return,
+        Some(p) => p
+    };
+
+    for (cords, entity) in fg_entities_to_set.into_iter() {
+        current_project_mut.map_entity.tiles.get_mut(cords).unwrap().terrain.fg_entity = Some(entity);
     }
 }
 
@@ -365,13 +382,19 @@ pub fn update_sprite_reader(
     r_textures: Res<GraphicsResource>,
     r_grid: Res<Grid>,
 ) {
+    let cdda_data = match r_editor_data.config.cdda_data.clone() {
+        None => return,
+        Some(d) => d
+    };
+    
     let project = match r_editor_data.get_current_project_mut() {
         None => { return; }
         Some(p) => { p }
     };
 
     for e in e_update_sprite.read() {
-        let tile_sprite = r_textures.textures.get_textures(&project, &e.tile.character, &e.coordinates);
+        let tile_sprite = r_textures.textures.get_textures(&project, &cdda_data, &e.tile.character, &e.coordinates);
+
         macro_rules! spawn_sprite {
             ($sprite: expr, $tile_path: expr, $sprite_type: ident) => {
                 if let Some(fg) = &$sprite.fg {
@@ -495,6 +518,11 @@ pub fn tile_spawn_reader(
     r_textures: Res<GraphicsResource>,
     mut r_editor_data: ResMut<EditorData>,
 ) {
+    let cdda_data = match r_editor_data.config.cdda_data.clone() {
+        None => return,
+        Some(d) => d
+    };
+    
     let project = match r_editor_data.get_current_project_mut() {
         None => { return; }
         Some(p) => { p }
@@ -502,7 +530,7 @@ pub fn tile_spawn_reader(
 
 
     for e in e_tile_place.read() {
-        let sprites = r_textures.textures.get_textures(project, &e.tile.character, &e.coordinates);
+        let sprites = r_textures.textures.get_textures(project, &cdda_data, &e.tile.character, &e.coordinates);
 
         match sprites {
             TileSprite::Exists { terrain, furniture, .. } => {

@@ -8,9 +8,9 @@ use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use serde_json::{Error, Value};
 
-use crate::ALL_PALETTES;
 use crate::common::{Coordinates, MeabyMulti, MeabyNumberRange, MeabyWeighted, TileId};
 use crate::common::io::{Load, LoadError};
+use crate::editor_data::CDDAData;
 use crate::map::resources::ComputedParameters;
 use crate::map::resources::MapEntity;
 use crate::map::resources::MapEntityType;
@@ -19,9 +19,10 @@ use crate::tiles::components::Tile;
 
 pub type ParameterId = String;
 
-pub struct MapEntityLoader {
+pub struct MapEntityLoader<'a> {
     pub path: PathBuf,
     pub id: String,
+    pub cdda_data: &'a CDDAData
 }
 
 #[derive(Deserialize, Clone, Serialize, Debug)]
@@ -31,7 +32,11 @@ pub struct Parameter {
     pub default: MapGenValue,
 }
 
-fn compute_palettes(parameters: &HashMap<String, String>, palettes: &Vec<MapObjectId<MeabyParam>>) -> HashMap<PaletteId, ComputedParameters> {
+fn compute_palettes(
+    cdda_data: &CDDAData,
+    parameters: &HashMap<String, String>, 
+    palettes: &Vec<MapObjectId<MeabyParam>>
+) -> HashMap<PaletteId, ComputedParameters> {
     let mut computed_palettes = HashMap::new();
 
     for palette in palettes.iter() {
@@ -60,7 +65,7 @@ fn compute_palettes(parameters: &HashMap<String, String>, palettes: &Vec<MapObje
             }
         };
 
-        let associated_palette = ALL_PALETTES.get(&palette_id).unwrap();
+        let associated_palette = cdda_data.palettes.get(&palette_id).unwrap();
 
         let mut this = HashMap::new();
 
@@ -70,7 +75,7 @@ fn compute_palettes(parameters: &HashMap<String, String>, palettes: &Vec<MapObje
 
         let computed_palette_parameters = ComputedParameters {
             this: this.clone(),
-            palettes: compute_palettes(&this, &associated_palette.palettes),
+            palettes: compute_palettes(cdda_data, &this, &associated_palette.palettes),
         };
 
         computed_palettes.insert(palette_id, computed_palette_parameters.clone());
@@ -81,7 +86,7 @@ fn compute_palettes(parameters: &HashMap<String, String>, palettes: &Vec<MapObje
     return computed_palettes;
 }
 
-impl Load<MapEntity> for MapEntityLoader {
+impl<'a> Load<MapEntity> for MapEntityLoader<'a> {
     fn load(&self) -> Result<MapEntity, LoadError> {
         let mut map_type: Option<MapEntityType> = None;
 
@@ -203,7 +208,7 @@ impl Load<MapEntity> for MapEntityLoader {
 
         let computed_parameters = ComputedParameters {
             this: this.clone(),
-            palettes: compute_palettes(&this, &palettes),
+            palettes: compute_palettes(self.cdda_data, &this, &palettes),
         };
 
         let terrain = match object.get("terrain") {

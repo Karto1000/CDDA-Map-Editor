@@ -5,6 +5,7 @@ use bevy::prelude::{Assets, Image, ResMut, Resource};
 
 use crate::common::{Coordinates, GetRandom, TileId};
 use crate::common::io::Load;
+use crate::editor_data::CDDAData;
 use crate::graphics::tileset::legacy::{LegacyTileset, SingleForeground};
 use crate::graphics::tileset::{GetBackground, GetForeground, TilesetLoader};
 use crate::project::resources::Project;
@@ -169,11 +170,11 @@ pub enum SpriteState<'a> {
 }
 
 pub trait GetTexture: Send + Sync {
-    fn get_textures(&self, project: &Project, character: &char, coordinates: &Coordinates) -> TileSprite {
-        let terrain = self.get_terrain(project, character, coordinates);
-        let furniture = self.get_furniture(project, character, coordinates);
-        let items = self.get_item(project, character, coordinates);
-        let toilets = self.get_toilets(project, character, coordinates);
+    fn get_textures(&self, project: &Project, cdda_data: &CDDAData, character: &char, coordinates: &Coordinates) -> TileSprite {
+        let terrain = self.get_terrain(project, cdda_data, character, coordinates);
+        let furniture = self.get_furniture(project, cdda_data, character, coordinates);
+        let items = self.get_item(project, cdda_data, character, coordinates);
+        let toilets = self.get_toilets(project, cdda_data, character, coordinates);
 
         let terrain_sprite: Option<&Sprite> = match terrain {
             SpriteState::Defined(s) => Some(s),
@@ -181,7 +182,7 @@ pub trait GetTexture: Send + Sync {
             SpriteState::NotMapped => {
                 match &project.map_entity.fill {
                     None => None,
-                    Some(fill) => self.get_terrain_texture_from_tile_id(project, coordinates, fill)
+                    Some(fill) => self.get_terrain_texture_from_tile_id(project, cdda_data, coordinates, fill)
                 }
             }
         };
@@ -216,11 +217,11 @@ pub trait GetTexture: Send + Sync {
         };
     }
 
-    fn get_terrain_texture_from_tile_id(&self, project: &Project, coordinates: &Coordinates, id: &TileId) -> Option<&Sprite>;
-    fn get_terrain(&self, project: &Project, character: &char, coordinates: &Coordinates) -> SpriteState;
-    fn get_furniture(&self, project: &Project, character: &char, coordinates: &Coordinates) -> SpriteState;
-    fn get_item(&self, project: &Project, character: &char, coordinates: &Coordinates) -> SpriteState;
-    fn get_toilets(&self, project: &Project, character: &char, coordinates: &Coordinates) -> SpriteState;
+    fn get_terrain_texture_from_tile_id(&self, project: &Project, cdda_data: &CDDAData, coordinates: &Coordinates, id: &TileId) -> Option<&Sprite>;
+    fn get_terrain(&self, project: &Project, cdda_data: &CDDAData, character: &char, coordinates: &Coordinates) -> SpriteState;
+    fn get_furniture(&self, project: &Project, cdda_data: &CDDAData, character: &char, coordinates: &Coordinates) -> SpriteState;
+    fn get_item(&self, project: &Project, cdda_data: &CDDAData, character: &char, coordinates: &Coordinates) -> SpriteState;
+    fn get_toilets(&self, project: &Project, cdda_data: &CDDAData, character: &char, coordinates: &Coordinates) -> SpriteState;
     fn get_fallback_texture(&self, character: &char) -> &Sprite;
 }
 
@@ -263,6 +264,7 @@ macro_rules! define_get_sprite_from_sprite_type {
     ($field: ident, $ident: ident, $is_terrain: literal) => {
         fn $ident<'a>(
             project: &Project,
+            cdda_data: &CDDAData,
             coordinates: &Coordinates,
             character: &char,
             sprite_type: &'a SpriteType,
@@ -271,14 +273,14 @@ macro_rules! define_get_sprite_from_sprite_type {
                 SpriteType::Single(s) => s,
                 SpriteType::Multitile { center, corner, t_connection, edge, end_piece, unconnected } => {
                     let tiles_around = project.map_entity.get_tiles_around(coordinates);
-                    let field_this = project.map_entity.get_ids(character).$field;
+                    let field_this = project.map_entity.get_ids(cdda_data, character).$field;
 
                     macro_rules! match_tiles_around {
                         ($name: ident, $num: expr) => {
                            let $name = match tiles_around.get($num).unwrap().0 {
                                None => false,
                                Some(t)  => {
-                                    let field_around = project.map_entity.get_ids(&t.character).$field;
+                                    let field_around = project.map_entity.get_ids(cdda_data, &t.character).$field;
                                     let is_same_character = t.character == *character;
 
                                     let is_this_filled = match (&field_this, &project.map_entity.fill) {
@@ -345,6 +347,7 @@ macro_rules! define_get_sprite_from_sprite_type_and_tile_id {
     ($field: ident, $ident: ident, $is_terrain: literal) => {
         fn $ident<'a>(
             project: &Project,
+            cdda_data: &CDDAData,
             coordinates: &Coordinates,
             tile_id: Option<&TileId>,
             sprite_type: &'a SpriteType,
@@ -359,7 +362,7 @@ macro_rules! define_get_sprite_from_sprite_type_and_tile_id {
                            let $name = match tiles_around.get($num).unwrap().0 {
                                None => false,
                                Some(t)  => {
-                                    let field_around = project.map_entity.get_ids(&t.character).$field;
+                                    let field_around = project.map_entity.get_ids(cdda_data, &t.character).$field;
 
                                     let is_this_filled = match (&tile_id, &project.map_entity.fill) {
                                         (None, Some(_)) => $is_terrain,
@@ -418,7 +421,7 @@ macro_rules! define_get_sprite_from_sprite_type_and_tile_id {
 define_get_sprite_from_sprite_type_and_tile_id!(terrain, get_terrain_sprite_from_sprite_type_and_tile_id, true);
 
 impl GetTexture for LegacyTextures {
-    fn get_terrain_texture_from_tile_id(&self, project: &Project, coordinates: &Coordinates, id: &TileId) -> Option<&Sprite> {
+    fn get_terrain_texture_from_tile_id(&self, project: &Project, cdda_data: &CDDAData, coordinates: &Coordinates, id: &TileId) -> Option<&Sprite> {
         let sprite_type = match self.textures.get(id) {
             None => return None,
             Some(s) => s
@@ -427,14 +430,15 @@ impl GetTexture for LegacyTextures {
         // TODO: Refactor this mess
         return Some(get_terrain_sprite_from_sprite_type_and_tile_id(
             project,
+            cdda_data,
             coordinates,
             Some(id),
             sprite_type,
         ));
     }
 
-    fn get_terrain(&self, project: &Project, character: &char, coordinates: &Coordinates) -> SpriteState {
-        return match &project.map_entity.get_ids(character).terrain {
+    fn get_terrain(&self, project: &Project, cdda_data: &CDDAData, character: &char, coordinates: &Coordinates) -> SpriteState {
+        return match &project.map_entity.get_ids(cdda_data, character).terrain {
             None => SpriteState::NotMapped,
             Some(terrain) => {
                 if let Some(terrain) = self.region_settings.get_random_terrain_from_region(&terrain) {
@@ -445,6 +449,7 @@ impl GetTexture for LegacyTextures {
 
                     return SpriteState::Defined(get_terrain_sprite_from_sprite_type(
                         project,
+                        cdda_data,
                         coordinates,
                         character,
                         sprite_type,
@@ -458,6 +463,7 @@ impl GetTexture for LegacyTextures {
 
                 SpriteState::Defined(get_terrain_sprite_from_sprite_type(
                     project,
+                    cdda_data,
                     coordinates,
                     character,
                     sprite_type,
@@ -466,18 +472,19 @@ impl GetTexture for LegacyTextures {
         };
     }
 
-    fn get_furniture(&self, project: &Project, character: &char, coordinates: &Coordinates) -> SpriteState {
-        return match &project.map_entity.get_ids(character).furniture {
+    fn get_furniture(&self, project: &Project, cdda_data: &CDDAData, character: &char, coordinates: &Coordinates) -> SpriteState {
+        return match &project.map_entity.get_ids(cdda_data, character).furniture {
             None => SpriteState::NotMapped,
             Some(furniture) => {
                 if let Some(furniture) = self.region_settings.get_random_furniture_from_region(&furniture) {
                     let sprite_type = match self.textures.get(furniture) {
-                            None => return SpriteState::TextureNotFound,
+                        None => return SpriteState::TextureNotFound,
                         Some(s) => s
                     };
 
                     return SpriteState::Defined(get_furniture_sprite_from_sprite_type(
                         project,
+                        cdda_data,
                         coordinates,
                         character,
                         sprite_type,
@@ -491,6 +498,7 @@ impl GetTexture for LegacyTextures {
 
                 SpriteState::Defined(get_furniture_sprite_from_sprite_type(
                     project,
+                    cdda_data,
                     coordinates,
                     character,
                     sprite_type,
@@ -499,8 +507,8 @@ impl GetTexture for LegacyTextures {
         };
     }
 
-    fn get_item(&self, project: &Project, character: &char, coordinates: &Coordinates) -> SpriteState {
-        return match &project.map_entity.get_ids(character).item {
+    fn get_item(&self, project: &Project, cdda_data: &CDDAData, character: &char, coordinates: &Coordinates) -> SpriteState {
+        return match &project.map_entity.get_ids(cdda_data, character).item {
             None => SpriteState::NotMapped,
             Some(item) => {
                 let sprite_type = match self.textures.get(item) {
@@ -510,6 +518,7 @@ impl GetTexture for LegacyTextures {
 
                 SpriteState::Defined(get_item_sprite_from_sprite_type(
                     project,
+                    cdda_data,
                     coordinates,
                     character,
                     sprite_type,
@@ -518,8 +527,8 @@ impl GetTexture for LegacyTextures {
         };
     }
 
-    fn get_toilets(&self, project: &Project, character: &char, coordinates: &Coordinates) -> SpriteState {
-        return match &project.map_entity.get_ids(character).toilet {
+    fn get_toilets(&self, project: &Project, cdda_data: &CDDAData, character: &char, coordinates: &Coordinates) -> SpriteState {
+        return match &project.map_entity.get_ids(cdda_data, character).toilet {
             None => SpriteState::NotMapped,
             Some(toilet) => {
                 let sprite_type = match self.textures.get(toilet) {
@@ -529,6 +538,7 @@ impl GetTexture for LegacyTextures {
 
                 SpriteState::Defined(get_toilet_sprite_from_sprite_type(
                     project,
+                    cdda_data,
                     coordinates,
                     character,
                     sprite_type,

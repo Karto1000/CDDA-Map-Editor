@@ -12,6 +12,7 @@ pub(crate) mod interaction;
 pub(crate) mod components;
 pub(crate) mod hotbar;
 pub(crate) mod tabs;
+pub(crate) mod grid;
 
 pub struct UiPlugin;
 

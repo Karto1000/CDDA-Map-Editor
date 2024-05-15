@@ -5,9 +5,10 @@ use crate::common::{Coordinates, MeabyMulti, MeabyNumberRange, MeabyWeighted, Ti
 use crate::map::loader::ParameterId;
 use crate::palettes::{Item, MapObjectId, PaletteId};
 use crate::tiles::components::Tile;
-use crate::{ALL_PALETTES, MeabyParam};
+use crate::{MeabyParam};
 use crate::Weighted;
 use crate::common::GetRandom;
+use crate::editor_data::CDDAData;
 
 #[derive(Default, Serialize, Deserialize, Debug, Resource, Clone)]
 pub struct ComputedParameters {
@@ -155,7 +156,7 @@ impl MapEntity {
         };
     }
 
-    pub fn get_ids(&self, character: &char) -> TileIdGroup {
+    pub fn get_ids(&self, cdda_data: &CDDAData, character: &char) -> TileIdGroup {
         let mut group = TileIdGroup::default();
 
         macro_rules! match_id {
@@ -206,7 +207,7 @@ impl MapEntity {
             match_id!(id, group.furniture, self.computed_parameters);
         }
 
-        fn match_palette(map_entity: &MapEntity, group: &mut TileIdGroup, character: &char, palette: &MapObjectId<MeabyParam>) {
+        fn match_palette(map_entity: &MapEntity, cdda_data: &CDDAData, group: &mut TileIdGroup, character: &char, palette: &MapObjectId<MeabyParam>) {
             let palette_id = match palette {
                 MapObjectId::Grouped(_) => { todo!() }
                 MapObjectId::Nested(_) => { todo!() }
@@ -232,7 +233,7 @@ impl MapEntity {
                 }
             };
 
-            let palette = ALL_PALETTES.get(&palette_id).unwrap();
+            let palette = cdda_data.palettes.get(&palette_id).unwrap();
 
             if let Some(id) = palette.furniture.get(character) {
                 if group.furniture.is_none() {
@@ -247,12 +248,12 @@ impl MapEntity {
             }
 
             for parent_palette in palette.palettes.iter() {
-                match_palette(map_entity, group, character, parent_palette);
+                match_palette(map_entity, cdda_data, group, character, parent_palette);
             }
         }
 
         for palette_object_id in self.palettes.iter() {
-            match_palette(self, &mut group, character, palette_object_id);
+            match_palette(self, cdda_data, &mut group, character, palette_object_id);
         }
 
         return group;

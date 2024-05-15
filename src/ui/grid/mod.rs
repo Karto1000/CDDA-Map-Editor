@@ -5,8 +5,8 @@ use bevy::prelude::{Component, Resource, TypePath};
 use bevy::render::render_resource::{AsBindGroup, ShaderRef};
 use bevy::sprite::Material2d;
 
-use crate::grid::resources::{DragInfo, Grid};
-use crate::grid::systems::{
+use crate::ui::grid::resources::{DragInfo, Grid};
+use crate::ui::grid::systems::{
     drag_system, grid_resize_system, window_grid_resize_system,
 };
 

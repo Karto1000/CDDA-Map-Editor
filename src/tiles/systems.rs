@@ -5,8 +5,8 @@ use bevy::window::{PrimaryWindow, WindowResized};
 
 use crate::{EditorData, IsCursorCaptured};
 use crate::common::Coordinates;
-use crate::grid::GridMarker;
-use crate::grid::resources::Grid;
+use crate::ui::grid::GridMarker;
+use crate::ui::grid::resources::Grid;
 use crate::map::events::{TileDeleteEvent, TilePlaceEvent};
 use crate::tiles::components::Tile;
 use crate::tiles::resources::PlaceInfo;

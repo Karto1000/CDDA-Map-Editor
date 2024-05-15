@@ -5,7 +5,7 @@ use bevy::prelude::{Commands, CursorMoved, EventReader, KeyCode, MouseButton, Qu
 use bevy::window::{PrimaryWindow, WindowResized};
 
 use crate::EditorData;
-use crate::grid::{DragInfo, Grid, GridMarker};
+use crate::ui::grid::{DragInfo, Grid, GridMarker};
 use crate::tiles::components::Tile;
 
 pub fn window_grid_resize_system(
