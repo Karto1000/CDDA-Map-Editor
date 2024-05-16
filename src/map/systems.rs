@@ -510,11 +510,9 @@ pub fn update_sprite_reader(
 }
 
 pub fn tile_spawn_reader(
-    mut commands: Commands,
     mut e_tile_place: EventReader<TilePlaceEvent>,
     mut e_spawn_sprite: EventWriter<SpawnSprite>,
     mut e_update_sprite: EventWriter<UpdateSpriteEvent>,
-    r_grid: Res<Grid>,
     r_textures: Res<GraphicsResource>,
     mut r_editor_data: ResMut<EditorData>,
 ) {

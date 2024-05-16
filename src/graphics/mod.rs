@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use bevy::prelude::{Assets, Image, ResMut, Resource};
 
-use crate::common::{Coordinates, GetRandom, TileId};
+use crate::common::{Coordinates, TileId};
 use crate::common::io::Load;
 use crate::editor_data::CDDAData;
 use crate::graphics::tileset::legacy::{LegacyTileset, SingleForeground};

@@ -1,6 +1,6 @@
 use bevy::asset::AssetServer;
 use bevy::hierarchy::BuildChildren;
-use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Changed, Color, Commands, Component, default, Display, Entity, Event, EventReader, EventWriter, ImageBundle, Interaction, NodeBundle, Query, Res, ResMut, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val, With};
+use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Changed, Color, Commands, default, Display, Entity, EventReader, EventWriter, ImageBundle, Interaction, NodeBundle, Query, Res, ResMut, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val, With};
 
 use crate::{EditorData, SwitchProject};
 use crate::common::{PRIMARY_COLOR, PRIMARY_COLOR_FADED, PRIMARY_COLOR_SELECTED};
@@ -80,7 +80,7 @@ pub fn setup(
 }
 
 pub fn on_add_tab_button_click(
-    q_interaction: Query<(&Interaction), (Changed<Interaction>, With<AddTabButtonMarker>)>,
+    q_interaction: Query<&Interaction, (Changed<Interaction>, With<AddTabButtonMarker>)>,
     mut r_editor_data: ResMut<EditorData>,
     mut e_spawn_tab: EventWriter<SpawnTab>,
 ) {

@@ -1,7 +1,7 @@
 use bevy::app::{App, Plugin, Update};
 use bevy::asset::Asset;
 use bevy::math::Vec2;
-use bevy::prelude::{Component, Resource, TypePath};
+use bevy::prelude::{Component, TypePath};
 use bevy::render::render_resource::{AsBindGroup, ShaderRef};
 use bevy::sprite::Material2d;
 

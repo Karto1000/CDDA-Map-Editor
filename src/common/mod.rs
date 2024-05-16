@@ -8,7 +8,7 @@ use bevy::prelude::Component;
 use color_print::cformat;
 use lazy_static::lazy_static;
 use log::{Level, Log, Metadata, Record};
-use num::{Bounded, Num};
+use num::{Num};
 use rand::{Rng, SeedableRng, thread_rng};
 use rand::distributions::Distribution;
 use rand::distributions::uniform::{SampleRange, SampleUniform};

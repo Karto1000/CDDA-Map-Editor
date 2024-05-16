@@ -1,26 +1,26 @@
-use std::any::Any;
+
 use std::default::Default;
 use std::io::Write;
 use std::ops::Deref;
 use std::path::PathBuf;
-use std::str::FromStr;
+
 use std::string::ToString;
 use std::sync::Arc;
 
 use bevy::{prelude::*, window::PrimaryWindow};
 use bevy::app::{App, AppExit, PluginGroup};
-use bevy::asset::{Asset, AssetServer, AsyncReadExt};
+use bevy::asset::{AssetServer, AsyncReadExt};
 use bevy::DefaultPlugins;
 use bevy::log::LogPlugin;
-use bevy::prelude::{Assets, Bundle, Camera2dBundle, Commands, Component, EventReader, Mesh, NonSend, Query, Res, ResMut, Resource, Transform, TypePath, Vec2, Vec2Swizzles, Window, With};
-use bevy::render::render_resource::{AsBindGroup, AsBindGroupShaderType};
-use bevy::sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle, Mesh2dHandle};
+use bevy::prelude::{Assets, Camera2dBundle, Commands, Component, EventReader, Mesh, NonSend, Query, Res, ResMut, Resource, Transform, Vec2, Window, With};
+
+use bevy::sprite::{Material2dPlugin, MaterialMesh2dBundle, Mesh2dHandle};
 use bevy::utils::default;
-use bevy::utils::tracing::instrument::WithSubscriber;
+
 use bevy::window::{WindowMode, WindowPlugin};
 use bevy::winit::WinitWindows;
-use bevy_console::{AddConsoleCommand, ConsoleConfiguration, ConsolePlugin, PrintConsoleLine};
-use bevy_console::clap::Parser;
+use bevy_console::{ConsoleConfiguration, ConsolePlugin, PrintConsoleLine};
+
 use bevy_file_dialog::FileDialogPlugin;
 use bevy_inspector_egui::bevy_egui::EguiContexts;
 use bevy_inspector_egui::egui;
@@ -30,9 +30,9 @@ use clap::builder::StyledStr;
 use color_print::cformat;
 use imageproc::drawing::Canvas;
 use lazy_static::lazy_static;
-use log::{LevelFilter, Log};
+use log::{LevelFilter};
 use num::ToPrimitive;
-use serde::{Deserialize, Serialize};
+
 use winit::window::Icon;
 
 use crate::common::{BufferedLogger, Coordinates, LogMessage, PRIMARY_COLOR, Weighted};

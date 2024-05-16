@@ -51,7 +51,7 @@ pub struct ResetToggle {
 }
 
 pub fn reset_toggle_reader(
-    mut q_buttons: Query<(Entity, &mut BackgroundColor, &mut ToggleEffect), (With<Button>)>,
+    mut q_buttons: Query<(Entity, &mut BackgroundColor, &mut ToggleEffect), With<Button>>,
     mut e_reset_toggle: EventReader<ResetToggle>,
 ) {
     for event in e_reset_toggle.read() {

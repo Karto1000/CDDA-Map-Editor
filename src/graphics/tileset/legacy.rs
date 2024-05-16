@@ -2,22 +2,22 @@ use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
-use std::process::exit;
+use std::path::{PathBuf};
+
 use std::str::FromStr;
 use std::sync::Arc;
 
 use anyhow::Error;
-use bevy::asset::{Assets, AssetServer, Handle};
-use bevy::prelude::{Image, Res, ResMut, Vec2};
+use bevy::asset::{Assets, Handle};
+use bevy::prelude::{Image, ResMut, Vec2};
 use bevy::render::render_asset::RenderAssetUsages;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-use image::{ColorType, DynamicImage, EncodableLayout, GenericImageView, ImageBuffer, imageops, Rgb, Rgba};
+use image::{DynamicImage, EncodableLayout, GenericImageView, ImageBuffer, imageops, Rgba};
 use image::io::Reader;
-use imageproc::definitions::HasBlack;
-use imageproc::geometric_transformations::{Interpolation, rotate};
+
+
 use log::{debug, error, info, warn};
-use rand::Rng;
+
 use serde::Deserialize;
 use serde_json::Value;
 

@@ -4,8 +4,8 @@ use bevy::prelude::Event;
 
 use crate::common::Coordinates;
 use crate::map::resources::MapEntity;
-use crate::map::systems::SpriteKind;
-use crate::tiles::components::{Offset, Tile};
+
+use crate::tiles::components::{Tile};
 
 #[derive(Event)]
 pub struct UpdateSpriteEvent {

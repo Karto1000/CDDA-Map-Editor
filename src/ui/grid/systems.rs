@@ -1,10 +1,10 @@
 use bevy::input::ButtonInput;
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::math::Vec2;
-use bevy::prelude::{Commands, CursorMoved, EventReader, KeyCode, MouseButton, Query, Res, ResMut, Transform, Vec2Swizzles, Window, With, Without};
+use bevy::prelude::{Commands, CursorMoved, EventReader, MouseButton, Query, Res, ResMut, Transform, Vec2Swizzles, Window, With, Without};
 use bevy::window::{PrimaryWindow, WindowResized};
 
-use crate::EditorData;
+
 use crate::ui::grid::{DragInfo, Grid, GridMarker};
 use crate::tiles::components::Tile;
 
