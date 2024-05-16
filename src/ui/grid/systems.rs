@@ -35,8 +35,8 @@ pub fn grid_resize_system(
                 r_grid.tile_size = (old_size + event.y * 2.).clamp(r_grid.min_zoom, r_grid.max_zoom);
                 let new_size = r_grid.tile_size.clone();
 
-                let old_position = (window.cursor_position().unwrap() + r_grid.offset) / old_size;
-                let new_position = (window.cursor_position().unwrap() + r_grid.offset) / new_size;
+                let old_position = (window.cursor_position().unwrap_or(Vec2::new(0., 0.)) + r_grid.offset) / old_size;
+                let new_position = (window.cursor_position().unwrap_or(Vec2::new(0., 0.)) + r_grid.offset) / new_size;
                 r_grid.offset -= (new_position - old_position) * new_size;
 
                 for (_, mut transform) in tiles.iter_mut() {
@@ -44,7 +44,7 @@ pub fn grid_resize_system(
                     transform.scale.y = r_grid.tile_size / r_grid.default_tile_size;
                 }
             }
-            MouseScrollUnit::Pixel => panic!("Not Implemented")
+            MouseScrollUnit::Pixel => todo!()
         }
     }
 }

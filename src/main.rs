@@ -9,13 +9,14 @@ use std::sync::Arc;
 
 use bevy::{prelude::*, window::PrimaryWindow};
 use bevy::app::{App, AppExit, PluginGroup};
-use bevy::asset::{Asset, AssetServer};
+use bevy::asset::{Asset, AssetServer, AsyncReadExt};
 use bevy::DefaultPlugins;
 use bevy::log::LogPlugin;
 use bevy::prelude::{Assets, Bundle, Camera2dBundle, Commands, Component, EventReader, Mesh, NonSend, Query, Res, ResMut, Resource, Transform, TypePath, Vec2, Vec2Swizzles, Window, With};
 use bevy::render::render_resource::{AsBindGroup, AsBindGroupShaderType};
 use bevy::sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle, Mesh2dHandle};
 use bevy::utils::default;
+use bevy::utils::tracing::instrument::WithSubscriber;
 use bevy::window::{WindowMode, WindowPlugin};
 use bevy::winit::WinitWindows;
 use bevy_console::{AddConsoleCommand, ConsoleConfiguration, ConsolePlugin, PrintConsoleLine};
@@ -27,6 +28,7 @@ use bevy_inspector_egui::egui::{Color32, FontData, FontFamily, Stroke};
 use bevy_inspector_egui::egui::epaint::Shadow;
 use clap::builder::StyledStr;
 use color_print::cformat;
+use imageproc::drawing::Canvas;
 use lazy_static::lazy_static;
 use log::{LevelFilter, Log};
 use num::ToPrimitive;
@@ -79,7 +81,6 @@ pub struct SwitchProject {
     pub index: u32,
 }
 
-
 fn main() {
     lazy_static::initialize(&LOGGER);
     log::set_logger(LOGGER.deref()).unwrap();
@@ -103,7 +104,10 @@ fn main() {
             ..default()
         })
         .add_event::<LogMessage>()
-        .add_systems(Startup, (setup, setup_egui))
+        .add_systems(Startup, (
+            setup,
+            setup_egui,
+        ))
         .add_event::<SwitchProject>()
         .add_plugins(FileDialogPlugin::new()
             .with_save_file::<Project>()
@@ -113,7 +117,6 @@ fn main() {
         .add_plugins((GridPlugin {}, MapPlugin {}, TilePlugin {}, UiPlugin {}))
         .add_systems(Update, (
             update,
-            // update_mouse_location,
             app_exit,
             switch_project,
             tile_despawn_reader,
@@ -139,7 +142,6 @@ fn setup(
     res_grid: Res<Grid>,
     mut e_spawn_map_entity: EventWriter<SpawnMapEntity>,
     mut e_spawn_tab: EventWriter<SpawnTab>,
-    mut e_log: EventWriter<LogMessage>,
     mut r_images: ResMut<Assets<Image>>,
 ) {
     commands.spawn(Camera2dBundle::default());
@@ -192,9 +194,9 @@ fn setup(
     }
 
     let (icon_rgba, icon_width, icon_height) = {
-        let image = image::open("./assets/grass.png")
-            .expect("Failed to open icon path")
-            .into_rgba8();
+        let image = image::load_from_memory(include_bytes!("../assets/grass.png"))
+            .unwrap()
+            .to_rgba8();
         let (width, height) = image.dimensions();
         let rgba = image.into_raw();
         (rgba, width, height)
