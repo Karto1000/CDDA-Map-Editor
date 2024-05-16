@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::path::PathBuf;
 
-use bevy::math::Vec2;
+
 
 use bevy::tasks::futures_lite::StreamExt;
 use log::{info};
@@ -13,7 +13,7 @@ use crate::common::{Coordinates, MeabyWeighted, TileId};
 use crate::common::io::{Load, LoadError};
 use crate::editor_data::CDDAData;
 use crate::map::resources::{ComputedParameters, Multi, Nested, Single, TileSelection};
-use crate::map::resources::MapEntity;
+
 use crate::palettes::{MeabyParam, MapGenValue, MapObjectId, PaletteId, ParameterType};
 use crate::tiles::components::Tile;
 

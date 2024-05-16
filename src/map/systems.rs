@@ -1,11 +1,11 @@
 use std::collections::HashMap;
-use std::fs;
+
 use std::sync::Arc;
 
 use bevy::asset::Handle;
 use bevy::math::Vec3;
 use bevy::prelude::{Commands, Component, default, Entity, Event, EventReader, EventWriter, Image, Query, Res, ResMut, SpriteBundle, Transform, With};
-use log::{info, warn};
+use log::{warn};
 
 use crate::common::Coordinates;
 use crate::editor_data::EditorData;
@@ -15,7 +15,7 @@ use crate::map::{TileDeleteEvent, TilePlaceEvent};
 use crate::map::events::{ClearTiles, SpawnMapEntity, UpdateSpriteEvent};
 use crate::tiles::components::{Offset, Tile};
 use crate::ui::grid::resources::Grid;
-use crate::ui::tabs::components::Tab;
+
 
 #[derive(Event)]
 pub struct SpawnSprite {
