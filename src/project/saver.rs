@@ -27,7 +27,7 @@ impl Save<Project> for ProjectSaver {
             MapEntityType::NestedMapgen { .. } => todo!(),
             MapEntityType::Default { om_terrain, .. } => om_terrain,
             MapEntityType::Multi { .. } => todo!(),
-            MapEntityType::Nested { .. } => todo!()
+            MapEntityType::Nested { .. } => "NESTED_TODO"
         };
         
         let filename = format!("auto_save_{}.map", filename);

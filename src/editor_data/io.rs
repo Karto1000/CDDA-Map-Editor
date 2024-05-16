@@ -48,7 +48,7 @@ impl Save<EditorData> for EditorDataSaver {
                         MapEntityType::NestedMapgen { .. } => todo!(),
                         MapEntityType::Default { om_terrain, .. } => om_terrain,
                         MapEntityType::Multi { .. } => todo!(),
-                        MapEntityType::Nested { .. } => todo!()
+                        MapEntityType::Nested { .. } => "NESTED_TODO"
                     };
 
                     info!("autosaving {}", filename);
@@ -88,14 +88,14 @@ impl Load<EditorData> for EditorDataSaver {
         let value: Map<String, Value> = serde_json::from_str(contents.as_str())
             .expect("Valid Json");
 
-        let history_array: Vec<ProjectSaveState> = value
-            .get("history")
-            .expect("history Field")
-            .as_array()
-            .expect("Valid Array")
-            .iter()
-            .map(|v| serde_json::from_value::<ProjectSaveState>(v.clone()).unwrap())
-            .collect();
+        // let history_array: Vec<ProjectSaveState> = value
+        //     .get("history")
+        //     .expect("history Field")
+        //     .as_array()
+        //     .expect("Valid Array")
+        //     .iter()
+        //     .map(|v| serde_json::from_value::<ProjectSaveState>(v.clone()).unwrap())
+        //     .collect();
 
         let projects_array: Vec<Project> = value
             .get("open_projects")
@@ -150,7 +150,8 @@ impl Load<EditorData> for EditorDataSaver {
         return Ok(EditorData {
             current_project_index: 0,
             projects: projects_array,
-            history: history_array,
+            // TODO: Implement
+            history: Default::default(),
             config: Default::default(),
         });
     }

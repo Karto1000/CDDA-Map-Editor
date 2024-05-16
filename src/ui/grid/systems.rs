@@ -29,28 +29,15 @@ pub fn grid_resize_system(
     for event in scroll_event.read() {
         match event.unit {
             MouseScrollUnit::Line => {
-                if r_grid.tile_size <= r_grid.min_zoom && event.y <= -1. { return; }
-                if r_grid.tile_size >= r_grid.max_zoom && event.y >= 1. { return; }
-
                 let window = q_windows.single();
 
-                let original_tile_amount = Vec2::new(
-                    window.resolution.width() / r_grid.tile_size,
-                    window.resolution.height() / r_grid.tile_size,
-                );
+                let old_size = r_grid.tile_size.clone();
+                r_grid.tile_size = (old_size + event.y * 2.).clamp(r_grid.min_zoom, r_grid.max_zoom);
+                let new_size = r_grid.tile_size.clone();
 
-                let size = r_grid.tile_size.clone();
-                r_grid.tile_size = size + event.y * 2.;
-
-                let new_tile_amount = Vec2::new(
-                    window.resolution.width() / r_grid.tile_size,
-                    window.resolution.height() / r_grid.tile_size,
-                );
-
-                let pixels_shifted = original_tile_amount - new_tile_amount;
-                let offset = r_grid.offset.clone();
-
-                r_grid.offset += (((window.cursor_position().unwrap() - pixels_shifted) + offset) / size) * event.y;
+                let old_position = (window.cursor_position().unwrap() + r_grid.offset) / old_size;
+                let new_position = (window.cursor_position().unwrap() + r_grid.offset) / new_size;
+                r_grid.offset -= (new_position - old_position) * new_size;
 
                 for (_, mut transform) in tiles.iter_mut() {
                     transform.scale.x = r_grid.tile_size / r_grid.default_tile_size;

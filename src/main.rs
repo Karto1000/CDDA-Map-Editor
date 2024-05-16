@@ -166,7 +166,7 @@ fn setup(
     let loader = MapEntityLoader {
         path: PathBuf::from(format!(r"{}/data/json/mapgen/mall/mall_ground.json", cdda_path)),
         id: "mall_a_1".to_string(),
-        cdda_data: &editor_data.config.cdda_data.clone().unwrap(),
+        cdda_data: &editor_data.config.cdda_data.as_ref().unwrap().clone(),
     };
 
     let map_entity = loader.load().unwrap();
@@ -287,12 +287,12 @@ fn update(
     grid_material.1.tile_size = res_grid.tile_size;
     grid_material.1.mouse_pos = window.cursor_position().unwrap_or(Vec2::default());
     grid_material.1.map_size = project.map_entity.size;
-    // Weird way to do this but bevy does not let me pass a bool as a uniform for some reason
+    // Weird way to do this, but bevy does not let me pass a bool as a uniform for some reason
     grid_material.1.is_cursor_captured = match res_cursor.0 {
         true => 1,
         false => 0
     };
-    grid_material.1.scale_factor = window.resolution.scale_factor() as f32;
+    grid_material.1.scale_factor = window.resolution.scale_factor();
 
     for (mut transform, coordinates, sprite_offset) in tiles.iter_mut() {
         //                                              < CENTER TO TOP LEFT >                                  < ALIGN ON GRID >
