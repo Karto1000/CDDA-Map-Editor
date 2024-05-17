@@ -5,10 +5,10 @@ use bevy::prelude::Vec2;
 use serde::{Deserialize, Serialize};
 
 use crate::common::{Coordinates, GetRandom, MeabyWeighted, TileId, Weighted};
+use crate::editor_data::CDDAData;
 use crate::map::loader::ParameterId;
 use crate::palettes::{MapObjectId, MeabyParam, PaletteId};
 use crate::tiles::components::Tile;
-use crate::editor_data::CDDAData;
 
 #[derive(Default, Serialize, Deserialize, Debug, Resource, Clone)]
 pub struct ComputedParameters {

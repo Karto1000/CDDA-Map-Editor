@@ -4,11 +4,10 @@ use std::io::Read;
 use std::path::Path;
 
 use directories::ProjectDirs;
+
 use crate::common::io::{Load, LoadError};
 use crate::common::io::LoadError::NoAutoSave;
-
 use crate::project::resources::Project;
-
 
 pub struct ProjectAutoSaveLoader {
     directory: Box<Path>,

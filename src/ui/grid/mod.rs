@@ -59,9 +59,9 @@ pub struct GridMaterial {
     pub is_cursor_captured: i32,
     #[uniform(5)]
     pub scale_factor: f32,
-    
+
     #[uniform(6)]
-    pub inside_grid_color: Vec3,    
+    pub inside_grid_color: Vec3,
     #[uniform(7)]
     pub outside_grid_color: Vec3,
 }

@@ -2,19 +2,16 @@ use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::path::PathBuf;
 
-
-
 use bevy::tasks::futures_lite::StreamExt;
-use log::{info};
+use log::info;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value};
+use serde_json::Value;
 
 use crate::common::{Coordinates, MeabyWeighted, TileId};
 use crate::common::io::{Load, LoadError};
 use crate::editor_data::CDDAData;
 use crate::map::resources::{ComputedParameters, Multi, Nested, Single, TileSelection};
-
-use crate::palettes::{MeabyParam, MapGenValue, MapObjectId, PaletteId, ParameterType};
+use crate::palettes::{MapGenValue, MapObjectId, MeabyParam, PaletteId, ParameterType};
 use crate::tiles::components::Tile;
 
 pub type ParameterId = String;
@@ -22,7 +19,7 @@ pub type ParameterId = String;
 pub struct MapEntityLoader<'a> {
     pub path: PathBuf,
     pub id: String,
-    pub cdda_data: &'a CDDAData
+    pub cdda_data: &'a CDDAData,
 }
 
 #[derive(Deserialize, Clone, Serialize, Debug)]
@@ -34,8 +31,8 @@ pub struct Parameter {
 
 fn compute_palettes(
     cdda_data: &CDDAData,
-    parameters: &HashMap<String, String>, 
-    palettes: &Vec<MapObjectId<MeabyParam>>
+    parameters: &HashMap<String, String>,
+    palettes: &Vec<MapObjectId<MeabyParam>>,
 ) -> HashMap<PaletteId, ComputedParameters> {
     let mut computed_palettes = HashMap::new();
 

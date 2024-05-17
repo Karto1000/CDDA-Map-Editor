@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
-use log::info;
 
+use log::info;
 use serde_json::Value;
 
 use crate::common::io::{Load, LoadError};
@@ -16,8 +16,8 @@ impl RegionSettingsLoader {
     pub fn new(path: PathBuf, id: String) -> Self {
         return Self {
             path,
-            id
-        }
+            id,
+        };
     }
 }
 

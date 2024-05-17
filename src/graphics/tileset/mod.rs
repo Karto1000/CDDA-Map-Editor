@@ -1,10 +1,7 @@
 use std::collections::HashMap;
 
-
-
 use bevy::asset::{Assets, Handle};
 use bevy::prelude::{Image, ResMut};
-
 
 use crate::common::io::Load;
 use crate::common::TileId;

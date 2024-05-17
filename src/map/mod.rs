@@ -1,13 +1,5 @@
 use bevy::app::{App, Plugin, Update};
 
-
-
-
-
-
-
-
-
 use crate::map::events::{ClearTiles, SpawnMapEntity, TileDeleteEvent, TilePlaceEvent, UpdateSpriteEvent};
 use crate::map::systems::{clear_tiles_reader, spawn_map_entity_reader, SpawnSprite, update_animated_sprites};
 

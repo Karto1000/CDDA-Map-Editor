@@ -1,11 +1,10 @@
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
+
 use crate::common::io::{Save, SaveError};
 use crate::map::resources::MapEntity;
 use crate::project::resources::Project;
-
-
 
 pub struct ProjectSaver {
     pub directory: Box<Path>,
@@ -27,7 +26,7 @@ impl Save<Project> for ProjectSaver {
             MapEntity::Single(s) => s.om_terrain.clone(),
             _ => todo!()
         };
-        
+
         let filename = format!("auto_save_{}.map", filename);
 
         let mut file = match File::options()

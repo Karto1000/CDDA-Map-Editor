@@ -3,14 +3,14 @@ use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::{EventReader, EventWriter, MouseButton, Query, Res, ResMut, Transform, Vec2Swizzles, Window, With, Without};
 use bevy::window::{PrimaryWindow, WindowResized};
 
-use crate::{IsCursorCaptured};
 use crate::common::Coordinates;
 use crate::editor_data::EditorData;
-use crate::ui::grid::GridMarker;
-use crate::ui::grid::resources::Grid;
+use crate::IsCursorCaptured;
 use crate::map::events::{TileDeleteEvent, TilePlaceEvent};
 use crate::tiles::components::Tile;
 use crate::tiles::resources::PlaceInfo;
+use crate::ui::grid::GridMarker;
+use crate::ui::grid::resources::Grid;
 
 pub fn window_tile_resize_system(
     mut resize_reader: EventReader<WindowResized>,
@@ -93,10 +93,10 @@ pub fn tile_place_system(
             if existing_tile.character != ' ' { return; }
 
             e_delete_tile.send(
-              TileDeleteEvent {
-                  tile: existing_tile.clone(),
-                  coordinates: tile_cords.clone(),
-              }  
+                TileDeleteEvent {
+                    tile: existing_tile.clone(),
+                    coordinates: tile_cords.clone(),
+                }
             );
         }
 
@@ -138,17 +138,17 @@ pub fn tile_delete_system(
             None => { return; }
             Some(t) => t
         };
-        
+
         // Do not delete empty tiles
         if tile.character == ' ' {
-            return
+            return;
         }
 
         e_delete_tile.send(TileDeleteEvent {
             tile: *tile,
             coordinates: tile_cords.clone(),
         });
-        
+
         e_spawn_tile.send(
             TilePlaceEvent {
                 tile: Tile::from(' '),

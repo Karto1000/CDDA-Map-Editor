@@ -4,9 +4,8 @@ use bevy::math::Vec2;
 use bevy::prelude::{Commands, CursorMoved, EventReader, MouseButton, Query, Res, ResMut, Transform, Vec2Swizzles, Window, With, Without};
 use bevy::window::{PrimaryWindow, WindowResized};
 
-
-use crate::ui::grid::{DragInfo, Grid, GridMarker};
 use crate::tiles::components::Tile;
+use crate::ui::grid::{DragInfo, Grid, GridMarker};
 
 pub fn window_grid_resize_system(
     mut resize_reader: EventReader<WindowResized>,

@@ -1,5 +1,6 @@
 use bevy::prelude::{Component, Entity};
 use serde::{Deserialize, Serialize};
+
 use crate::common::Coordinates;
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, Component, PartialEq)]
@@ -14,15 +15,15 @@ pub struct SpriteRepresentation {
 #[derive(Default, Debug, Component, Clone)]
 pub struct Offset {
     pub x: i32,
-    pub y: i32
+    pub y: i32,
 }
 
 impl From<Coordinates> for Offset {
     fn from(value: Coordinates) -> Self {
         return Self {
             x: value.x,
-            y: value.y
-        }
+            y: value.y,
+        };
     }
 }
 

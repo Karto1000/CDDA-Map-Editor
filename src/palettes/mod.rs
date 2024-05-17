@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -35,7 +34,7 @@ impl MapGenValue {
         match self {
             MapGenValue::Simple(_) => { panic!() }
             MapGenValue::Distribution { distribution } => {
-                return distribution.get_random_weighted().unwrap().to_string()
+                return distribution.get_random_weighted().unwrap().to_string();
             }
             MapGenValue::Param { .. } => { panic!() }
             MapGenValue::Switch { .. } => { panic!() }

@@ -1,7 +1,5 @@
 use bevy::app::{App, Plugin, Update};
 
-
-
 use crate::tiles::resources::PlaceInfo;
 use crate::tiles::systems::{tile_delete_system, tile_place_system, tile_resize_system, window_tile_resize_system};
 

@@ -20,14 +20,13 @@ use bevy_egui::egui::style::{Widgets, WidgetVisuals};
 use bevy_file_dialog::FileDialogPlugin;
 use bevy_inspector_egui::bevy_egui::EguiContexts;
 use bevy_inspector_egui::egui;
-use bevy_inspector_egui::egui::{Color32, FontData, FontFamily, Stroke};
+use bevy_inspector_egui::egui::{FontData, FontFamily, Stroke};
 use bevy_inspector_egui::egui::epaint::Shadow;
 use clap::builder::StyledStr;
 use color_print::cformat;
 use imageproc::drawing::Canvas;
 use lazy_static::lazy_static;
 use log::LevelFilter;
-use num::ToPrimitive;
 use winit::window::Icon;
 
 use crate::common::{BufferedLogger, Coordinates, LogMessage};
@@ -256,7 +255,7 @@ fn setup_egui(
         widgets: Widgets {
             open: WidgetVisuals {
                 bg_fill: Default::default(),
-                weak_bg_fill:  r_editor_data.config.style.blue_dark.into_color32(),
+                weak_bg_fill: r_editor_data.config.style.blue_dark.into_color32(),
                 bg_stroke: Default::default(),
                 rounding: Default::default(),
                 fg_stroke: Default::default(),

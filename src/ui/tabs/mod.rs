@@ -2,10 +2,10 @@ use bevy::asset::AssetServer;
 use bevy::hierarchy::BuildChildren;
 use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Changed, Color, Commands, default, Display, Entity, EventReader, EventWriter, ImageBundle, Interaction, NodeBundle, Query, Res, ResMut, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val, With};
 
-use crate::{SwitchProject};
 use crate::editor_data::EditorData;
 use crate::map::resources::MapEntity;
 use crate::project::resources::{Project, ProjectSaveState};
+use crate::SwitchProject;
 use crate::ui::components::{HoverEffect, ToggleEffect};
 use crate::ui::hotbar::components::TopHotbarMarker;
 use crate::ui::tabs::components::{AddTabButtonMarker, Tab, TabContainerMarker};
@@ -109,7 +109,7 @@ pub fn on_add_tab_button_click(
                     r_editor_data.projects.push(project);
                     e_spawn_tab.send(SpawnTab { name, index: r_editor_data.projects.len() as u32 - 1 });
                 }
-                 _ => todo!()
+                _ => todo!()
             }
         }
         _ => {}

@@ -1,11 +1,10 @@
 use std::collections::HashMap;
-
 use std::sync::Arc;
 
 use bevy::asset::Handle;
 use bevy::math::Vec3;
 use bevy::prelude::{Commands, Component, default, Entity, Event, EventReader, EventWriter, Image, Query, Res, ResMut, SpriteBundle, Transform, With};
-use log::{warn};
+use log::warn;
 
 use crate::common::Coordinates;
 use crate::editor_data::EditorData;
@@ -15,7 +14,6 @@ use crate::map::{TileDeleteEvent, TilePlaceEvent};
 use crate::map::events::{ClearTiles, SpawnMapEntity, UpdateSpriteEvent};
 use crate::tiles::components::{Offset, Tile};
 use crate::ui::grid::resources::Grid;
-
 
 #[derive(Event)]
 pub struct SpawnSprite {
@@ -79,7 +77,7 @@ pub fn spawn_sprite(
     for e in e_spawn_sprite.read() {
         let fg = e.sprite_kind.get_fg();
         let bg = e.sprite_kind.get_bg();
-        
+
         if fg.is_some() {
             let layer = e.z as f32 + 1. + e.coordinates.y as f32 * 10.;
             let mut fg_entity_commands = commands.spawn((
@@ -292,7 +290,7 @@ pub fn update_sprite_reader(
         None => return,
         Some(d) => d
     };
-    
+
     let project = match r_editor_data.get_current_project_mut() {
         None => { return; }
         Some(p) => { p }
@@ -426,7 +424,7 @@ pub fn tile_spawn_reader(
         None => return,
         Some(d) => d
     };
-    
+
     let project = match r_editor_data.get_current_project_mut() {
         None => { return; }
         Some(p) => { p }

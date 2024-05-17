@@ -2,8 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::path::{PathBuf};
-
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -14,18 +13,15 @@ use bevy::render::render_asset::RenderAssetUsages;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use image::{DynamicImage, EncodableLayout, GenericImageView, ImageBuffer, imageops, Rgba};
 use image::io::Reader;
-
-
 use log::{debug, error, info, warn};
-
 use serde::Deserialize;
 use serde_json::Value;
 
 use crate::common::{GetRandom, MeabyMulti, MeabyWeighted, TileId, Weighted};
 use crate::common::io::{Load, LoadError};
 use crate::graphics::{Corner, Edge, FullCardinal, Sprite, SpriteType};
+use crate::graphics::tileset::{GetBackground, GetForeground};
 use crate::graphics::tileset::TilesetLoader;
-use crate::graphics::tileset::{GetForeground, GetBackground};
 
 const TILESET_INFO_NAME: &'static str = "tileset.txt";
 const AMOUNT_OF_SPRITES_PER_ROW: u32 = 16;

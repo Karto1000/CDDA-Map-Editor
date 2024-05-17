@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use std::fs;
-use std::path::{PathBuf};
+use std::path::PathBuf;
 
 use log::{info, warn};
 use serde_json::Value;
 
 use crate::common::io::{Load, LoadError, recurse_files};
-use crate::palettes::{Palette};
+use crate::palettes::Palette;
 
 pub struct PalettesLoader {
     pub parent_dir: PathBuf,

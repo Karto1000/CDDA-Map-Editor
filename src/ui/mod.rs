@@ -1,4 +1,4 @@
-use bevy::app::{App, Plugin, PostStartup, Startup, Update};
+use bevy::app::{App, Plugin, PostStartup, Update};
 use bevy::prelude::{apply_deferred, IntoSystemConfigs};
 
 use crate::ui::hotbar::spawn_hotbar;
