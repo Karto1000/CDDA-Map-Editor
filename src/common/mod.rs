@@ -20,10 +20,6 @@ use serde::de::Visitor;
 pub(crate) mod io;
 
 pub type TileId = String;
-pub const PRIMARY_COLOR: Color = Color::rgb(0.19, 0.21, 0.23);
-pub const PRIMARY_COLOR_FADED: Color = Color::rgb(0.23, 0.25, 0.27);
-pub const PRIMARY_COLOR_SELECTED: Color = Color::rgb(0.63, 0.70, 0.76);
-pub const ERROR: Color = Color::rgba(0.79, 0.2, 0.21, 0.5);
 
 lazy_static! {
     pub static ref RANDOM: Arc<RwLock<StdRng>> = Arc::new(RwLock::new(StdRng::seed_from_u64(1)));
@@ -133,7 +129,7 @@ impl<T: Debug> GetRandom<T> for Vec<Weighted<T>> {
             }
         }).collect::<Vec<f32>>().as_slice()).unwrap();
         let mut lock = RANDOM.write().unwrap();
-        
+
         return match self.get(dist.sample(lock.deref_mut())) {
             None => None,
             Some(v) => Some(&v.value)
@@ -150,7 +146,7 @@ impl<T> GetRandom<T> for Vec<MeabyWeighted<T>> {
             MeabyWeighted::Weighted(w) => w.weight as f32
         }).collect::<Vec<f32>>().as_slice()).unwrap();
         let mut lock = RANDOM.write().unwrap();
-        
+
         return match self.get(dist.sample(lock.deref_mut())) {
             None => None,
             Some(v) => match v {
@@ -169,7 +165,7 @@ impl<K> GetRandom<K> for HashMap<K, u32> {
 
         let items = self.keys().collect::<Vec<&K>>();
         let mut lock = RANDOM.write().unwrap();
-        
+
         return Some(items[dist.sample(lock.deref_mut())]);
     }
 }
@@ -224,7 +220,7 @@ impl<T> MeabyWeighted<T> {
         return match self {
             MeabyWeighted::NotWeighted(v) => v,
             MeabyWeighted::Weighted(w) => &w.value
-        }
+        };
     }
 }
 

@@ -2,8 +2,8 @@ use bevy::asset::{AssetServer, Handle};
 use bevy::hierarchy::{BuildChildren, ChildBuilder};
 use bevy::prelude::{AlignItems, BackgroundColor, Bundle, ButtonBundle, Color, Commands, default, Display, Image, ImageBundle, JustifyContent, NodeBundle, Res, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val};
 use bevy::ui::PositionType;
+use crate::editor_data::EditorData;
 
-use crate::common::{PRIMARY_COLOR, PRIMARY_COLOR_FADED};
 use crate::ui::components::OriginalColor;
 use crate::ui::hotbar::components::{CloseIconMarker, ImportIconMarker, OpenIconMarker, SaveIconMarker, TopHotbarMarker};
 
@@ -37,11 +37,19 @@ fn spawn_button_icon<T: Bundle>(container: &mut ChildBuilder, icon: Handle<Image
     });
 }
 
-pub fn spawn_hotbar(mut commands: Commands, asset_server: Res<AssetServer>) {
-    build_hotbar(&mut commands, &asset_server);
+pub fn spawn_hotbar(
+    mut commands: Commands,
+    r_asset_server: Res<AssetServer>,
+    r_editor_data: Res<EditorData>
+) {
+    build_hotbar(&mut commands, &r_asset_server, &r_editor_data);
 }
 
-pub fn build_hotbar(commands: &mut Commands, asset_server: &Res<AssetServer>) {
+pub fn build_hotbar(
+    commands: &mut Commands, 
+    asset_server: &Res<AssetServer>,
+    editor_data: &Res<EditorData>
+) {
     let grass = asset_server.load("grass.png");
     let font = asset_server.load("fonts/unifont.ttf");
 
@@ -55,7 +63,7 @@ pub fn build_hotbar(commands: &mut Commands, asset_server: &Res<AssetServer>) {
                 height: Val::Px(32.),
                 ..default()
             },
-            background_color: BackgroundColor::from(PRIMARY_COLOR),
+            background_color: BackgroundColor::from(editor_data.config.style.gray_dark),
             ..default()
         },
     ).with_children(|parent| {
@@ -114,7 +122,7 @@ pub fn build_hotbar(commands: &mut Commands, asset_server: &Res<AssetServer>) {
             },
             ..default()
         }).with_children(|top_right| {
-            spawn_button_icon(top_right, asset_server.load("icons/close.png"), PRIMARY_COLOR, CloseIconMarker {});
+            spawn_button_icon(top_right, asset_server.load("icons/close.png"), editor_data.config.style.gray_dark, CloseIconMarker {});
         });
     });
 
@@ -127,7 +135,7 @@ pub fn build_hotbar(commands: &mut Commands, asset_server: &Res<AssetServer>) {
                 top: Val::Px(30.),
                 ..default()
             },
-            background_color: BackgroundColor::from(PRIMARY_COLOR_FADED),
+            background_color: BackgroundColor::from(editor_data.config.style.gray_darker),
             ..default()
         }
     ).with_children(|parent| {
@@ -140,10 +148,10 @@ pub fn build_hotbar(commands: &mut Commands, asset_server: &Res<AssetServer>) {
             },
             ..default()
         }).with_children(|icons_container| {
-            spawn_button_icon(icons_container, asset_server.load("icons/floppy-disk.png"), PRIMARY_COLOR_FADED, SaveIconMarker {});
+            spawn_button_icon(icons_container, asset_server.load("icons/floppy-disk.png"), editor_data.config.style.gray_darker, SaveIconMarker {});
             //spawn_button_icon(icons_container, asset_server.load("icons/upload-file.png"), PRIMARY_COLOR_FADED);
-            spawn_button_icon(icons_container, asset_server.load("icons/download-file.png"), PRIMARY_COLOR_FADED, ImportIconMarker {});
-            spawn_button_icon(icons_container, asset_server.load("icons/new-folder.png"), PRIMARY_COLOR_FADED, OpenIconMarker {});
+            spawn_button_icon(icons_container, asset_server.load("icons/download-file.png"), editor_data.config.style.gray_darker, ImportIconMarker {});
+            spawn_button_icon(icons_container, asset_server.load("icons/new-folder.png"), editor_data.config.style.gray_darker, OpenIconMarker {});
             //spawn_button_icon(icons_container, asset_server.load("icons/recycle-bin.png"), ERROR)
         });
     });

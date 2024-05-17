@@ -3,7 +3,6 @@ use bevy::hierarchy::BuildChildren;
 use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Changed, Color, Commands, default, Display, Entity, EventReader, EventWriter, ImageBundle, Interaction, NodeBundle, Query, Res, ResMut, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val, With};
 
 use crate::{SwitchProject};
-use crate::common::{PRIMARY_COLOR, PRIMARY_COLOR_FADED, PRIMARY_COLOR_SELECTED};
 use crate::editor_data::EditorData;
 use crate::map::resources::MapEntity;
 use crate::project::resources::{Project, ProjectSaveState};
@@ -18,6 +17,7 @@ pub(crate) mod components;
 pub fn setup(
     r_asset_server: Res<AssetServer>,
     q_top_hotbar: Query<Entity, With<TopHotbarMarker>>,
+    r_editor_data: Res<EditorData>,
     mut commands: Commands,
 ) {
     let hotbar = q_top_hotbar.iter().next().unwrap();
@@ -57,10 +57,10 @@ pub fn setup(
                             height: Val::Px(32.),
                             ..default()
                         },
-                        background_color: BackgroundColor::from(PRIMARY_COLOR_FADED),
+                        background_color: BackgroundColor::from(r_editor_data.config.style.gray_dark),
                         ..default()
                     },
-                    HoverEffect { original_color: PRIMARY_COLOR_FADED, hover_color: PRIMARY_COLOR },
+                    HoverEffect { original_color: r_editor_data.config.style.gray_dark, hover_color: r_editor_data.config.style.gray_light },
                     AddTabButtonMarker {},
                 )).with_children(|parent| {
                     parent.spawn(
@@ -119,6 +119,7 @@ pub fn on_add_tab_button_click(
 pub fn spawn_tab_reader(
     top_hotbar: Query<Entity, With<TabContainerMarker>>,
     asset_server: Res<AssetServer>,
+    r_editor_data: Res<EditorData>,
     mut e_spawn_tab: EventReader<SpawnTab>,
     mut commands: Commands,
 ) {
@@ -137,16 +138,16 @@ pub fn spawn_tab_reader(
                         padding: UiRect::px(9., 9., 8., 8.),
                         ..default()
                     },
-                    background_color: BackgroundColor::from(PRIMARY_COLOR_FADED),
+                    background_color: BackgroundColor::from(r_editor_data.config.style.blue_dark),
                     ..default()
                 },
                 HoverEffect {
-                    original_color: PRIMARY_COLOR_FADED,
-                    hover_color: PRIMARY_COLOR,
+                    original_color: r_editor_data.config.style.blue_dark,
+                    hover_color: r_editor_data.config.style.selected,
                 },
                 ToggleEffect {
-                    original_color: PRIMARY_COLOR_FADED,
-                    toggled_color: PRIMARY_COLOR_SELECTED,
+                    original_color: r_editor_data.config.style.blue_dark,
+                    toggled_color: r_editor_data.config.style.selected,
                     toggled: false,
                 },
                 Tab { index: event.index }

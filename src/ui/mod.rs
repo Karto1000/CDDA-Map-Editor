@@ -1,4 +1,4 @@
-use bevy::app::{App, Plugin, Startup, Update};
+use bevy::app::{App, Plugin, PostStartup, Startup, Update};
 use bevy::prelude::{apply_deferred, IntoSystemConfigs};
 
 use crate::ui::hotbar::spawn_hotbar;
@@ -13,12 +13,13 @@ pub(crate) mod components;
 pub(crate) mod hotbar;
 pub(crate) mod tabs;
 pub(crate) mod grid;
+pub(crate) mod style;
 
 pub struct UiPlugin;
 
 impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, (spawn_hotbar, apply_deferred, setup).chain());
+        app.add_systems(PostStartup, (spawn_hotbar, apply_deferred, setup).chain());
 
         app.add_event::<ResetToggle>();
         app.add_systems(Update, reset_toggle_reader);

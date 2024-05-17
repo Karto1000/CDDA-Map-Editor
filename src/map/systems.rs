@@ -79,7 +79,7 @@ pub fn spawn_sprite(
     for e in e_spawn_sprite.read() {
         let fg = e.sprite_kind.get_fg();
         let bg = e.sprite_kind.get_bg();
-
+        
         if fg.is_some() {
             let layer = e.z as f32 + 1. + e.coordinates.y as f32 * 10.;
             let mut fg_entity_commands = commands.spawn((

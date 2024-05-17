@@ -2,25 +2,21 @@ use std::default::Default;
 use std::io::Write;
 use std::ops::Deref;
 use std::path::PathBuf;
-
 use std::string::ToString;
 use std::sync::Arc;
 
 use bevy::{prelude::*, window::PrimaryWindow};
 use bevy::app::{App, PluginGroup};
-use bevy::asset::{AssetServer, AsyncReadExt};
+use bevy::asset::AsyncReadExt;
 use bevy::DefaultPlugins;
 use bevy::log::LogPlugin;
-
-
 use bevy::prelude::{Assets, Camera2dBundle, Commands, Component, EventReader, Mesh, NonSend, Query, Res, ResMut, Resource, Transform, Vec2, Window, With};
-
 use bevy::sprite::{Material2dPlugin, MaterialMesh2dBundle, Mesh2dHandle};
 use bevy::utils::default;
 use bevy::window::{WindowMode, WindowPlugin};
 use bevy::winit::WinitWindows;
 use bevy_console::{ConsoleConfiguration, ConsolePlugin, PrintConsoleLine};
-
+use bevy_egui::egui::style::{Widgets, WidgetVisuals};
 use bevy_file_dialog::FileDialogPlugin;
 use bevy_inspector_egui::bevy_egui::EguiContexts;
 use bevy_inspector_egui::egui;
@@ -29,28 +25,23 @@ use bevy_inspector_egui::egui::epaint::Shadow;
 use clap::builder::StyledStr;
 use color_print::cformat;
 use imageproc::drawing::Canvas;
-
-use crate::editor_data::io::EditorDataSaver;
 use lazy_static::lazy_static;
-use log::{LevelFilter};
+use log::LevelFilter;
 use num::ToPrimitive;
-
 use winit::window::Icon;
 
-use crate::common::{BufferedLogger, Coordinates, LogMessage, PRIMARY_COLOR};
-use crate::common::io::{Load};
-use crate::editor_data::EditorData;
+use crate::common::{BufferedLogger, Coordinates, LogMessage};
+use crate::common::io::Load;
+use crate::editor_data::{EditorData, IntoColor32};
+use crate::editor_data::io::EditorDataSaver;
 use crate::graphics::{GraphicsResource, LegacyTextures};
 use crate::graphics::tileset::legacy::LegacyTilesetLoader;
 use crate::map::events::{ClearTiles, SpawnMapEntity};
 use crate::map::loader::MapEntityLoader;
 use crate::map::MapPlugin;
-
-use crate::map::resources::{MapEntity};
+use crate::map::resources::MapEntity;
 use crate::map::systems::{set_tile_reader, spawn_sprite, tile_despawn_reader, tile_remove_reader, tile_spawn_reader, update_sprite_reader};
-
-
-use crate::project::resources::{Project};
+use crate::project::resources::Project;
 use crate::region_settings::loader::RegionSettingsLoader;
 use crate::tiles::components::{Offset, Tile};
 use crate::tiles::TilePlugin;
@@ -84,8 +75,6 @@ pub struct SwitchProject {
     pub index: u32,
 }
 
-
-
 fn main() {
     lazy_static::initialize(&LOGGER);
     log::set_logger(LOGGER.deref()).unwrap();
@@ -111,6 +100,9 @@ fn main() {
         .add_event::<LogMessage>()
         .add_systems(Startup, (
             setup,
+        ))
+        .add_systems(PostStartup, (
+            spawn_initial_tabs,
             setup_egui,
         ))
         .add_event::<SwitchProject>()
@@ -137,15 +129,28 @@ fn main() {
         .run();
 }
 
+fn spawn_initial_tabs(
+    mut e_spawn_tab: EventWriter<SpawnTab>,
+    r_editor_data: Res<EditorData>,
+) {
+    for (i, project) in r_editor_data.projects.iter().enumerate() {
+        let name = match &project.map_entity {
+            MapEntity::Single(s) => s.om_terrain.clone(),
+            MapEntity::Nested(_) => "Nested_TODO".to_string(),
+            _ => todo!()
+        };
+
+        e_spawn_tab.send(SpawnTab { name, index: i as u32 });
+    }
+}
+
 fn setup(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
     mut materials: ResMut<Assets<GridMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
     win_windows: NonSend<WinitWindows>,
     res_grid: Res<Grid>,
     mut e_spawn_map_entity: EventWriter<SpawnMapEntity>,
-    mut e_spawn_tab: EventWriter<SpawnTab>,
     mut r_images: ResMut<Assets<Image>>,
 ) {
     commands.spawn(Camera2dBundle::default());
@@ -174,27 +179,17 @@ fn setup(
         id: "mall_a_1".to_string(),
         cdda_data: &editor_data.config.cdda_data.as_ref().unwrap().clone(),
     };
-    
+
     let map_entity = MapEntity::Nested(loader.load().unwrap());
 
     let mut project = Project::default();
     project.map_entity = map_entity.clone();
-    
+
     editor_data.projects.push(project);
 
     e_spawn_map_entity.send(SpawnMapEntity {
         map_entity: Arc::new(map_entity)
     });
-
-    for (i, project) in editor_data.projects.iter().enumerate() {
-        let name = match &project.map_entity {
-            MapEntity::Single(s) => s.om_terrain.clone(),
-            MapEntity::Nested(_) => "Nested_TODO".to_string(),
-            _ => todo!()
-        };
-
-        e_spawn_tab.send(SpawnTab { name, index: i as u32 });
-    }
 
     let (icon_rgba, icon_width, icon_height) = {
         let image = image::load_from_memory(include_bytes!("../assets/grass.png"))
@@ -211,7 +206,7 @@ fn setup(
     commands.spawn((
         MaterialMesh2dBundle {
             mesh: Mesh2dHandle::from(meshes.add(Cuboid::new(1., 1., 0.0).mesh())),
-            transform: Transform::from_xyz(0.0, 0.0, 1.0),
+            transform: Transform::from_xyz(0.0, 0.0, 0.0),
             material: materials.add(GridMaterial {
                 tile_size: res_grid.tile_size,
                 offset: Vec2::default(),
@@ -219,6 +214,8 @@ fn setup(
                 is_cursor_captured: 0,
                 map_size: editor_data.get_current_project().unwrap().map_entity.size(),
                 scale_factor: 1.,
+                inside_grid_color: editor_data.config.style.gray_light.rgb_to_vec3(),
+                outside_grid_color: editor_data.config.style.gray_darker.rgb_to_vec3(),
             }),
             ..default()
         },
@@ -231,6 +228,7 @@ fn setup(
 
 fn setup_egui(
     mut contexts: EguiContexts,
+    r_editor_data: Res<EditorData>,
 ) {
     let mut fonts = egui::FontDefinitions::empty();
     fonts.font_data.insert(
@@ -255,13 +253,20 @@ fn setup_egui(
             extrusion: 0.0,
             color: Default::default(),
         },
+        widgets: Widgets {
+            open: WidgetVisuals {
+                bg_fill: Default::default(),
+                weak_bg_fill:  r_editor_data.config.style.blue_dark.into_color32(),
+                bg_stroke: Default::default(),
+                rounding: Default::default(),
+                fg_stroke: Default::default(),
+                expansion: 0.0,
+            },
+            ..Default::default()
+        },
         window_stroke: Stroke::NONE,
-        override_text_color: Some(Color32::from_rgb(255, 255, 255)),
-        window_fill: Color32::from_rgb(
-            (PRIMARY_COLOR.r() * 255.).to_u8().unwrap(),
-            (PRIMARY_COLOR.g() * 255.).to_u8().unwrap(),
-            (PRIMARY_COLOR.b() * 255.).to_u8().unwrap(),
-        ),
+        override_text_color: Some(r_editor_data.config.style.white.into_color32()),
+        window_fill: r_editor_data.config.style.gray_darker.into_color32(),
         ..default()
     });
 }

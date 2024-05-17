@@ -1,6 +1,6 @@
 use bevy::app::{App, Plugin, Update};
 use bevy::asset::Asset;
-use bevy::math::Vec2;
+use bevy::math::{Vec2, Vec3};
 use bevy::prelude::{Component, TypePath};
 use bevy::render::render_resource::{AsBindGroup, ShaderRef};
 use bevy::sprite::Material2d;
@@ -59,6 +59,11 @@ pub struct GridMaterial {
     pub is_cursor_captured: i32,
     #[uniform(5)]
     pub scale_factor: f32,
+    
+    #[uniform(6)]
+    pub inside_grid_color: Vec3,    
+    #[uniform(7)]
+    pub outside_grid_color: Vec3,
 }
 
 
