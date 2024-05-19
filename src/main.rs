@@ -44,8 +44,10 @@ use crate::project::resources::Project;
 use crate::region_settings::loader::RegionSettingsLoader;
 use crate::tiles::components::{Offset, Tile};
 use crate::tiles::TilePlugin;
+use crate::ui::components::CDDADirContents;
 use crate::ui::grid::{GridMarker, GridMaterial, GridPlugin};
 use crate::ui::grid::resources::Grid;
+use crate::ui::settings::Settings;
 use crate::ui::tabs::events::SpawnTab;
 use crate::ui::UiPlugin;
 
@@ -83,7 +85,7 @@ fn main() {
         .add_plugins((DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "CDDA Map Editor".to_string(),
-                mode: WindowMode::BorderlessFullscreen,
+                mode: WindowMode::Windowed,
                 ..Default::default()
             }),
             ..Default::default()
@@ -108,6 +110,7 @@ fn main() {
         .add_plugins(FileDialogPlugin::new()
             .with_save_file::<Project>()
             .with_load_file::<Project>()
+            .with_pick_directory::<CDDADirContents>()
         )
         .add_plugins(Material2dPlugin::<GridMaterial>::default())
         .add_plugins((GridPlugin {}, MapPlugin {}, TilePlugin {}, UiPlugin {}))
@@ -157,38 +160,13 @@ fn setup(
     let editor_data_saver = EditorDataSaver::new();
     let mut editor_data = editor_data_saver.load().unwrap();
 
-    let cdda_path = "C:/CDDA/testing";
+    commands.insert_resource(Settings::default());
+    
+    let texture_resource = GraphicsResource::default();
 
-    // TODO: This is just for debug
-    match &mut editor_data.config.cdda_data {
-        None => {
-            editor_data.config.load_cdda_dir(PathBuf::from(cdda_path));
-        }
-        _ => {}
-    }
-
-    let tileset_loader = LegacyTilesetLoader::new(PathBuf::from(format!(r"{}/gfx/MSX++UnDeadPeopleEdition", cdda_path)));
-    let region_settings_loader = RegionSettingsLoader::new(PathBuf::from(format!(r"{}/data/json/regional_map_settings.json", cdda_path)), "default".to_string());
-
-    let legacy_textures = LegacyTextures::new(tileset_loader, region_settings_loader, &mut r_images);
-    let texture_resource = GraphicsResource::new(Box::new(legacy_textures));
-
-    let loader = MapEntityLoader {
-        path: PathBuf::from(format!(r"{}/data/json/mapgen/mall/mall_ground.json", cdda_path)),
-        id: "mall_a_1".to_string(),
-        cdda_data: &editor_data.config.cdda_data.as_ref().unwrap().clone(),
-    };
-
-    let map_entity = MapEntity::Nested(loader.load().unwrap());
-
-    let mut project = Project::default();
-    project.map_entity = map_entity.clone();
+    let project = Project::default();
 
     editor_data.projects.push(project);
-
-    e_spawn_map_entity.send(SpawnMapEntity {
-        map_entity: Arc::new(map_entity)
-    });
 
     let (icon_rgba, icon_width, icon_height) = {
         let image = image::load_from_memory(include_bytes!("../assets/grass.png"))
@@ -227,7 +205,7 @@ fn setup(
 
 fn setup_egui(
     mut contexts: EguiContexts,
-    r_editor_data: Res<EditorData>,
+    mut r_editor_data: ResMut<EditorData>,
 ) {
     let mut fonts = egui::FontDefinitions::empty();
     fonts.font_data.insert(
@@ -263,6 +241,7 @@ fn setup_egui(
             },
             ..Default::default()
         },
+        extreme_bg_color: r_editor_data.config.style.blue_dark.into_color32(),
         window_stroke: Stroke::NONE,
         override_text_color: Some(r_editor_data.config.style.white.into_color32()),
         window_fill: r_editor_data.config.style.gray_darker.into_color32(),

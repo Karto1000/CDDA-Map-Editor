@@ -17,3 +17,6 @@ pub struct ToggleEffect {
     pub toggled: bool,
 }
 
+
+#[derive(Debug)]
+pub struct CDDADirContents;

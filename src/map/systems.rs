@@ -8,7 +8,7 @@ use log::warn;
 
 use crate::common::Coordinates;
 use crate::editor_data::EditorData;
-use crate::graphics::{GraphicsResource, Sprite, SpriteState, TileSprite};
+use crate::graphics::{GetTexture, GraphicsResource, Sprite, SpriteState, TileSprite};
 use crate::graphics::tileset::{GetBackground, GetForeground};
 use crate::map::{TileDeleteEvent, TilePlaceEvent};
 use crate::map::events::{ClearTiles, SpawnMapEntity, UpdateSpriteEvent};
@@ -182,6 +182,11 @@ pub fn update_animated_sprites(
         None => return,
         Some(p) => p
     };
+    
+    let textures = match &r_textures.textures {
+        None => return,
+        Some(t) => t
+    };
 
     let mut fg_entities_to_set = HashMap::new();
 
@@ -193,7 +198,7 @@ pub fn update_animated_sprites(
             }
             Some(t) => t
         };
-        match r_textures.textures.get_terrain(current_project, &cdda_data, &tile.character, cords) {
+        match textures.get_terrain(current_project, &cdda_data, &tile.character, cords) {
             SpriteState::Defined(terrain) => {
                 if (chrono::prelude::Utc::now().timestamp_millis() / 1000) as u64 - animated.last_update < animated.cooldown as u64 {
                     return;
@@ -295,9 +300,14 @@ pub fn update_sprite_reader(
         None => { return; }
         Some(p) => { p }
     };
+    
+    let textures = match &r_textures.textures {
+        None => return,
+        Some(t) => t
+    };
 
     for e in e_update_sprite.read() {
-        let tile_sprite = r_textures.textures.get_textures(&project, &cdda_data, &e.tile.character, &e.coordinates);
+        let tile_sprite = textures.get_textures(&project, &cdda_data, &e.tile.character, &e.coordinates);
 
         macro_rules! spawn_sprite {
             ($sprite: expr, $tile_path: expr, $sprite_type: ident) => {
@@ -429,9 +439,14 @@ pub fn tile_spawn_reader(
         None => { return; }
         Some(p) => { p }
     };
+    
+    let textures = match &r_textures.textures {
+        None => return,
+        Some(t) => t
+    };
 
     for e in e_tile_place.read() {
-        let sprites = r_textures.textures.get_textures(project, &cdda_data, &e.tile.character, &e.coordinates);
+        let sprites = textures.get_textures(project, &cdda_data, &e.tile.character, &e.coordinates);
 
         match sprites {
             TileSprite::Exists { terrain, furniture, .. } => {

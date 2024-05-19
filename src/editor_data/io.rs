@@ -8,7 +8,7 @@ use directories::ProjectDirs;
 use serde_json::{Map, Value};
 
 use crate::common::io::{Load, LoadError, Save, SaveError};
-use crate::editor_data::EditorData;
+use crate::editor_data::{EditorData, Menus};
 use crate::map::resources::MapEntity;
 use crate::project::resources::{Project, ProjectSaveState};
 use crate::project::saver::ProjectSaver;
@@ -153,6 +153,7 @@ impl Load<EditorData> for EditorDataSaver {
             projects: projects_array,
             history: Default::default(),
             config: Default::default(),
+            menus: Menus::default(),
         });
     }
 }

@@ -21,6 +21,7 @@ pub struct EditorData {
     pub projects: Vec<Project>,
     pub history: Vec<ProjectSaveState>,
     pub config: Config,
+    pub menus: Menus
 }
 
 impl EditorData {
@@ -40,13 +41,15 @@ impl Default for EditorData {
             projects: vec![],
             history: vec![],
             config: Config::default(),
+            menus: Menus {
+                is_settings_menu_open: false
+            },
         };
     }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CDDAData {
-    pub path: PathBuf,
     pub palettes: HashMap<String, Palette>,
 }
 
@@ -63,7 +66,6 @@ impl Config {
 
         self.cdda_data = Some(Arc::new(CDDAData {
             palettes,
-            path: cdda_dir,
         }));
     }
 }
@@ -89,4 +91,9 @@ impl IntoColor32 for Color {
             (self.b() * 255.).to_u8().unwrap(),
         );
     }
+}
+
+#[derive(Debug, Default)]
+pub struct Menus {
+    pub is_settings_menu_open: bool,
 }

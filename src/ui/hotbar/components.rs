@@ -15,3 +15,5 @@ pub struct OpenIconMarker;
 #[derive(Component)]
 pub struct CloseIconMarker;
 
+#[derive(Component)]
+pub struct SettingsIconMarker;

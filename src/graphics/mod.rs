@@ -554,15 +554,15 @@ impl GetTexture for LegacyTextures {
     }
 }
 
-#[derive(Resource)]
+#[derive(Resource, Default)]
 pub struct GraphicsResource {
-    pub textures: Box<dyn GetTexture>,
+    pub textures: Option<Box<dyn GetTexture>>,
 }
 
 impl GraphicsResource {
     pub fn new(tileset_loader: Box<dyn GetTexture>) -> Self {
         return Self {
-            textures: tileset_loader
+            textures: Some(tileset_loader)
         };
     }
 }

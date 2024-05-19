@@ -1,15 +1,21 @@
 use bevy::asset::{AssetServer, Handle};
 use bevy::hierarchy::{BuildChildren, ChildBuilder};
-use bevy::prelude::{AlignItems, BackgroundColor, Bundle, ButtonBundle, Color, Commands, default, Display, Image, ImageBundle, JustifyContent, NodeBundle, Res, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val};
+use bevy::prelude::{AlignItems, BackgroundColor, Bundle, ButtonBundle, Color, Commands, default, Display, FlexDirection, Image, ImageBundle, JustifyContent, NodeBundle, Res, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val};
 use bevy::ui::PositionType;
 
 use crate::editor_data::EditorData;
-use crate::ui::components::OriginalColor;
-use crate::ui::hotbar::components::{CloseIconMarker, ImportIconMarker, OpenIconMarker, SaveIconMarker, TopHotbarMarker};
+use crate::ui::components::{HoverEffect, OriginalColor};
+use crate::ui::hotbar::components::{CloseIconMarker, ImportIconMarker, OpenIconMarker, SaveIconMarker, SettingsIconMarker, TopHotbarMarker};
 
 pub(crate) mod components;
 
-fn spawn_button_icon<T: Bundle>(container: &mut ChildBuilder, icon: Handle<Image>, color: Color, marker: T) {
+fn spawn_button_icon<T: Bundle>(
+    container: &mut ChildBuilder,
+    editor_data: &Res<EditorData>,
+    icon: Handle<Image>,
+    color: Color,
+    marker: T,
+) {
     container.spawn((
         ButtonBundle {
             style: Style {
@@ -23,6 +29,10 @@ fn spawn_button_icon<T: Bundle>(container: &mut ChildBuilder, icon: Handle<Image
             ..default()
         },
         OriginalColor(color),
+        HoverEffect {
+            original_color: color,
+            hover_color: editor_data.config.style.selected,
+        },
         marker
     )).with_children(|icon_container| {
         icon_container.spawn(
@@ -122,7 +132,13 @@ pub fn build_hotbar(
             },
             ..default()
         }).with_children(|top_right| {
-            spawn_button_icon(top_right, asset_server.load("icons/close.png"), editor_data.config.style.gray_dark, CloseIconMarker {});
+            spawn_button_icon(
+                top_right,
+                editor_data,
+                asset_server.load("icons/close.png"),
+                editor_data.config.style.gray_dark,
+                CloseIconMarker {},
+            );
         });
     });
 
@@ -130,6 +146,9 @@ pub fn build_hotbar(
         NodeBundle {
             style: Style {
                 position_type: PositionType::Absolute,
+                display: Display::Flex,
+                flex_direction: FlexDirection::Row,
+                justify_content: JustifyContent::SpaceBetween,
                 width: Val::Percent(100.),
                 height: Val::Px(32.),
                 top: Val::Px(30.),
@@ -148,11 +167,47 @@ pub fn build_hotbar(
             },
             ..default()
         }).with_children(|icons_container| {
-            spawn_button_icon(icons_container, asset_server.load("icons/floppy-disk.png"), editor_data.config.style.gray_darker, SaveIconMarker {});
+            spawn_button_icon(
+                icons_container,
+                editor_data,
+                asset_server.load("icons/floppy-disk.png"),
+                editor_data.config.style.gray_darker,
+                SaveIconMarker {},
+            );
             //spawn_button_icon(icons_container, asset_server.load("icons/upload-file.png"), PRIMARY_COLOR_FADED);
-            spawn_button_icon(icons_container, asset_server.load("icons/download-file.png"), editor_data.config.style.gray_darker, ImportIconMarker {});
-            spawn_button_icon(icons_container, asset_server.load("icons/new-folder.png"), editor_data.config.style.gray_darker, OpenIconMarker {});
+            spawn_button_icon(
+                icons_container,
+                editor_data,
+                asset_server.load("icons/download-file.png"),
+                editor_data.config.style.gray_darker,
+                ImportIconMarker {},
+            );
+            spawn_button_icon(
+                icons_container,
+                editor_data,
+                asset_server.load("icons/new-folder.png"),
+                editor_data.config.style.gray_darker,
+                OpenIconMarker {},
+            );
             //spawn_button_icon(icons_container, asset_server.load("icons/recycle-bin.png"), ERROR)
+        });
+
+        parent.spawn(NodeBundle {
+            style: Style {
+                width: Val::Auto,
+                height: Val::Percent(100.),
+                display: Display::Flex,
+                ..default()
+            },
+            ..default()
+        }).with_children(|icons_container| {
+            spawn_button_icon(
+                icons_container, 
+                editor_data,
+                asset_server.load("icons/cog.png"), 
+                editor_data.config.style.gray_darker, 
+                SettingsIconMarker {}
+            );
         });
     });
 }
