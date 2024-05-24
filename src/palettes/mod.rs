@@ -67,13 +67,13 @@ pub struct Parameter {
     pub calculated_value: Option<TileId>,
 }
 
-#[derive(Deserialize, Clone, Serialize, Debug)]
+#[derive(Deserialize, Clone, Serialize, Debug, PartialEq)]
 pub struct ParameterReference {
     pub param: String,
     pub fallback: String,
 }
 
-#[derive(Deserialize, Clone, Serialize, Debug)]
+#[derive(Deserialize, Clone, Serialize, Debug, PartialEq)]
 #[serde(untagged)]
 pub enum MeabyParam {
     TileId(TileId),

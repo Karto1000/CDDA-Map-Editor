@@ -112,6 +112,22 @@ pub enum MeabyMulti<T> {
     Single(T),
 }
 
+impl<T> MeabyMulti<T> {
+    pub fn multi(self) -> Vec<T> {
+        return match self {
+            MeabyMulti::Multi(mul) => mul,
+            MeabyMulti::Single(_) => panic!("Tried to call 'multi()' on a Single MeabyMulti Variant")
+        }
+    }
+    
+    pub fn single(self) -> T {
+        return match self {
+            MeabyMulti::Multi(_) => panic!("Tried to call 'single()' on a Multi MeabyMulti Variant"),
+            MeabyMulti::Single(s) => s
+        }
+    }
+}
+
 
 pub trait GetRandom<T> {
     fn get_random_weighted(&self) -> Option<&T>;
@@ -221,6 +237,20 @@ impl<T> MeabyWeighted<T> {
             MeabyWeighted::NotWeighted(v) => v,
             MeabyWeighted::Weighted(w) => &w.value
         };
+    }
+    
+    pub fn weighted(self) -> Weighted<T> {
+        return match self {
+            MeabyWeighted::NotWeighted(_) => panic!("Tried to call 'weighted()' on a NotWeighted MeabyWeighted Variant"),
+            MeabyWeighted::Weighted(w) => w
+        }
+    }
+    
+    pub fn not_weighted(self) -> T {
+        return match self {
+            MeabyWeighted::NotWeighted(nw) => nw,
+            MeabyWeighted::Weighted(_) => panic!("Tried to call 'not_weighted()' on a Weighted MeabyWeighted Variant")
+        }
     }
 }
 

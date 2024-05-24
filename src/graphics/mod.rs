@@ -233,8 +233,8 @@ pub struct LegacyTextures {
 
 impl LegacyTextures {
     pub fn new(loader: impl TilesetLoader<LegacyTileset, i32>, region_settings: impl Load<RegionSettings>, image_resource: &mut ResMut<Assets<Image>>) -> Self {
-        let textures = loader.assign_textures(image_resource).unwrap();
-        let fallback_textures = loader.load_fallback_textures(image_resource).unwrap();
+        let textures = loader.load_sprite_handles(image_resource).unwrap();
+        let fallback_textures = loader.load_fallback_textures().unwrap();
 
         let mut fallback_sprites: HashMap<String, Sprite> = HashMap::new();
 
@@ -242,7 +242,7 @@ impl LegacyTextures {
             fallback_sprites.insert(
                 key,
                 Sprite {
-                    fg: Some(Arc::new(SingleForeground::new(image))),
+                    fg: Some(Arc::new(SingleForeground::new(image_resource.add(image)))),
                     bg: None,
                     offset_x: 0,
                     offset_y: 0,

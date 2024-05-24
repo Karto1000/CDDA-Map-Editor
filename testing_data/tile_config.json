@@ -1,0 +1,26 @@
+{
+  "tile_info": [
+    {
+      "pixelscale": 1,
+      "width": 32,
+      "height": 32,
+      "iso": false,
+      "retract_dist_min": -1.0,
+      "retract_dist_max": 1.0
+    }
+  ],
+  "tiles-new": [
+    {
+      "file": "normal_items.png",
+      "//": "range 1 to 2",
+      "tiles": [
+        {
+          "id": "10mm_fmj",
+          "fg": 1,
+          "bg": 9443,
+          "rotates": false
+        }
+      ]
+    }
+  ]
+}

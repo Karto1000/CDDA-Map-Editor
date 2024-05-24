@@ -112,14 +112,14 @@ pub struct TileGroup {
 }
 
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct AdditionalTile {
     id: String,
     fg: Option<MeabyMulti<MeabyWeighted<i32>>>,
     bg: Option<MeabyMulti<MeabyWeighted<i32>>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct TilesetTileDescriptor {
     pub id: MeabyMulti<String>,
 
@@ -180,7 +180,7 @@ fn get_image_from_tileset(image: &DynamicImage, x: u32, y: u32, width: u32, heig
 }
 
 fn get_xy_from_index(index: &i32, last_group_index: i32) -> Vec2 {
-    let local_tile_index: u32 = (index - last_group_index) as u32 - 1;
+    let local_tile_index: u32 = (index - last_group_index) as u32;
 
     return Vec2::new(
         (local_tile_index % AMOUNT_OF_SPRITES_PER_ROW) as f32,
@@ -594,9 +594,9 @@ impl Load<LegacyTileset> for LegacyTilesetLoader {
 }
 
 impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
-    fn load_textures(&self, image_resource: &mut ResMut<Assets<Image>>) -> Result<HashMap<i32, Handle<Image>>, Error> {
+    fn load_textures(&self) -> Result<HashMap<i32, Image>, Error> {
         let tileset = self.load().unwrap();
-        let mut textures: HashMap<i32, Handle<Image>> = HashMap::new();
+        let mut textures: HashMap<i32, Image> = HashMap::new();
         let mut out_of_range = Vec::new();
 
         for group in tileset.tiles.iter() {
@@ -647,7 +647,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                                 group_height,
                                             );
 
-                                            textures.insert(*fg, image_resource.add(image));
+                                            textures.insert(*fg, image);
                                         }
                                         MeabyWeighted::Weighted(w) => {
                                             if textures.contains_key(&w.value) {
@@ -664,7 +664,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                                 group_height,
                                             );
 
-                                            textures.insert(w.value, image_resource.add(image));
+                                            textures.insert(w.value, image);
                                         }
                                     }
                                 }
@@ -684,6 +684,8 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                             continue;
                                         }
 
+                                        println!("{:?} {} {}", xy, fg, start);
+
                                         let image = get_image_from_tileset(
                                             &image,
                                             xy.x as u32 * group_width,
@@ -692,7 +694,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                             group_height,
                                         );
 
-                                        textures.insert(*fg, image_resource.add(image));
+                                        textures.insert(*fg, image);
                                     }
                                     MeabyWeighted::Weighted(w) => {
                                         if textures.contains_key(&w.value) {
@@ -713,7 +715,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                             group_height,
                                         );
 
-                                        textures.insert(w.value, image_resource.add(image));
+                                        textures.insert(w.value, image);
                                     }
                                 }
                             }
@@ -749,7 +751,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                                             group_height,
                                                         );
 
-                                                        textures.insert(*fg, image_resource.add(image));
+                                                        textures.insert(*fg, image);
                                                     }
                                                     MeabyWeighted::Weighted(w) => {
                                                         if textures.contains_key(&w.value) {
@@ -766,7 +768,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                                             group_height,
                                                         );
 
-                                                        textures.insert(w.value, image_resource.add(image));
+                                                        textures.insert(w.value, image);
                                                     }
                                                 }
                                             }
@@ -797,7 +799,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                                         group_height,
                                                     );
 
-                                                    textures.insert(*fg, image_resource.add(image));
+                                                    textures.insert(*fg, image);
                                                 }
                                                 MeabyWeighted::Weighted(w) => {
                                                     if textures.contains_key(&w.value) {
@@ -818,7 +820,7 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                                         group_height,
                                                     );
 
-                                                    textures.insert(w.value, image_resource.add(image));
+                                                    textures.insert(w.value, image);
                                                 }
                                             }
                                         }
@@ -833,9 +835,9 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
 
         return Ok(textures);
     }
-    fn load_fallback_textures(&self, image_resource: &mut ResMut<Assets<Image>>) -> Result<HashMap<String, Handle<Image>>, Error> {
+    fn load_fallback_textures(&self) -> Result<HashMap<String, Image>, Error> {
         let tileset = self.load().unwrap();
-        let mut fallback_textures: HashMap<String, Handle<Image>> = HashMap::new();
+        let mut fallback_textures: HashMap<String, Image> = HashMap::new();
 
         for group in tileset.tiles.iter() {
             if group.file != "fallback.png".to_string() { continue; }
@@ -858,16 +860,24 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                         tileset.info.tile_height,
                     );
 
-                    fallback_textures.insert(format!("{}_{}", character, color.color), image_resource.add(fallback_image));
+                    fallback_textures.insert(format!("{}_{}", character, color.color), fallback_image);
                 }
             };
         }
 
         return Ok(fallback_textures);
     }
-    fn assign_textures(&self, image_resource: &mut ResMut<Assets<Image>>) -> Result<HashMap<TileId, SpriteType>, Error> {
+
+    fn load_sprite_handles(&self, image_resource: &mut ResMut<Assets<Image>>) -> Result<HashMap<TileId, SpriteType>, Error> {
         let tileset = self.load().unwrap();
-        let loaded_sprites = self.load_textures(image_resource).unwrap();
+        let mut loaded_sprites: HashMap<i32, Handle<Image>> = HashMap::new();
+
+        self.load_textures()
+            .unwrap()
+            .into_iter()
+            .map(|(k, v)| (k, image_resource.add(v)))
+            .for_each(|(k, v)| { loaded_sprites.insert(k, v); });
+
         let mut assigned_textures: HashMap<TileId, SpriteType> = HashMap::new();
 
         for group in tileset.tiles.iter() {
@@ -1147,6 +1157,66 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
         };
 
         return Ok(assigned_textures);
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use std::fs;
+    use std::fs::File;
+    use std::path::PathBuf;
+    use bevy::asset::saver::ErasedAssetSaver;
+    use image::{DynamicImage, RgbaImage};
+    use image::io::Reader;
+    use imageproc::definitions::Image;
+
+    use crate::common::io::Load;
+    use crate::graphics::tileset::legacy::{get_image_from_tileset, LegacyTilesetLoader};
+    use crate::graphics::tileset::TilesetLoader;
+
+    #[test]
+    pub fn test_load_legacy_tileset() {
+        let data = LegacyTilesetLoader::new(PathBuf::from("./testing_data")).load().unwrap();
+
+        assert_eq!(data.config_file_name, "tile_config.json");
+        assert_eq!(data.name, "TEST");
+        assert_eq!(data.info.tile_width, 32);
+        assert_eq!(data.info.tile_height, 32);
+        assert_eq!(data.info.pixelscale, 1);
+
+        let first_group = data.tiles.first().unwrap();
+
+        assert_eq!(first_group.file, "normal_items.png");
+        assert_eq!(first_group.range.as_ref().unwrap(), "range 1 to 2");
+
+        let first_tile = first_group.tiles.first().unwrap().clone();
+
+        assert_eq!(first_tile.id.single(), "10mm_fmj".to_string());
+        assert_eq!(first_tile.fg.unwrap().single().not_weighted(), 1);
+        assert_eq!(first_tile.bg.unwrap().single().not_weighted(), 9443);
+        assert_eq!(first_tile.is_rotate_allowed, Some(false));
+    }
+
+    #[test]
+    pub fn test_load_textures() {
+        let data = LegacyTilesetLoader::new(PathBuf::from("./testing_data")).load_textures().unwrap();
+
+        let image = Reader::open(PathBuf::from("./testing_data/normal_items.png"))
+                .unwrap()
+                .decode()
+                .unwrap();
+
+        let item = data.get(&1).unwrap();
+
+        let supposed_data = get_image_from_tileset(
+            &image,
+            32,
+            0,
+            32,
+            32
+        );
+
+        assert_eq!(item.data, supposed_data.data);
     }
 }
 
