@@ -1,7 +1,8 @@
 use std::fs;
+use std::path::PathBuf;
 
 use bevy::app::AppExit;
-use bevy::prelude::{Changed, Commands, EventReader, EventWriter, Interaction, Query, Res, ResMut, With};
+use bevy::prelude::{Changed, Commands, Event, EventReader, EventWriter, Interaction, Query, Res, ResMut, With};
 use bevy_egui::egui;
 use bevy_egui::egui::{Align, Color32, Margin, Ui, WidgetText};
 use bevy_file_dialog::{DialogDirectoryPicked, DialogFileLoaded, FileDialogExt};
@@ -12,7 +13,7 @@ use crate::map::resources::MapEntity;
 use crate::project::resources::{Project, ProjectSaveState};
 use crate::ui::components::CDDADirContents;
 use crate::ui::hotbar::components::{CloseIconMarker, ImportIconMarker, OpenIconMarker, SaveIconMarker, SettingsIconMarker};
-use crate::ui::settings::Settings;
+use crate::settings::Settings;
 use crate::ui::tabs::events::SpawnTab;
 
 pub fn close_button_interaction(
@@ -122,8 +123,24 @@ pub fn file_loaded_reader(
     }
 }
 
+#[derive(Event, Debug)]
+pub struct CDDADirPicked {
+    pub path: PathBuf,
+}
+
+pub fn file_dialog_cdda_dir_picked(
+    mut e_dialog_cdda_dir_picked: EventReader<DialogDirectoryPicked<CDDADirContents>>,
+    mut e_cdda_dir_picked: EventWriter<CDDADirPicked>,
+) {
+    for e in e_dialog_cdda_dir_picked.read() {
+        e_cdda_dir_picked.send(CDDADirPicked {
+            path: e.path.clone()
+        });
+    }
+}
+
 pub fn cdda_folder_picked(
-    mut e_cdda_dir_picked: EventReader<DialogDirectoryPicked<CDDADirContents>>,
+    mut e_cdda_dir_picked: EventReader<CDDADirPicked>,
     mut r_settings: ResMut<Settings>,
     mut r_editor_data: ResMut<EditorData>,
 ) {
@@ -143,6 +160,15 @@ pub fn cdda_folder_picked(
         });
     }
 }
+
+#[derive(Debug, Event)]
+pub struct TilesetSelected {
+
+}
+
+pub fn tileset_selected(
+    mut e_tileset_selected: EventReader<TilesetSelected>
+) {}
 
 pub fn settings_button_interaction(
     q_interaction: Query<&Interaction, (Changed<Interaction>, With<SettingsIconMarker>)>,

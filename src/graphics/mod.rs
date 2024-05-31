@@ -560,9 +560,9 @@ pub struct GraphicsResource {
 }
 
 impl GraphicsResource {
-    pub fn new(tileset_loader: Box<dyn GetTexture>) -> Self {
+    pub fn new(tileset: Box<dyn GetTexture>) -> Self {
         return Self {
-            textures: Some(tileset_loader)
+            textures: Some(tileset)
         };
     }
 }

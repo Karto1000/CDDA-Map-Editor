@@ -1,12 +1,12 @@
 use std::default::Default;
 use std::io::Write;
+use std::marker::PhantomData;
 use std::ops::Deref;
-use std::path::PathBuf;
 use std::string::ToString;
 use std::sync::Arc;
 
 use bevy::{prelude::*, window::PrimaryWindow};
-use bevy::app::{App, PluginGroup};
+use bevy::app::{App, AppExit, PluginGroup};
 use bevy::asset::AsyncReadExt;
 use bevy::DefaultPlugins;
 use bevy::log::LogPlugin;
@@ -17,7 +17,7 @@ use bevy::window::{WindowMode, WindowPlugin};
 use bevy::winit::WinitWindows;
 use bevy_console::{ConsoleConfiguration, ConsolePlugin, PrintConsoleLine};
 use bevy_egui::egui::style::{Widgets, WidgetVisuals};
-use bevy_file_dialog::FileDialogPlugin;
+use bevy_file_dialog::{DialogDirectoryPicked, FileDialogPlugin};
 use bevy_inspector_egui::bevy_egui::EguiContexts;
 use bevy_inspector_egui::egui;
 use bevy_inspector_egui::egui::{FontData, FontFamily, Stroke};
@@ -29,25 +29,25 @@ use lazy_static::lazy_static;
 use log::LevelFilter;
 use winit::window::Icon;
 
+use settings::Settings;
+
 use crate::common::{BufferedLogger, Coordinates, LogMessage};
-use crate::common::io::Load;
+use crate::common::io::{Load, LoadError, Save};
 use crate::editor_data::{EditorData, IntoColor32};
-use crate::editor_data::io::EditorDataSaver;
-use crate::graphics::{GraphicsResource, LegacyTextures};
-use crate::graphics::tileset::legacy::LegacyTilesetLoader;
+use crate::editor_data::io::{EditorDataLoader, EditorDataSaver};
+use crate::graphics::GraphicsResource;
 use crate::map::events::{ClearTiles, SpawnMapEntity};
-use crate::map::loader::MapEntityLoader;
 use crate::map::MapPlugin;
 use crate::map::resources::MapEntity;
 use crate::map::systems::{set_tile_reader, spawn_sprite, tile_despawn_reader, tile_remove_reader, tile_spawn_reader, update_sprite_reader};
 use crate::project::resources::Project;
-use crate::region_settings::loader::RegionSettingsLoader;
+use crate::settings::{SettingsLoader, SettingsSaver};
 use crate::tiles::components::{Offset, Tile};
 use crate::tiles::TilePlugin;
 use crate::ui::components::CDDADirContents;
 use crate::ui::grid::{GridMarker, GridMaterial, GridPlugin};
 use crate::ui::grid::resources::Grid;
-use crate::ui::settings::Settings;
+use crate::ui::interaction::{CDDADirPicked, TilesetSelected};
 use crate::ui::tabs::events::SpawnTab;
 use crate::ui::UiPlugin;
 
@@ -60,6 +60,7 @@ mod palettes;
 mod common;
 mod region_settings;
 mod editor_data;
+mod settings;
 
 lazy_static! {
     pub static ref LOGGER: BufferedLogger = BufferedLogger::new();
@@ -127,6 +128,7 @@ fn main() {
             apply_deferred,
             spawn_sprite,
             update_sprite_reader,
+            exit_system
         ).chain())
         .run();
 }
@@ -153,15 +155,32 @@ fn setup(
     win_windows: NonSend<WinitWindows>,
     res_grid: Res<Grid>,
     mut e_spawn_map_entity: EventWriter<SpawnMapEntity>,
+    mut e_cdda_dir_picked: EventWriter<CDDADirPicked>,
+    mut e_tileset_selected: EventWriter<TilesetSelected>,
     mut r_images: ResMut<Assets<Image>>,
 ) {
     commands.spawn(Camera2dBundle::default());
-
-    let editor_data_saver = EditorDataSaver::new();
-    let mut editor_data = editor_data_saver.load().unwrap();
-
-    commands.insert_resource(Settings::default());
     
+    let settings = match (SettingsLoader {}.load()) {
+        Ok(s) => {
+            e_cdda_dir_picked.send(CDDADirPicked {
+                path: s.selected_cdda_dir.clone()
+            });
+            
+            e_tileset_selected.send(TilesetSelected {
+                
+            });
+            
+            s
+        }
+        Err(_) => Settings::default()
+    };
+    
+    commands.insert_resource(settings);
+
+    let editor_data_io = EditorDataLoader::new();
+    let mut editor_data = editor_data_io.load().unwrap();
+
     let texture_resource = GraphicsResource::default();
 
     let project = Project::default();
@@ -306,4 +325,18 @@ fn switch_project(
 
         r_editor_data.current_project_index = switch_project.index;
     }
+}
+
+fn exit_system(
+    e_exit: EventReader<AppExit>,
+    r_settings: Res<Settings>,
+    r_editor_data: Res<EditorData>,
+) {
+    if e_exit.is_empty() { return; }
+
+    let data_saver = EditorDataSaver::new();
+    data_saver.save(&r_editor_data).unwrap();
+
+    let settings_saver = SettingsSaver {};
+    settings_saver.save(&r_settings).unwrap();
 }

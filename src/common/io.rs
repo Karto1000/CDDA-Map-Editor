@@ -6,12 +6,14 @@ pub enum LoadError {
     NoAutoSave,
     DirectoryNotFound,
     ParseError,
+    Other(anyhow::Error)
 }
 
 #[derive(Debug)]
 pub enum SaveError {
     DirectoryNotFound(String),
     InvalidPath(anyhow::Error),
+    Other(anyhow::Error)
 }
 
 pub trait Load<T> {

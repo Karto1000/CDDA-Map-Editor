@@ -7,6 +7,7 @@ use crate::map::resources::MapEntity;
 
 #[derive(Debug, Default, Clone, Resource, Serialize, Deserialize)]
 pub struct Project {
+    pub name: String,
     pub map_entity: MapEntity,
     pub save_state: ProjectSaveState,
 }

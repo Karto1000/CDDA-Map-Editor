@@ -12,12 +12,15 @@ use crate::editor_data::{EditorData, Menus};
 use crate::map::resources::MapEntity;
 use crate::project::resources::{Project, ProjectSaveState};
 use crate::project::saver::ProjectSaver;
+use crate::settings::Settings;
 
-pub struct EditorDataSaver;
+pub struct EditorDataSaver {
+}
 
 impl EditorDataSaver {
     pub fn new() -> Self {
-        return Self {};
+        return Self {
+        };
     }
 }
 
@@ -46,16 +49,10 @@ impl Save<EditorData> for EditorDataSaver {
                 ProjectSaveState::AutoSaved(val) => ProjectSaveState::AutoSaved(val.clone()),
                 ProjectSaveState::Saved(val) => ProjectSaveState::Saved(val.clone()),
                 ProjectSaveState::NotSaved => {
-                    let filename = match &project.map_entity {
-                        MapEntity::Single(s) => s.om_terrain.clone(),
-                        MapEntity::Multi(_) => todo!(),
-                        MapEntity::Nested(_) => "NESTED_TODO".to_string()
-                    };
-
-                    info!("autosaving {}", filename);
+                    info!("autosaving {}", project.name);
                     let project_saver = ProjectSaver { directory: Box::from(data_dir) };
                     project_saver.save(project).unwrap();
-                    ProjectSaveState::AutoSaved(data_dir.join(format!("auto_save_{}.map", filename)))
+                    ProjectSaveState::AutoSaved(data_dir.join(format!("auto_save_{}.map", project.name)))
                 }
             }
         }).collect();
@@ -68,7 +65,19 @@ impl Save<EditorData> for EditorDataSaver {
     }
 }
 
-impl Load<EditorData> for EditorDataSaver {
+pub struct EditorDataLoader {
+    
+}
+
+impl EditorDataLoader {
+    pub fn new() -> Self {
+        return Self {
+            
+        }
+    }
+}
+
+impl Load<EditorData> for EditorDataLoader {
     fn load(&self) -> Result<EditorData, LoadError> {
         let dir = match ProjectDirs::from_path("CDDA Map Editor".into()) {
             None => { return Err(LoadError::DirectoryNotFound); }
