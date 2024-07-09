@@ -3,10 +3,12 @@ use bevy::hierarchy::BuildChildren;
 use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Changed, Color, Commands, default, Display, Entity, EventReader, EventWriter, ImageBundle, Interaction, NodeBundle, Query, Res, ResMut, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val, With};
 
 use crate::editor_data::EditorData;
+use crate::map::events::ClearTiles;
 use crate::map::resources::MapEntity;
 use crate::project::resources::{Project, ProjectSaveState};
 use crate::SwitchProject;
 use crate::ui::components::{HoverEffect, ToggleEffect};
+use crate::ui::grid::resources::Grid;
 use crate::ui::hotbar::components::TopHotbarMarker;
 use crate::ui::tabs::components::{AddTabButtonMarker, Tab, TabContainerMarker};
 use crate::ui::tabs::events::SpawnTab;
@@ -102,7 +104,9 @@ pub fn on_add_tab_button_click(
                         .filter(|n| n.contains("unnamed"))
                         .count();
 
-                    s.om_terrain = format!("unnamed{}", amount_of_unnamed).to_string();
+                    let name = format!("unnamed{}", amount_of_unnamed).to_string();
+                    s.om_terrain = name.clone();
+                    project.name = name.clone();
 
                     let name = s.om_terrain.clone();
 
@@ -195,12 +199,34 @@ pub fn spawn_tab_reader(
 
 pub fn tab_clicked(
     mut e_switch_project: EventWriter<SwitchProject>,
-    r_editor_data: Res<EditorData>,
+    mut e_clear_tiles: EventWriter<ClearTiles>,
     mut q_interaction: Query<(&Interaction, &Tab), (Changed<Interaction>, With<Tab>)>,
+    mut r_grid: ResMut<Grid>,
+    mut commands: Commands,
+    mut r_editor_data: ResMut<EditorData>,
 ) {
     for (interaction, tab) in q_interaction.iter_mut() {
         match *interaction {
             Interaction::Pressed => {
+                match r_editor_data.current_project_index {
+                    None => {}
+                    Some(current_project_index) => {
+                        if tab.index == current_project_index {
+                            e_clear_tiles.send(ClearTiles {});
+
+                            match r_grid.instantiated_grid {
+                                None => {}
+                                Some(g) => { commands.get_entity(g).unwrap().despawn() }
+                            }
+
+                            r_editor_data.current_project_index = None;
+                            r_grid.instantiated_grid = None;
+
+                            return;
+                        }
+                    }
+                };
+
                 match r_editor_data.projects.get(tab.index as usize) {
                     None => { return; }
                     Some(_) => {}

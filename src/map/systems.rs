@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use bevy::asset::Handle;
-use bevy::math::Vec3;
-use bevy::prelude::{Commands, Component, default, Entity, Event, EventReader, EventWriter, Image, Query, Res, ResMut, SpriteBundle, Transform, With};
+use bevy::asset::{Assets, Handle};
+use bevy::math::{Vec2, Vec3};
+use bevy::prelude::{Commands, Component, Cuboid, default, Entity, Event, EventReader, EventWriter, Image, Mesh, Meshable, Query, Res, ResMut, SpriteBundle, Transform, With};
+use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
+use bevy::window::{PrimaryWindow, Window};
 use log::warn;
 
 use crate::common::Coordinates;
@@ -13,6 +15,7 @@ use crate::graphics::tileset::{GetBackground, GetForeground};
 use crate::map::{TileDeleteEvent, TilePlaceEvent};
 use crate::map::events::{ClearTiles, SpawnMapEntity, UpdateSpriteEvent};
 use crate::tiles::components::{Offset, Tile};
+use crate::ui::grid::GridMaterial;
 use crate::ui::grid::resources::Grid;
 
 #[derive(Event)]
@@ -182,7 +185,7 @@ pub fn update_animated_sprites(
         None => return,
         Some(p) => p
     };
-    
+
     let textures = match &r_textures.textures {
         None => return,
         Some(t) => t
@@ -300,7 +303,7 @@ pub fn update_sprite_reader(
         None => { return; }
         Some(p) => { p }
     };
-    
+
     let textures = match &r_textures.textures {
         None => return,
         Some(t) => t
@@ -439,7 +442,7 @@ pub fn tile_spawn_reader(
         None => { return; }
         Some(p) => { p }
     };
-    
+
     let textures = match &r_textures.textures {
         None => return,
         Some(t) => t
@@ -566,8 +569,37 @@ pub fn tile_despawn_reader(
 pub fn spawn_map_entity_reader(
     mut e_spawn_map_entity: EventReader<SpawnMapEntity>,
     mut e_tile_place: EventWriter<TilePlaceEvent>,
+    mut commands: Commands,
+    mut materials: ResMut<Assets<GridMaterial>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut r_grid: ResMut<Grid>,
+    r_editor_data: Res<EditorData>,
+    q_windows: Query<&Window, With<PrimaryWindow>>
 ) {
     for event in e_spawn_map_entity.read() {
+        if let None = r_grid.instantiated_grid {
+            let window = q_windows.single();
+
+            r_grid.instantiated_grid = Some(commands.spawn((
+                MaterialMesh2dBundle {
+                    mesh: Mesh2dHandle::from(meshes.add(Cuboid::new(1., 1., 0.0).mesh())),
+                    transform: Transform::from_scale(Vec3::new(window.width(), window.height(), 0.0)),
+                    material: materials.add(GridMaterial {
+                        tile_size: r_grid.tile_size,
+                        offset: Vec2::default(),
+                        mouse_pos: Default::default(),
+                        is_cursor_captured: 0,
+                        map_size: r_editor_data.get_current_project().unwrap().map_entity.size(),
+                        scale_factor: 1.,
+                        inside_grid_color: r_editor_data.config.style.gray_light.rgb_to_vec3(),
+                        outside_grid_color: r_editor_data.config.style.gray_darker.rgb_to_vec3(),
+                    }),
+                    ..default()
+                },
+                crate::ui::grid::GridMarker {}
+            )).id());
+        }
+
         for (coords, tile) in event.map_entity.tiles().iter() {
             e_tile_place.send(
                 TilePlaceEvent {

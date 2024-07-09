@@ -17,27 +17,29 @@ pub(crate) mod io;
 
 #[derive(Debug, Resource)]
 pub struct EditorData {
-    pub current_project_index: u32,
+    pub current_project_index: Option<u32>,
     pub projects: Vec<Project>,
     pub history: Vec<ProjectSaveState>,
     pub config: Config,
-    pub menus: Menus
+    pub menus: Menus,
 }
 
 impl EditorData {
     pub fn get_current_project(&self) -> Option<&Project> {
-        return self.projects.get(self.current_project_index as usize);
+        if self.current_project_index == None { return None; }
+        return self.projects.get(self.current_project_index.unwrap() as usize);
     }
 
     pub fn get_current_project_mut(&mut self) -> Option<&mut Project> {
-        return self.projects.get_mut(self.current_project_index as usize);
+        if self.current_project_index == None { return None; }
+        return self.projects.get_mut(self.current_project_index.unwrap() as usize);
     }
 }
 
 impl Default for EditorData {
     fn default() -> Self {
         return Self {
-            current_project_index: 0,
+            current_project_index: None,
             projects: vec![],
             history: vec![],
             config: Config::default(),

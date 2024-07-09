@@ -23,6 +23,7 @@ impl Plugin for GridPlugin {
             offset: Vec2::new(0., 0.),
             min_zoom: 6.,
             max_zoom: 128.,
+            instantiated_grid: None,
         };
 
         let drag_info: DragInfo = DragInfo {

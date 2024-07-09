@@ -158,7 +158,7 @@ impl Load<EditorData> for EditorDataLoader {
             .collect();
 
         return Ok(EditorData {
-            current_project_index: 0,
+            current_project_index: None,
             projects: projects_array,
             history: Default::default(),
             config: Default::default(),

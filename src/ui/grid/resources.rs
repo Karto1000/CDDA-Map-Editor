@@ -1,5 +1,5 @@
 use bevy::math::Vec2;
-use bevy::prelude::Resource;
+use bevy::prelude::{Entity, Resource};
 
 #[derive(Resource, Debug)]
 pub struct DragInfo {
@@ -7,7 +7,7 @@ pub struct DragInfo {
     pub last_position: Option<Vec2>,
 }
 
-#[derive(Resource)]
+#[derive(Resource, Debug)]
 pub struct Grid {
     pub tile_size: f32,
     pub default_tile_size: f32,
@@ -15,4 +15,6 @@ pub struct Grid {
 
     pub min_zoom: f32,
     pub max_zoom: f32,
+    
+    pub instantiated_grid: Option<Entity>
 }

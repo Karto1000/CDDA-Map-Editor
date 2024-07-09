@@ -3,7 +3,8 @@ use std::fmt::{Debug, Formatter};
 use std::ops::{Add, DerefMut};
 use std::sync::{Arc, RwLock};
 
-use bevy::prelude::Component;
+use bevy::math::Vec3;
+use bevy::prelude::{Color, Component};
 use bevy::prelude::Event;
 use color_print::cformat;
 use lazy_static::lazy_static;
@@ -104,7 +105,6 @@ impl LogMessage {
     }
 }
 
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum MeabyMulti<T> {
@@ -117,14 +117,14 @@ impl<T> MeabyMulti<T> {
         return match self {
             MeabyMulti::Multi(mul) => mul,
             MeabyMulti::Single(_) => panic!("Tried to call 'multi()' on a Single MeabyMulti Variant")
-        }
+        };
     }
-    
+
     pub fn single(self) -> T {
         return match self {
             MeabyMulti::Multi(_) => panic!("Tried to call 'single()' on a Multi MeabyMulti Variant"),
             MeabyMulti::Single(s) => s
-        }
+        };
     }
 }
 
@@ -238,19 +238,19 @@ impl<T> MeabyWeighted<T> {
             MeabyWeighted::Weighted(w) => &w.value
         };
     }
-    
+
     pub fn weighted(self) -> Weighted<T> {
         return match self {
             MeabyWeighted::NotWeighted(_) => panic!("Tried to call 'weighted()' on a NotWeighted MeabyWeighted Variant"),
             MeabyWeighted::Weighted(w) => w
-        }
+        };
     }
-    
+
     pub fn not_weighted(self) -> T {
         return match self {
             MeabyWeighted::NotWeighted(nw) => nw,
             MeabyWeighted::Weighted(_) => panic!("Tried to call 'not_weighted()' on a Weighted MeabyWeighted Variant")
-        }
+        };
     }
 }
 
@@ -264,7 +264,10 @@ impl<'de> Visitor<'de> for CoordinatesVisitor {
         formatter.write_str("an string of two numbers separated by a semicolon (example: 10;10)")
     }
 
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E> where E: serde::de::Error {
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
         let split: Vec<&str> = v.split(";").collect::<Vec<&str>>();
 
         return Ok(Coordinates {
@@ -298,13 +301,19 @@ impl Add for Coordinates {
 }
 
 impl Serialize for Coordinates {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
         return Ok(serializer.serialize_str(&format!("{};{}", self.x, self.y))?);
     }
 }
 
 impl<'de> Deserialize<'de> for Coordinates {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
         return Ok(deserializer.deserialize_str(CoordinatesVisitor)?);
     }
 }
