@@ -1,5 +1,7 @@
 use bevy::app::{App, Plugin, Update};
+use bevy::prelude::{in_state, IntoSystemConfigs};
 
+use crate::program::data::ProgramState;
 use crate::tiles::data::PlaceInfo;
 use crate::tiles::systems::{tile_delete_system, tile_place_system, tile_resize_system, window_tile_resize_system};
 
@@ -12,11 +14,15 @@ impl Plugin for TilePlugin {
         };
 
         app.insert_resource(place_info);
-        app.add_systems(Update, (
-            window_tile_resize_system,
-            tile_resize_system,
-            tile_place_system,
-            tile_delete_system
-        ));
+
+        app.add_systems(
+            Update,
+            (
+                window_tile_resize_system,
+                tile_resize_system,
+                tile_place_system,
+                tile_delete_system
+            ).run_if(in_state(ProgramState::ProjectOpen)),
+        );
     }
 }

@@ -1,18 +1,19 @@
 use std::collections::HashMap;
+use std::ops::Index;
 use std::sync::Arc;
 
 use bevy::asset::{Assets, Handle};
 use bevy::math::{Vec2, Vec3};
-use bevy::prelude::{Commands, Component, Cuboid, default, Entity, Event, EventReader, EventWriter, Image, Mesh, Meshable, Query, Res, ResMut, SpriteBundle, Transform, With};
+use bevy::prelude::{Commands, Component, Cuboid, default, Entity, Event, EventReader, EventWriter, Image, Mesh, Meshable, Query, Res, ResMut, SpriteBundle, State, Transform, With};
 use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
 use bevy::window::{PrimaryWindow, Window};
 use log::warn;
 
 use crate::common::Coordinates;
-use crate::editor_data::data::EditorData;
 use crate::graphics::{GetTexture, GraphicsResource, Sprite, SpriteState, TileSprite};
 use crate::graphics::tileset::{GetBackground, GetForeground};
 use crate::map::data::{ClearTiles, SpawnMapEntity, TileDeleteEvent, TilePlaceEvent, UpdateSpriteEvent};
+use crate::program::data::{OpenedProject, Program, ProgramState};
 use crate::tiles::data::{Offset, Tile};
 use crate::ui::grid::GridMaterial;
 use crate::ui::grid::resources::Grid;
@@ -69,9 +70,15 @@ pub fn spawn_sprite(
     mut commands: Commands,
     r_grid: Res<Grid>,
     mut e_spawn_sprite: EventReader<SpawnSprite>,
-    mut r_editor_data: ResMut<EditorData>,
+    mut r_editor_data: ResMut<Program>,
+    q_opened_project: Query<(Entity, &OpenedProject)>,
 ) {
-    let project = match r_editor_data.get_current_project_mut() {
+    let index = match q_opened_project.iter().next() {
+        None => return,
+        Some(o) => o.1.index
+    };
+
+    let project = match r_editor_data.projects.get_mut(index) {
         None => return,
         Some(p) => p
     };
@@ -169,18 +176,24 @@ pub fn spawn_sprite(
 }
 
 pub fn update_animated_sprites(
-    query: Query<(Entity, &Coordinates, &Animated, &Layer)>,
+    q_sprites: Query<(Entity, &Coordinates, &Animated, &Layer)>,
     mut commands: Commands,
     r_textures: Res<GraphicsResource>,
     r_grid: Res<Grid>,
-    mut r_editor_data: ResMut<EditorData>,
+    mut r_program: ResMut<Program>,
+    q_opened_project: Query<(Entity, &OpenedProject)>,
 ) {
-    let cdda_data = match &r_editor_data.config.cdda_data {
+    let index = match q_opened_project.iter().next() {
+        None => return,
+        Some(o) => o.1.index
+    };
+
+    let cdda_data = match &r_program.config.cdda_data {
         None => return,
         Some(d) => d
     };
 
-    let current_project = match r_editor_data.get_current_project() {
+    let current_project = match r_program.projects.get(index) {
         None => return,
         Some(p) => p
     };
@@ -192,7 +205,7 @@ pub fn update_animated_sprites(
 
     let mut fg_entities_to_set = HashMap::new();
 
-    for (entity, cords, animated, layer) in query.iter() {
+    for (entity, cords, animated, layer) in q_sprites.iter() {
         let tile = match current_project.map_entity.tiles().get(cords) {
             None => {
                 warn!("Tile at cords {:?} does not exist even though query matched tile", cords);
@@ -244,7 +257,7 @@ pub fn update_animated_sprites(
         }
     }
 
-    let current_project_mut = match r_editor_data.get_current_project_mut() {
+    let current_project_mut = match r_program.projects.get_mut(index) {
         None => return,
         Some(p) => p
     };
@@ -256,9 +269,15 @@ pub fn update_animated_sprites(
 
 pub fn set_tile_reader(
     mut e_set_tile: EventReader<TilePlaceEvent>,
-    mut r_editor_data: ResMut<EditorData>,
+    mut r_program: ResMut<Program>,
+    q_opened_project: Query<(Entity, &OpenedProject)>,
 ) {
-    let project = match r_editor_data.get_current_project_mut() {
+    let index = match q_opened_project.iter().next() {
+        None => return,
+        Some(o) => o.1.index
+    };
+
+    let project = match r_program.projects.get_mut(index) {
         None => { return; }
         Some(p) => { p }
     };
@@ -273,9 +292,15 @@ pub fn set_tile_reader(
 
 pub fn tile_remove_reader(
     mut e_delete_tile: EventReader<TileDeleteEvent>,
-    mut r_editor_data: ResMut<EditorData>,
+    mut r_program: ResMut<Program>,
+    q_opened_project: Query<(Entity, &OpenedProject)>,
 ) {
-    let project = match r_editor_data.get_current_project_mut() {
+    let index = match q_opened_project.iter().next() {
+        None => return,
+        Some(o) => o.1.index
+    };
+
+    let project = match r_program.projects.get_mut(index) {
         None => { return; }
         Some(p) => { p }
     };
@@ -289,16 +314,22 @@ pub fn update_sprite_reader(
     mut commands: Commands,
     mut e_update_sprite: EventReader<UpdateSpriteEvent>,
     mut q_sprite: Query<&mut Handle<Image>, With<Tile>>,
-    mut r_editor_data: ResMut<EditorData>,
+    mut r_program: ResMut<Program>,
     r_textures: Res<GraphicsResource>,
     r_grid: Res<Grid>,
+    q_opened_project: Query<(Entity, &OpenedProject)>,
 ) {
-    let cdda_data = match r_editor_data.config.cdda_data.clone() {
+    let index = match q_opened_project.iter().next() {
+        None => return,
+        Some(o) => o.1.index
+    };
+
+    let cdda_data = match r_program.config.cdda_data.clone() {
         None => return,
         Some(d) => d
     };
 
-    let project = match r_editor_data.get_current_project_mut() {
+    let project = match r_program.projects.get_mut(index) {
         None => { return; }
         Some(p) => { p }
     };
@@ -430,14 +461,20 @@ pub fn tile_spawn_reader(
     mut e_spawn_sprite: EventWriter<SpawnSprite>,
     mut e_update_sprite: EventWriter<UpdateSpriteEvent>,
     r_textures: Res<GraphicsResource>,
-    mut r_editor_data: ResMut<EditorData>,
+    mut r_program: ResMut<Program>,
+    q_opened_project: Query<(Entity, &OpenedProject)>,
 ) {
-    let cdda_data = match r_editor_data.config.cdda_data.clone() {
+    let index = match q_opened_project.iter().next() {
+        None => return,
+        Some(o) => o.1.index
+    };
+
+    let cdda_data = match r_program.config.cdda_data.clone() {
         None => return,
         Some(d) => d
     };
 
-    let project = match r_editor_data.get_current_project_mut() {
+    let project = match r_program.projects.get_mut(index) {
         None => { return; }
         Some(p) => { p }
     };
@@ -515,9 +552,15 @@ pub fn tile_despawn_reader(
     mut commands: Commands,
     mut e_tile_delete: EventReader<TileDeleteEvent>,
     mut e_update_sprite: EventWriter<UpdateSpriteEvent>,
-    r_editor_data: Res<EditorData>,
+    r_program: Res<Program>,
+    q_opened_project: Query<(Entity, &OpenedProject)>,
 ) {
-    let project = match r_editor_data.get_current_project() {
+    let index = match q_opened_project.iter().next() {
+        None => return,
+        Some(o) => o.1.index
+    };
+
+    let project = match r_program.projects.get(index) {
         None => { return; }
         Some(p) => { p }
     };
@@ -572,11 +615,17 @@ pub fn spawn_map_entity_reader(
     mut materials: ResMut<Assets<GridMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut r_grid: ResMut<Grid>,
-    r_editor_data: Res<EditorData>,
+    r_program: Res<Program>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
+    q_opened_project: Query<(Entity, &OpenedProject)>,
 ) {
     for event in e_spawn_map_entity.read() {
         if let None = r_grid.instantiated_grid {
+            let index = match q_opened_project.iter().next() {
+                None => return,
+                Some(o) => o.1.index
+            };
+            
             let window = q_windows.single();
 
             r_grid.instantiated_grid = Some(commands.spawn((
@@ -588,10 +637,10 @@ pub fn spawn_map_entity_reader(
                         offset: Vec2::default(),
                         mouse_pos: Default::default(),
                         is_cursor_captured: 0,
-                        map_size: r_editor_data.get_current_project().unwrap().map_entity.size(),
+                        map_size: r_program.projects.get(index).unwrap().map_entity.size(),
                         scale_factor: 1.,
-                        inside_grid_color: r_editor_data.config.style.gray_light.rgb_to_vec3(),
-                        outside_grid_color: r_editor_data.config.style.gray_darker.rgb_to_vec3(),
+                        inside_grid_color: r_program.config.style.gray_light.rgb_to_vec3(),
+                        outside_grid_color: r_program.config.style.gray_darker.rgb_to_vec3(),
                     }),
                     ..default()
                 },

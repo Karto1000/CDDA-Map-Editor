@@ -1,41 +1,41 @@
 use bevy::input::ButtonInput;
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
-use bevy::prelude::{EventReader, EventWriter, MouseButton, Query, Res, ResMut, Transform, Vec2Swizzles, Window, With, Without};
+use bevy::prelude::{Entity, EventReader, EventWriter, MouseButton, Query, Res, ResMut, State, Transform, Vec2Swizzles, Window, With, Without};
 use bevy::window::{PrimaryWindow, WindowResized};
 
 use crate::common::Coordinates;
-use crate::editor_data::data::EditorData;
-use crate::ui::IsCursorCaptured;
 use crate::map::data::{TileDeleteEvent, TilePlaceEvent};
+use crate::program::data::{OpenedProject, Program, ProgramState};
 use crate::tiles::data::PlaceInfo;
 use crate::tiles::data::Tile;
 use crate::ui::grid::GridMarker;
 use crate::ui::grid::resources::Grid;
+use crate::ui::IsCursorCaptured;
 
 pub fn window_tile_resize_system(
-    mut resize_reader: EventReader<WindowResized>,
-    mut tiles: Query<(&mut Tile, &mut Transform, &Coordinates), Without<GridMarker>>,
-    res_grid: Res<Grid>,
+    mut e_resize: EventReader<WindowResized>,
+    mut q_tiles: Query<(&mut Tile, &mut Transform, &Coordinates), Without<GridMarker>>,
+    r_grid: Res<Grid>,
 ) {
-    for e in resize_reader.read() {
-        for (tile, mut transform, coordinates) in tiles.iter_mut() {
-            transform.translation.x = -e.width / 2. + res_grid.tile_size / 2. + res_grid.tile_size * coordinates.x as f32;
-            transform.translation.y = e.height / 2. - res_grid.tile_size / 2. - res_grid.tile_size * coordinates.y as f32;
+    for e in e_resize.read() {
+        for (tile, mut transform, coordinates) in q_tiles.iter_mut() {
+            transform.translation.x = -e.width / 2. + r_grid.tile_size / 2. + r_grid.tile_size * coordinates.x as f32;
+            transform.translation.y = e.height / 2. - r_grid.tile_size / 2. - r_grid.tile_size * coordinates.y as f32;
         };
     }
 }
 
 pub fn tile_resize_system(
-    mut scroll_event: EventReader<MouseWheel>,
-    res_grid: ResMut<Grid>,
-    mut tiles: Query<(&mut Tile, &mut Transform), Without<GridMarker>>,
+    mut e_scroll: EventReader<MouseWheel>,
+    r_grid: ResMut<Grid>,
+    mut q_tiles: Query<(&mut Tile, &mut Transform), Without<GridMarker>>,
 ) {
-    for event in scroll_event.read() {
+    for event in e_scroll.read() {
         match event.unit {
             MouseScrollUnit::Line => {
-                for (_, mut transform) in tiles.iter_mut() {
-                    transform.scale.x = res_grid.tile_size / res_grid.default_tile_size;
-                    transform.scale.y = res_grid.tile_size / res_grid.default_tile_size;
+                for (_, mut transform) in q_tiles.iter_mut() {
+                    transform.scale.x = r_grid.tile_size / r_grid.default_tile_size;
+                    transform.scale.y = r_grid.tile_size / r_grid.default_tile_size;
                 }
             }
             MouseScrollUnit::Pixel => panic!("Not Implemented")
@@ -47,18 +47,24 @@ pub fn tile_place_system(
     mut e_set_tile: EventWriter<TilePlaceEvent>,
     mut e_delete_tile: EventWriter<TileDeleteEvent>,
     mut r_place_info: ResMut<PlaceInfo>,
-    buttons: Res<ButtonInput<MouseButton>>,
+    r_program: Res<Program>,
+    r_buttons: Res<ButtonInput<MouseButton>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     r_grid: Res<Grid>,
-    mut r_editor_data: ResMut<EditorData>,
     r_captured: Res<IsCursorCaptured>,
+    q_opened_project: Query<(Entity, &OpenedProject)>,
 ) {
-    if buttons.just_released(MouseButton::Left) {
+    if r_buttons.just_released(MouseButton::Left) {
         r_place_info.last_place_position = None
     }
 
-    if buttons.pressed(MouseButton::Left) {
-        let project = match r_editor_data.get_current_project_mut() {
+    if r_buttons.pressed(MouseButton::Left) {
+        let index = match q_opened_project.iter().next() {
+            None => return,
+            Some(o) => o.1.index
+        };
+
+        let project = match r_program.projects.get(index) {
             None => return,
             Some(p) => p
         };
@@ -106,26 +112,33 @@ pub fn tile_place_system(
 }
 
 pub fn tile_delete_system(
-    mut res_editor_data: ResMut<EditorData>,
+    mut r_program: ResMut<Program>,
     mut e_delete_tile: EventWriter<TileDeleteEvent>,
     mut e_spawn_tile: EventWriter<TilePlaceEvent>,
-    buttons: Res<ButtonInput<MouseButton>>,
+    r_buttons: Res<ButtonInput<MouseButton>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     r_grid: Res<Grid>,
-    res_captured: Res<IsCursorCaptured>,
+    r_captured: Res<IsCursorCaptured>,
+    s_state: Res<State<ProgramState>>,
+    q_opened_project: Query<(Entity, &OpenedProject)>,
 ) {
-    let project = match res_editor_data.get_current_project_mut() {
+    let index = match q_opened_project.iter().next() {
+        None => return,
+        Some(o) => o.1.index
+    };
+
+    let project = match r_program.projects.get(index) {
         None => return,
         Some(p) => p
     };
 
-    if buttons.pressed(MouseButton::Right) {
+    if r_buttons.pressed(MouseButton::Right) {
         let xy = match q_windows.single().cursor_position() {
             None => return,
             Some(p) => p.xy()
         };
 
-        if res_captured.0 {
+        if r_captured.0 {
             return;
         }
 

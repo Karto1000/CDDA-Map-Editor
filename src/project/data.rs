@@ -1,6 +1,8 @@
+use std::path::PathBuf;
+
 use bevy::prelude::{Event, Resource};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+
 use crate::map::data::MapEntity;
 
 #[derive(Debug, Default, Clone, Resource, Serialize, Deserialize)]
@@ -25,6 +27,11 @@ pub enum ProjectSaveState {
 }
 
 #[derive(Event)]
-pub struct SwitchProject {
+pub struct OpenProjectAtIndex {
     pub index: u32,
 }
+
+#[derive(Event)]
+pub struct CloseProject {}
+
+

@@ -26,23 +26,26 @@ use imageproc::drawing::Canvas;
 use lazy_static::lazy_static;
 use log::LevelFilter;
 use winit::window::Icon;
-use editor_data::data::{EditorData, IntoColor32};
 
-use map::plugin::MapPlugin;
-use project::data::{Project, SwitchProject};
-use settings::io::{SettingsLoader, SettingsSaver};
+use program::data::IntoColor32;
+use project::data::Project;
 use settings::data::Settings;
+use settings::io::{SettingsLoader, SettingsSaver};
 use tiles::data::{Offset, Tile};
-use tiles::plugin::TilePlugin;
 use ui::{CDDADirContents, IsCursorCaptured};
 
 use crate::common::{BufferedLogger, Coordinates, LogMessage};
 use crate::common::io::{Load, Save};
-use crate::editor_data::io::{EditorDataLoader, EditorDataSaver};
 use crate::graphics::GraphicsResource;
+use crate::map::plugin::MapPlugin;
 use crate::map::systems::{set_tile_reader, spawn_sprite, tile_despawn_reader, tile_remove_reader, tile_spawn_reader, update_sprite_reader};
-use crate::project::systems::switch_project;
-use crate::ui::grid::{GridMaterial, GridPlugin};
+use crate::program::data::{OpenedProject, Program, ProgramState};
+use crate::program::io::{ProgramdataLoader, ProgramdataSaver};
+use crate::program::plugin::ProgramPlugin;
+use crate::project::plugin::ProjectPlugin;
+use crate::tiles::plugin::TilePlugin;
+use crate::ui::grid::GridMaterial;
+use crate::ui::grid::GridPlugin;
 use crate::ui::grid::resources::Grid;
 use crate::ui::interaction::{CDDADirPicked, TilesetSelected};
 use crate::ui::UiPlugin;
@@ -55,8 +58,8 @@ mod graphics;
 mod palettes;
 mod common;
 mod region_settings;
-mod editor_data;
 mod settings;
+mod program;
 
 lazy_static! {
     pub static ref LOGGER: BufferedLogger = BufferedLogger::new();
@@ -67,55 +70,83 @@ fn main() {
     log::set_logger(LOGGER.deref()).unwrap();
     log::set_max_level(LevelFilter::Info);
 
-    App::new()
-        .add_plugins((
-            DefaultPlugins.set(WindowPlugin {
-                primary_window: Some(Window {
-                    title: "CDDA Map Editor".to_string(),
-                    mode: WindowMode::Windowed,
-                    ..Default::default()
-                }),
+    let mut app = App::new();
+
+    // -- Add Plugins --
+    app.add_plugins((
+        DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                title: "CDDA Map Editor".to_string(),
+                mode: WindowMode::Windowed,
                 ..Default::default()
-            }).disable::<LogPlugin>(), ConsolePlugin)
-        )
-        .insert_resource(ConsoleConfiguration {
-            keys: vec![
-                // TODO: Localize
-                KeyCode::F1
-            ],
-            ..default()
-        })
-        .add_event::<LogMessage>()
-        .add_systems(Startup, (
-            setup,
-        ))
-        .add_systems(PostStartup, (
-            setup_egui,
-        ))
-        .add_event::<SwitchProject>()
-        .add_plugins(FileDialogPlugin::new()
+            }),
+            ..Default::default()
+        }).disable::<LogPlugin>(),
+        ConsolePlugin,
+        FileDialogPlugin::new()
             .with_save_file::<Project>()
             .with_load_file::<Project>()
-            .with_pick_directory::<CDDADirContents>()
-        )
-        .add_plugins(Material2dPlugin::<GridMaterial>::default())
-        .add_plugins((GridPlugin {}, MapPlugin {}, TilePlugin {}, UiPlugin {}))
-        .add_systems(Update, (
-            update,
-            switch_project,
-            tile_despawn_reader,
-            apply_deferred,
-            tile_remove_reader,
-            apply_deferred,
-            set_tile_reader,
-            apply_deferred,
-            tile_spawn_reader,
-            apply_deferred,
-            spawn_sprite,
-            update_sprite_reader,
-            exit
-        ).chain())
-        .run();
+            .with_pick_directory::<CDDADirContents>(),
+        Material2dPlugin::<GridMaterial>::default(),
+        GridPlugin,
+        MapPlugin,
+        TilePlugin,
+        UiPlugin,
+        ProgramPlugin,
+        ProjectPlugin
+    ));
+
+    // -- Add Resources --
+    app.insert_resource(ConsoleConfiguration {
+        keys: vec![
+            // TODO: Localize
+            KeyCode::F1
+        ],
+        ..default()
+    });
+
+    // -- Add Events --
+    app.add_event::<LogMessage>();
+
+    // -- Add Systems --
+
+    // Startup
+    app.add_systems(Startup, setup);
+
+    // Post Startup
+    app.add_systems(PostStartup, setup_egui);
+
+    // Update
+    let not_open_sys = (
+        update,
+        exit
+    );
+
+    let open_sys = (
+        update,
+        tile_despawn_reader,
+        apply_deferred,
+        tile_remove_reader,
+        apply_deferred,
+        set_tile_reader,
+        apply_deferred,
+        tile_spawn_reader,
+        apply_deferred,
+        spawn_sprite,
+        update_sprite_reader,
+        exit
+    );
+
+    app.add_systems(Update, (
+        not_open_sys
+            .chain()
+            .run_if(in_state(ProgramState::NoneOpen)),
+        open_sys
+            .chain()
+            .run_if(in_state(ProgramState::ProjectOpen))
+    ));
+
+    app.run();
 }
 
 fn setup(
@@ -139,10 +170,8 @@ fn setup(
         Err(_) => Settings::default()
     };
 
-    commands.insert_resource(settings);
-
-    let editor_data_io = EditorDataLoader::new();
-    let editor_data = editor_data_io.load().unwrap();
+    let program_loader = ProgramdataLoader {};
+    let program_data = program_loader.load().unwrap();
 
     let texture_resource = GraphicsResource::default();
 
@@ -158,13 +187,15 @@ fn setup(
 
     win_windows.windows.iter().for_each(|(_, w)| w.set_window_icon(Some(icon.clone())));
 
-    commands.insert_resource(editor_data);
+    commands.insert_resource(settings);
+    commands.insert_resource(ClearColor(program_data.config.style.gray_dark.clone()));
+    commands.insert_resource(program_data);
     commands.insert_resource(texture_resource);
 }
 
 fn setup_egui(
     mut contexts: EguiContexts,
-    r_editor_data: ResMut<EditorData>,
+    r_program: ResMut<Program>,
 ) {
     let mut fonts = egui::FontDefinitions::empty();
     fonts.font_data.insert(
@@ -192,7 +223,7 @@ fn setup_egui(
         widgets: Widgets {
             open: WidgetVisuals {
                 bg_fill: Default::default(),
-                weak_bg_fill: r_editor_data.config.style.blue_dark.into_color32(),
+                weak_bg_fill: r_program.config.style.blue_dark.into_color32(),
                 bg_stroke: Default::default(),
                 rounding: Default::default(),
                 fg_stroke: Default::default(),
@@ -200,50 +231,56 @@ fn setup_egui(
             },
             ..Default::default()
         },
-        extreme_bg_color: r_editor_data.config.style.blue_dark.into_color32(),
+        extreme_bg_color: r_program.config.style.blue_dark.into_color32(),
         window_stroke: Stroke::NONE,
-        override_text_color: Some(r_editor_data.config.style.white.into_color32()),
-        window_fill: r_editor_data.config.style.gray_darker.into_color32(),
+        override_text_color: Some(r_program.config.style.white.into_color32()),
+        window_fill: r_program.config.style.gray_darker.into_color32(),
         ..default()
     });
 }
 
 fn update(
-    res_grid: Res<Grid>,
-    res_cursor: Res<IsCursorCaptured>,
-    mut tiles: Query<(&mut Transform, &Coordinates, &Offset), With<Tile>>,
+    r_grid: Res<Grid>,
+    r_cursor: Res<IsCursorCaptured>,
+    r_program: Res<Program>,
+    mut r_grid_material: ResMut<Assets<GridMaterial>>,
+    mut q_tiles: Query<(&mut Transform, &Coordinates, &Offset), With<Tile>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
-    mut grid_material: ResMut<Assets<GridMaterial>>,
-    r_data: Res<EditorData>,
     mut e_write_line: EventWriter<PrintConsoleLine>,
+    q_opened_project: Query<(Entity, &OpenedProject)>,
 ) {
     for log in LOGGER.log_queue.read().unwrap().iter() {
         e_write_line.send(PrintConsoleLine::new(StyledStr::from(cformat!(r#"<g>[{}] {}</g>"#, log.level.as_str(), log.message))));
     }
     LOGGER.log_queue.write().unwrap().clear();
 
-    let project = match r_data.get_current_project() {
-        None => return,
-        Some(p) => p
-    };
+    if let Some(grid_material) = r_grid_material.iter_mut().next() {
+        let index = match q_opened_project.iter().next() {
+            None => return,
+            Some(o) => o.1.index
+        };
+        
+        let project = match r_program.projects.get(index) {
+            None => return,
+            Some(p) => p
+        };
 
-    if let Some(grid_material) = grid_material.iter_mut().next() {
         let window = q_windows.single();
 
-        grid_material.1.offset = res_grid.offset;
-        grid_material.1.tile_size = res_grid.tile_size;
+        grid_material.1.offset = r_grid.offset;
+        grid_material.1.tile_size = r_grid.tile_size;
         grid_material.1.mouse_pos = window.cursor_position().unwrap_or(Vec2::default());
         grid_material.1.map_size = project.map_entity.size();
         // Weird way to do this but bevy does not let me pass a bool as a uniform for some reason
-        grid_material.1.is_cursor_captured = match res_cursor.0 {
+        grid_material.1.is_cursor_captured = match r_cursor.0 {
             true => 1,
             false => 0
         };
         grid_material.1.scale_factor = window.resolution.scale_factor();
 
-        for (mut transform, coordinates, sprite_offset) in tiles.iter_mut() {
-            transform.translation.x = (-window.resolution.width() / 2. + res_grid.tile_size / 2.) - (res_grid.offset.x - coordinates.x as f32 * res_grid.tile_size);
-            transform.translation.y = (window.resolution.height() / 2. - (res_grid.tile_size + (sprite_offset.y as f32 * (res_grid.tile_size / res_grid.default_tile_size))) / 2.) + (res_grid.offset.y - coordinates.y as f32 * res_grid.tile_size);
+        for (mut transform, coordinates, sprite_offset) in q_tiles.iter_mut() {
+            transform.translation.x = (-window.resolution.width() / 2. + r_grid.tile_size / 2.) - (r_grid.offset.x - coordinates.x as f32 * r_grid.tile_size);
+            transform.translation.y = (window.resolution.height() / 2. - (r_grid.tile_size + (sprite_offset.y as f32 * (r_grid.tile_size / r_grid.default_tile_size))) / 2.) + (r_grid.offset.y - coordinates.y as f32 * r_grid.tile_size);
         }
     }
 }
@@ -251,11 +288,11 @@ fn update(
 fn exit(
     e_exit: EventReader<AppExit>,
     r_settings: Res<Settings>,
-    r_editor_data: Res<EditorData>,
+    r_editor_data: Res<Program>,
 ) {
     if e_exit.is_empty() { return; }
 
-    let data_saver = EditorDataSaver::new();
+    let data_saver = ProgramdataSaver {};
     data_saver.save(&r_editor_data).unwrap();
 
     let settings_saver = SettingsSaver {};

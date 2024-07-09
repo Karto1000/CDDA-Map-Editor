@@ -8,69 +8,15 @@ use directories::ProjectDirs;
 use serde_json::{Map, Value};
 
 use crate::common::io::{Load, LoadError, Save, SaveError};
-use crate::editor_data::data::{EditorData, Menus};
+use crate::common::io::LoadError::ParseError;
+use crate::program::data::{Menus, Program, ProgramState};
 use crate::project::data::{Project, ProjectSaveState};
 use crate::project::io::ProjectSaver;
 
-pub struct EditorDataSaver {}
+pub struct ProgramdataLoader {}
 
-impl EditorDataSaver {
-    pub fn new() -> Self {
-        return Self {};
-    }
-}
-
-impl Save<EditorData> for EditorDataSaver {
-    fn save(&self, value: &EditorData) -> Result<(), SaveError> {
-        let dir = match ProjectDirs::from_path("CDDA Map Editor".into()) {
-            None => { return Err(SaveError::DirectoryNotFound("".into())); }
-            Some(d) => d
-        };
-
-        let data_dir = dir.data_local_dir();
-
-        if !data_dir.exists() { fs::create_dir_all(data_dir).unwrap(); }
-
-        let mut file = File::options()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(data_dir.join("data.json"))
-            .unwrap();
-
-        let mut data: Map<String, Value> = Map::new();
-
-        let open_projects: Vec<ProjectSaveState> = value.projects.iter().map(|project| {
-            match &project.save_state {
-                ProjectSaveState::AutoSaved(val) => ProjectSaveState::AutoSaved(val.clone()),
-                ProjectSaveState::Saved(val) => ProjectSaveState::Saved(val.clone()),
-                ProjectSaveState::NotSaved => {
-                    info!("autosaving {}", project.name);
-                    let project_saver = ProjectSaver { directory: Box::from(data_dir) };
-                    project_saver.save(project).unwrap();
-                    ProjectSaveState::AutoSaved(data_dir.join(format!("auto_save_{}.map", project.name)))
-                }
-            }
-        }).collect();
-
-        data.insert("open_projects".into(), serde_json::to_value(open_projects).unwrap());
-
-        file.write_all(serde_json::to_string(&data).unwrap().as_bytes()).unwrap();
-
-        return Ok(());
-    }
-}
-
-pub struct EditorDataLoader {}
-
-impl EditorDataLoader {
-    pub fn new() -> Self {
-        return Self {};
-    }
-}
-
-impl Load<EditorData> for EditorDataLoader {
-    fn load(&self) -> Result<EditorData, LoadError> {
+impl Load<Program> for ProgramdataLoader {
+    fn load(&self) -> Result<Program, LoadError> {
         let dir = match ProjectDirs::from_path("CDDA Map Editor".into()) {
             None => { return Err(LoadError::DirectoryNotFound); }
             Some(d) => d
@@ -81,9 +27,7 @@ impl Load<EditorData> for EditorDataLoader {
         if !data_dir.exists() { fs::create_dir_all(data_dir).unwrap(); }
 
         let contents = match fs::read_to_string(data_dir.join("data.json")) {
-            Err(_) => return Ok(EditorData {
-                ..default()
-            }),
+            Err(_) => return Err(ParseError),
             Ok(f) => f
         };
 
@@ -149,12 +93,49 @@ impl Load<EditorData> for EditorDataLoader {
             .map(|v| v.unwrap())
             .collect();
 
-        return Ok(EditorData {
-            current_project_index: None,
-            projects: projects_array,
-            history: Default::default(),
-            config: Default::default(),
-            menus: Menus::default(),
-        });
+        return Ok(Program::new(projects_array, vec![]));
+    }
+}
+
+pub struct ProgramdataSaver {}
+
+impl Save<Program> for ProgramdataSaver {
+    fn save(&self, value: &Program) -> Result<(), SaveError> {
+        let dir = match ProjectDirs::from_path("CDDA Map Editor".into()) {
+            None => { return Err(SaveError::DirectoryNotFound("".into())); }
+            Some(d) => d
+        };
+
+        let data_dir = dir.data_local_dir();
+
+        if !data_dir.exists() { fs::create_dir_all(data_dir).unwrap(); }
+
+        let mut file = File::options()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(data_dir.join("data.json"))
+            .unwrap();
+
+        let mut data: Map<String, Value> = Map::new();
+
+        let open_projects: Vec<ProjectSaveState> = value.projects.iter().map(|project| {
+            match &project.save_state {
+                ProjectSaveState::AutoSaved(val) => ProjectSaveState::AutoSaved(val.clone()),
+                ProjectSaveState::Saved(val) => ProjectSaveState::Saved(val.clone()),
+                ProjectSaveState::NotSaved => {
+                    info!("autosaving {}", project.name);
+                    let project_saver = ProjectSaver { directory: Box::from(data_dir) };
+                    project_saver.save(project).unwrap();
+                    ProjectSaveState::AutoSaved(data_dir.join(format!("auto_save_{}.map", project.name)))
+                }
+            }
+        }).collect();
+
+        data.insert("open_projects".into(), serde_json::to_value(open_projects).unwrap());
+
+        file.write_all(serde_json::to_string(&data).unwrap().as_bytes()).unwrap();
+
+        return Ok(());
     }
 }

@@ -2,14 +2,14 @@ use std::fs;
 use std::path::PathBuf;
 
 use bevy::app::AppExit;
-use bevy::prelude::{Changed, Commands, Event, EventReader, EventWriter, Interaction, Query, Res, ResMut, With};
+use bevy::prelude::{Changed, Commands, Entity, Event, EventReader, EventWriter, Interaction, Query, Res, ResMut, State, With};
 use bevy_egui::egui;
 use bevy_egui::egui::{Align, Color32, Margin, Ui, WidgetText};
 use bevy_file_dialog::{DialogDirectoryPicked, DialogFileLoaded, FileDialogExt};
 use bevy_inspector_egui::bevy_egui::EguiContexts;
 
-use crate::editor_data::data::{EditorData, IntoColor32};
 use crate::map::data::MapEntity;
+use crate::program::data::{IntoColor32, OpenedProject, Program, ProgramState};
 use crate::project::data::{Project, ProjectSaveState};
 use crate::settings::data::Settings;
 use crate::ui::CDDADirContents;
@@ -30,10 +30,17 @@ pub fn close_button_interaction(
 
 pub fn save_button_interaction(
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<SaveIconMarker>)>,
-    r_editor_data: Res<EditorData>,
+    r_program: Res<Program>,
+    s_state: Res<State<ProgramState>>,
     mut commands: Commands,
+    q_opened_project: Query<(Entity, &OpenedProject)>,
 ) {
-    let project = match r_editor_data.get_current_project() {
+    let index = match q_opened_project.iter().next() {
+        None => return,
+        Some(o) => o.1.index
+    };
+    
+    let project = match r_program.projects.get(index) {
         None => return,
         Some(p) => p
     };
@@ -92,10 +99,10 @@ pub fn open_button_interaction(
 pub fn file_loaded_reader(
     mut e_file_loaded: EventReader<DialogFileLoaded<Project>>,
     mut e_spawn_tab: EventWriter<SpawnTab>,
-    mut r_editor_data: ResMut<EditorData>,
+    mut r_program: ResMut<Program>,
 ) {
     for event in e_file_loaded.read() {
-        if r_editor_data.projects.iter().any(|p| {
+        if r_program.projects.iter().any(|p| {
             // Make it so the same project can't be opened more than once
             match &p.save_state {
                 ProjectSaveState::Saved(path) => path.clone() == event.path,
@@ -116,10 +123,10 @@ pub fn file_loaded_reader(
 
         e_spawn_tab.send(SpawnTab {
             name,
-            index: r_editor_data.projects.len() as u32,
+            index: r_program.projects.len() as u32,
         });
 
-        r_editor_data.projects.push(project);
+        r_program.projects.push(project);
     }
 }
 
@@ -142,11 +149,11 @@ pub fn file_dialog_cdda_dir_picked(
 pub fn cdda_folder_picked(
     mut e_cdda_dir_picked: EventReader<CDDADirPicked>,
     mut r_settings: ResMut<Settings>,
-    mut r_editor_data: ResMut<EditorData>,
+    mut r_program: ResMut<Program>,
 ) {
     for e in e_cdda_dir_picked.read() {
         r_settings.selected_cdda_dir = e.path.clone();
-        r_editor_data.config.load_cdda_dir(r_settings.selected_cdda_dir.clone());
+        r_program.config.load_cdda_dir(r_settings.selected_cdda_dir.clone());
 
         fs::read_dir(&e.path.join("gfx")).unwrap().into_iter().for_each(|e| {
             match e {
@@ -171,14 +178,14 @@ pub fn tileset_selected(
 pub fn settings_button_interaction(
     q_interaction: Query<&Interaction, (Changed<Interaction>, With<SettingsIconMarker>)>,
     mut contexts: EguiContexts,
-    mut r_editor_data: ResMut<EditorData>,
+    mut r_program: ResMut<Program>,
     mut commands: Commands,
     mut r_settings: ResMut<Settings>,
 ) {
-    let gray_dark_color32 = r_editor_data.config.style.gray_dark.into_color32();
+    let gray_dark_color32 = r_program.config.style.gray_dark.into_color32();
 
     egui::Window::new("General Settings")
-        .open(&mut r_editor_data.menus.is_settings_menu_open)
+        .open(&mut r_program.menus.is_settings_menu_open)
         .resizable(true)
         .show(contexts.ctx_mut(), |ui| {
             ui.vertical(|ui| {
@@ -253,7 +260,7 @@ pub fn settings_button_interaction(
     for interaction in q_interaction.iter() {
         match interaction {
             Interaction::Pressed => {
-                r_editor_data.menus.is_settings_menu_open = !r_editor_data.menus.is_settings_menu_open;
+                r_program.menus.is_settings_menu_open = !r_program.menus.is_settings_menu_open;
             }
             _ => {}
         }

@@ -1,5 +1,7 @@
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+use serde::{Deserialize, Serialize};
+
 use crate::common::{GetRandom, TileId, Weighted};
 
 type RegionId = String;

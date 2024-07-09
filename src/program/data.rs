@@ -1,43 +1,42 @@
+use bevy::prelude::{Color, Component, Resource, States};
 use bevy_egui::egui::Color32;
 use std::sync::Arc;
-use std::path::PathBuf;
-use bevy::prelude::{Color, Resource};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::PathBuf;
 use num::ToPrimitive;
 use crate::common::io::Load;
+
 use crate::palettes::data::Palette;
 use crate::palettes::io::PalettesLoader;
 use crate::project::data::{Project, ProjectSaveState};
 use crate::ui::style::Style;
 
-#[derive(Debug, Resource)]
-pub struct EditorData {
-    pub current_project_index: Option<u32>,
-    pub projects: Vec<Project>,
+#[derive(Default, States, Clone, Hash, Debug, Eq, PartialEq)]
+pub enum ProgramState {
+    ProjectOpen,
+    #[default]
+    NoneOpen,
+}
+
+#[derive(Component, Debug)]
+pub struct OpenedProject {
+    pub index: usize
+}
+
+#[derive(Resource)]
+pub struct Program {
     pub history: Vec<ProjectSaveState>,
     pub config: Config,
     pub menus: Menus,
+    pub projects: Vec<Project>,
 }
 
-impl EditorData {
-    pub fn get_current_project(&self) -> Option<&Project> {
-        if self.current_project_index == None { return None; }
-        return self.projects.get(self.current_project_index.unwrap() as usize);
-    }
-
-    pub fn get_current_project_mut(&mut self) -> Option<&mut Project> {
-        if self.current_project_index == None { return None; }
-        return self.projects.get_mut(self.current_project_index.unwrap() as usize);
-    }
-}
-
-impl Default for EditorData {
-    fn default() -> Self {
+impl Program {
+    pub fn new(projects: Vec<Project>, history: Vec<ProjectSaveState>) -> Self {
         return Self {
-            current_project_index: None,
-            projects: vec![],
-            history: vec![],
+            projects,
+            history,
             config: Config::default(),
             menus: Menus {
                 is_settings_menu_open: false
@@ -95,3 +94,4 @@ impl IntoColor32 for Color {
 pub struct Menus {
     pub is_settings_menu_open: bool,
 }
+

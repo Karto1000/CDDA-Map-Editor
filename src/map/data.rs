@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::common::{Coordinates, MeabyWeighted, TileId};
 use crate::common::GetRandom;
 use crate::common::Weighted;
-use crate::editor_data::data::CDDAData;
+use crate::program::data::CDDAData;
 use crate::map::io::ParameterId;
 use crate::palettes::data::{MapObjectId, MeabyParam, PaletteId};
 use crate::tiles::data::Tile;

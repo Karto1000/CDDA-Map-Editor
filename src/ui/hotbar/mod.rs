@@ -2,8 +2,8 @@ use bevy::asset::{AssetServer, Handle};
 use bevy::hierarchy::{BuildChildren, ChildBuilder};
 use bevy::prelude::{AlignItems, BackgroundColor, Bundle, ButtonBundle, Color, Commands, default, Display, FlexDirection, Image, ImageBundle, JustifyContent, NodeBundle, Res, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val};
 use bevy::ui::PositionType;
+use crate::program::data::Program;
 
-use crate::editor_data::data::EditorData;
 use crate::ui::{HoverEffect, OriginalColor};
 use crate::ui::hotbar::components::{CloseIconMarker, ImportIconMarker, OpenIconMarker, SaveIconMarker, SettingsIconMarker, TopHotbarMarker};
 
@@ -11,7 +11,7 @@ pub(crate) mod components;
 
 fn spawn_button_icon<T: Bundle>(
     container: &mut ChildBuilder,
-    editor_data: &Res<EditorData>,
+    program: &Res<Program>,
     icon: Handle<Image>,
     color: Color,
     marker: T,
@@ -31,7 +31,7 @@ fn spawn_button_icon<T: Bundle>(
         OriginalColor(color),
         HoverEffect {
             original_color: color,
-            hover_color: editor_data.config.style.selected,
+            hover_color: program.config.style.selected,
         },
         marker
     )).with_children(|icon_container| {
@@ -50,7 +50,7 @@ fn spawn_button_icon<T: Bundle>(
 pub fn spawn_hotbar(
     mut commands: Commands,
     r_asset_server: Res<AssetServer>,
-    r_editor_data: Res<EditorData>,
+    r_editor_data: Res<Program>,
 ) {
     build_hotbar(&mut commands, &r_asset_server, &r_editor_data);
 }
@@ -58,7 +58,7 @@ pub fn spawn_hotbar(
 pub fn build_hotbar(
     commands: &mut Commands,
     asset_server: &Res<AssetServer>,
-    editor_data: &Res<EditorData>,
+    editor_data: &Res<Program>,
 ) {
     let grass = asset_server.load("grass.png");
     let font = asset_server.load("fonts/unifont.ttf");

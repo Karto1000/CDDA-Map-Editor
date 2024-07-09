@@ -2,11 +2,11 @@ use bevy::math::Vec2;
 use bevy::prelude::{BackgroundColor, Button, Changed, Entity, Event, EventReader, EventWriter, GlobalTransform, Query, Res, ResMut, Vec3Swizzles, Visibility, Window, With};
 use bevy::ui::{Interaction, Node};
 use bevy::window::PrimaryWindow;
-use crate::editor_data::data::EditorData;
-use crate::map::data::MapEntity;
 
-use crate::ui::IsCursorCaptured;
+use crate::map::data::MapEntity;
+use crate::program::data::Program;
 use crate::ui::{HoverEffect, ToggleEffect};
+use crate::ui::IsCursorCaptured;
 use crate::ui::tabs::events::SpawnTab;
 
 pub fn button_hover_system(
@@ -106,9 +106,9 @@ pub fn check_ui_interaction(
 
 pub fn spawn_initial_tabs(
     mut e_spawn_tab: EventWriter<SpawnTab>,
-    r_editor_data: Res<EditorData>,
+    r_program: Res<Program>,
 ) {
-    for (i, project) in r_editor_data.projects.iter().enumerate() {
+    for (i, project) in r_program.projects.iter().enumerate() {
         let name = match &project.map_entity {
             MapEntity::Single(s) => s.om_terrain.clone(),
             MapEntity::Nested(_) => "Nested_TODO".to_string(),

@@ -1,6 +1,7 @@
+use bevy::math::Vec2;
 use bevy::prelude::{Component, Entity, Resource};
 use serde::{Deserialize, Serialize};
-use bevy::math::Vec2;
+
 use crate::common::Coordinates;
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, Component, PartialEq)]

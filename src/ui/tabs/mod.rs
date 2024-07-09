@@ -1,14 +1,12 @@
 use bevy::asset::AssetServer;
 use bevy::hierarchy::BuildChildren;
-use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Changed, Color, Commands, default, Display, Entity, EventReader, EventWriter, ImageBundle, Interaction, NodeBundle, Query, Res, ResMut, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val, With};
+use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Changed, Color, Commands, default, Display, Entity, EventReader, EventWriter, ImageBundle, Interaction, NodeBundle, Query, Res, ResMut, State, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val, With};
 
-use crate::editor_data::data::EditorData;
-use crate::map::data::ClearTiles;
 use crate::map::data::MapEntity;
-use crate::project::data::{Project, ProjectSaveState};
-use crate::project::data::SwitchProject;
+use crate::program::data::{OpenedProject, Program, ProgramState};
+use crate::project::data::{CloseProject, Project, ProjectSaveState};
+use crate::project::data::OpenProjectAtIndex;
 use crate::ui::{HoverEffect, ToggleEffect};
-use crate::ui::grid::resources::Grid;
 use crate::ui::hotbar::components::TopHotbarMarker;
 use crate::ui::tabs::components::{AddTabButtonMarker, Tab, TabContainerMarker};
 use crate::ui::tabs::events::SpawnTab;
@@ -19,7 +17,7 @@ pub(crate) mod components;
 pub fn setup(
     r_asset_server: Res<AssetServer>,
     q_top_hotbar: Query<Entity, With<TopHotbarMarker>>,
-    r_editor_data: Res<EditorData>,
+    r_program: Res<Program>,
     mut commands: Commands,
 ) {
     let hotbar = q_top_hotbar.iter().next().unwrap();
@@ -59,10 +57,10 @@ pub fn setup(
                             height: Val::Px(32.),
                             ..default()
                         },
-                        background_color: BackgroundColor::from(r_editor_data.config.style.gray_dark),
+                        background_color: BackgroundColor::from(r_program.config.style.gray_dark),
                         ..default()
                     },
-                    HoverEffect { original_color: r_editor_data.config.style.gray_dark, hover_color: r_editor_data.config.style.gray_light },
+                    HoverEffect { original_color: r_program.config.style.gray_dark, hover_color: r_program.config.style.gray_light },
                     AddTabButtonMarker {},
                 )).with_children(|parent| {
                     parent.spawn(
@@ -84,7 +82,7 @@ pub fn setup(
 
 pub fn on_add_tab_button_click(
     q_interaction: Query<&Interaction, (Changed<Interaction>, With<AddTabButtonMarker>)>,
-    mut r_editor_data: ResMut<EditorData>,
+    mut r_program: ResMut<Program>,
     mut e_spawn_tab: EventWriter<SpawnTab>,
 ) {
     let interaction = match q_interaction.iter().next() {
@@ -98,7 +96,7 @@ pub fn on_add_tab_button_click(
 
             match project.map_entity {
                 MapEntity::Single(ref mut s) => {
-                    let amount_of_unnamed = r_editor_data.projects.iter()
+                    let amount_of_unnamed = r_program.projects.iter()
                         .filter(|p| p.save_state == ProjectSaveState::NotSaved)
                         .map(|p| s.om_terrain.clone())
                         .filter(|n| n.contains("unnamed"))
@@ -110,8 +108,8 @@ pub fn on_add_tab_button_click(
 
                     let name = s.om_terrain.clone();
 
-                    r_editor_data.projects.push(project);
-                    e_spawn_tab.send(SpawnTab { name, index: r_editor_data.projects.len() as u32 - 1 });
+                    r_program.projects.push(project);
+                    e_spawn_tab.send(SpawnTab { name, index: r_program.projects.len() as u32 - 1 });
                 }
                 _ => todo!()
             }
@@ -123,7 +121,7 @@ pub fn on_add_tab_button_click(
 pub fn spawn_tab_reader(
     top_hotbar: Query<Entity, With<TabContainerMarker>>,
     asset_server: Res<AssetServer>,
-    r_editor_data: Res<EditorData>,
+    r_program: Res<Program>,
     mut e_spawn_tab: EventReader<SpawnTab>,
     mut commands: Commands,
 ) {
@@ -142,16 +140,16 @@ pub fn spawn_tab_reader(
                         padding: UiRect::px(9., 9., 8., 8.),
                         ..default()
                     },
-                    background_color: BackgroundColor::from(r_editor_data.config.style.blue_dark),
+                    background_color: BackgroundColor::from(r_program.config.style.blue_dark),
                     ..default()
                 },
                 HoverEffect {
-                    original_color: r_editor_data.config.style.blue_dark,
-                    hover_color: r_editor_data.config.style.selected,
+                    original_color: r_program.config.style.blue_dark,
+                    hover_color: r_program.config.style.selected,
                 },
                 ToggleEffect {
-                    original_color: r_editor_data.config.style.blue_dark,
-                    toggled_color: r_editor_data.config.style.selected,
+                    original_color: r_program.config.style.blue_dark,
+                    toggled_color: r_program.config.style.selected,
                     toggled: false,
                 },
                 Tab { index: event.index }
@@ -198,41 +196,37 @@ pub fn spawn_tab_reader(
 }
 
 pub fn tab_clicked(
-    mut e_switch_project: EventWriter<SwitchProject>,
-    mut e_clear_tiles: EventWriter<ClearTiles>,
+    mut e_open_project: EventWriter<OpenProjectAtIndex>,
+    mut e_close_project: EventWriter<CloseProject>,
     mut q_interaction: Query<(&Interaction, &Tab), (Changed<Interaction>, With<Tab>)>,
-    mut r_grid: ResMut<Grid>,
-    mut commands: Commands,
-    mut r_editor_data: ResMut<EditorData>,
+    r_program: Res<Program>,
+    s_state: Res<State<ProgramState>>,
+    q_opened_project: Query<(Entity, &OpenedProject)>,
 ) {
     for (interaction, tab) in q_interaction.iter_mut() {
         match *interaction {
             Interaction::Pressed => {
-                match r_editor_data.current_project_index {
-                    None => {}
-                    Some(current_project_index) => {
-                        if tab.index == current_project_index {
-                            e_clear_tiles.send(ClearTiles {});
-
-                            match r_grid.instantiated_grid {
-                                None => {}
-                                Some(g) => { commands.get_entity(g).unwrap().despawn() }
-                            }
-
-                            r_editor_data.current_project_index = None;
-                            r_grid.instantiated_grid = None;
-
+                match s_state.get() {
+                    ProgramState::ProjectOpen => {
+                        let index = match q_opened_project.iter().next() {
+                            None => return,
+                            Some(o) => o.1.index
+                        };
+                        
+                        if tab.index == index as u32 {
+                            e_close_project.send(CloseProject {});
                             return;
                         }
                     }
+                    ProgramState::NoneOpen => {}
                 };
 
-                match r_editor_data.projects.get(tab.index as usize) {
+                match r_program.projects.get(tab.index as usize) {
                     None => { return; }
                     Some(_) => {}
                 };
 
-                e_switch_project.send(SwitchProject {
+                e_open_project.send(OpenProjectAtIndex {
                     index: tab.index
                 });
             }

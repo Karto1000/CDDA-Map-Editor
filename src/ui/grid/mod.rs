@@ -1,10 +1,11 @@
 use bevy::app::{App, Plugin, Update};
 use bevy::asset::Asset;
 use bevy::math::{Vec2, Vec3};
-use bevy::prelude::{Component, TypePath};
+use bevy::prelude::{Component, in_state, IntoSystemConfigs, TypePath};
 use bevy::render::render_resource::{AsBindGroup, ShaderRef};
 use bevy::sprite::Material2d;
 
+use crate::program::data::ProgramState;
 use crate::ui::grid::resources::{DragInfo, Grid};
 use crate::ui::grid::systems::{
     drag_system, grid_resize_system, window_grid_resize_system,
@@ -37,7 +38,7 @@ impl Plugin for GridPlugin {
                 window_grid_resize_system,
                 grid_resize_system,
                 drag_system,
-            ),
+            ).run_if(in_state(ProgramState::ProjectOpen)),
         );
 
         app.insert_resource(drag_info);

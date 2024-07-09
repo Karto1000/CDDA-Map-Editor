@@ -1,6 +1,7 @@
+use std::path::PathBuf;
+
 use bevy::prelude::Resource;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 #[derive(Debug, Resource, Clone, Serialize, Deserialize)]
 pub struct Settings {
