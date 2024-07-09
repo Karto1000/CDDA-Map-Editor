@@ -2,12 +2,12 @@ use bevy::asset::AssetServer;
 use bevy::hierarchy::BuildChildren;
 use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Changed, Color, Commands, default, Display, Entity, EventReader, EventWriter, ImageBundle, Interaction, NodeBundle, Query, Res, ResMut, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val, With};
 
-use crate::editor_data::EditorData;
-use crate::map::events::ClearTiles;
-use crate::map::resources::MapEntity;
-use crate::project::resources::{Project, ProjectSaveState};
-use crate::SwitchProject;
-use crate::ui::components::{HoverEffect, ToggleEffect};
+use crate::editor_data::data::EditorData;
+use crate::map::data::ClearTiles;
+use crate::map::data::MapEntity;
+use crate::project::data::{Project, ProjectSaveState};
+use crate::project::data::SwitchProject;
+use crate::ui::{HoverEffect, ToggleEffect};
 use crate::ui::grid::resources::Grid;
 use crate::ui::hotbar::components::TopHotbarMarker;
 use crate::ui::tabs::components::{AddTabButtonMarker, Tab, TabContainerMarker};

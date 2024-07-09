@@ -1,14 +1,17 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
-use bevy::prelude::Resource;
-use bevy::prelude::Vec2;
+use bevy::math::Vec2;
+use bevy::prelude::{Event, Resource};
 use serde::{Deserialize, Serialize};
 
-use crate::common::{Coordinates, GetRandom, MeabyWeighted, TileId, Weighted};
-use crate::editor_data::CDDAData;
-use crate::map::loader::ParameterId;
-use crate::palettes::{MapObjectId, MeabyParam, PaletteId};
-use crate::tiles::components::Tile;
+use crate::common::{Coordinates, MeabyWeighted, TileId};
+use crate::common::GetRandom;
+use crate::common::Weighted;
+use crate::editor_data::data::CDDAData;
+use crate::map::io::ParameterId;
+use crate::palettes::data::{MapObjectId, MeabyParam, PaletteId};
+use crate::tiles::data::Tile;
 
 #[derive(Default, Serialize, Deserialize, Debug, Resource, Clone)]
 pub struct ComputedParameters {
@@ -250,3 +253,30 @@ pub struct Nested {
     pub tile_selection: TileSelection,
     pub tiles: HashMap<Coordinates, Tile>,
 }
+
+#[derive(Event)]
+pub struct UpdateSpriteEvent {
+    pub tile: Tile,
+    pub coordinates: Coordinates,
+}
+
+#[derive(Event, Debug)]
+pub struct TilePlaceEvent {
+    pub tile: Tile,
+    pub coordinates: Coordinates,
+    pub should_update_sprites: bool,
+}
+
+#[derive(Event, Debug)]
+pub struct TileDeleteEvent {
+    pub tile: Tile,
+    pub coordinates: Coordinates,
+}
+
+#[derive(Event)]
+pub struct SpawnMapEntity {
+    pub map_entity: Arc<MapEntity>,
+}
+
+#[derive(Event)]
+pub struct ClearTiles;

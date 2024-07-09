@@ -1,10 +1,13 @@
 use bevy::math::Vec2;
-use bevy::prelude::{BackgroundColor, Button, Changed, Entity, Event, EventReader, EventWriter, GlobalTransform, Query, ResMut, Vec3Swizzles, Visibility, Window, With};
+use bevy::prelude::{BackgroundColor, Button, Changed, Entity, Event, EventReader, EventWriter, GlobalTransform, Query, Res, ResMut, Vec3Swizzles, Visibility, Window, With};
 use bevy::ui::{Interaction, Node};
 use bevy::window::PrimaryWindow;
+use crate::editor_data::data::EditorData;
+use crate::map::data::MapEntity;
 
-use crate::IsCursorCaptured;
-use crate::ui::components::{HoverEffect, ToggleEffect};
+use crate::ui::IsCursorCaptured;
+use crate::ui::{HoverEffect, ToggleEffect};
+use crate::ui::tabs::events::SpawnTab;
 
 pub fn button_hover_system(
     mut q_interaction: Query<(
@@ -99,4 +102,19 @@ pub fn check_ui_interaction(
             (min.x..max.x).contains(&cursor_position.x)
                 && (min.y..max.y).contains(&cursor_position.y)
         });
+}
+
+pub fn spawn_initial_tabs(
+    mut e_spawn_tab: EventWriter<SpawnTab>,
+    r_editor_data: Res<EditorData>,
+) {
+    for (i, project) in r_editor_data.projects.iter().enumerate() {
+        let name = match &project.map_entity {
+            MapEntity::Single(s) => s.om_terrain.clone(),
+            MapEntity::Nested(_) => "Nested_TODO".to_string(),
+            _ => todo!()
+        };
+
+        e_spawn_tab.send(SpawnTab { name, index: i as u32 });
+    }
 }

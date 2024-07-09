@@ -2,14 +2,13 @@ use std::default::Default;
 use std::io::Write;
 use std::ops::Deref;
 use std::string::ToString;
-use std::sync::Arc;
 
 use bevy::{prelude::*, window::PrimaryWindow};
 use bevy::app::{App, AppExit, PluginGroup};
 use bevy::asset::AsyncReadExt;
 use bevy::DefaultPlugins;
 use bevy::log::LogPlugin;
-use bevy::prelude::{Assets, Camera2dBundle, Commands, Component, EventReader, NonSend, Query, Res, ResMut, Resource, Transform, Vec2, Window, With};
+use bevy::prelude::{Assets, Camera2dBundle, Commands, EventReader, NonSend, Query, Res, ResMut, Transform, Vec2, Window, With};
 use bevy::sprite::Material2dPlugin;
 use bevy::utils::default;
 use bevy::window::{WindowMode, WindowPlugin};
@@ -27,27 +26,25 @@ use imageproc::drawing::Canvas;
 use lazy_static::lazy_static;
 use log::LevelFilter;
 use winit::window::Icon;
+use editor_data::data::{EditorData, IntoColor32};
 
-use settings::Settings;
+use map::plugin::MapPlugin;
+use project::data::{Project, SwitchProject};
+use settings::io::{SettingsLoader, SettingsSaver};
+use settings::data::Settings;
+use tiles::data::{Offset, Tile};
+use tiles::plugin::TilePlugin;
+use ui::{CDDADirContents, IsCursorCaptured};
 
 use crate::common::{BufferedLogger, Coordinates, LogMessage};
 use crate::common::io::{Load, Save};
-use crate::editor_data::{EditorData, IntoColor32};
 use crate::editor_data::io::{EditorDataLoader, EditorDataSaver};
 use crate::graphics::GraphicsResource;
-use crate::map::events::{ClearTiles, SpawnMapEntity};
-use crate::map::MapPlugin;
-use crate::map::resources::MapEntity;
 use crate::map::systems::{set_tile_reader, spawn_sprite, tile_despawn_reader, tile_remove_reader, tile_spawn_reader, update_sprite_reader};
-use crate::project::resources::Project;
-use crate::settings::{SettingsLoader, SettingsSaver};
-use crate::tiles::components::{Offset, Tile};
-use crate::tiles::TilePlugin;
-use crate::ui::components::CDDADirContents;
+use crate::project::systems::switch_project;
 use crate::ui::grid::{GridMaterial, GridPlugin};
 use crate::ui::grid::resources::Grid;
 use crate::ui::interaction::{CDDADirPicked, TilesetSelected};
-use crate::ui::tabs::events::SpawnTab;
 use crate::ui::UiPlugin;
 
 mod tiles;
@@ -63,17 +60,6 @@ mod settings;
 
 lazy_static! {
     pub static ref LOGGER: BufferedLogger = BufferedLogger::new();
-}
-
-#[derive(Component)]
-pub struct MouseLocationTextMarker;
-
-#[derive(Resource)]
-pub struct IsCursorCaptured(bool);
-
-#[derive(Event)]
-pub struct SwitchProject {
-    pub index: u32,
 }
 
 fn main() {
@@ -92,7 +78,6 @@ fn main() {
                 ..Default::default()
             }).disable::<LogPlugin>(), ConsolePlugin)
         )
-        .insert_resource(IsCursorCaptured(false))
         .insert_resource(ConsoleConfiguration {
             keys: vec![
                 // TODO: Localize
@@ -105,7 +90,6 @@ fn main() {
             setup,
         ))
         .add_systems(PostStartup, (
-            spawn_initial_tabs,
             setup_egui,
         ))
         .add_event::<SwitchProject>()
@@ -129,24 +113,9 @@ fn main() {
             apply_deferred,
             spawn_sprite,
             update_sprite_reader,
-            exit_system
+            exit
         ).chain())
         .run();
-}
-
-fn spawn_initial_tabs(
-    mut e_spawn_tab: EventWriter<SpawnTab>,
-    r_editor_data: Res<EditorData>,
-) {
-    for (i, project) in r_editor_data.projects.iter().enumerate() {
-        let name = match &project.map_entity {
-            MapEntity::Single(s) => s.om_terrain.clone(),
-            MapEntity::Nested(_) => "Nested_TODO".to_string(),
-            _ => todo!()
-        };
-
-        e_spawn_tab.send(SpawnTab { name, index: i as u32 });
-    }
 }
 
 fn setup(
@@ -260,7 +229,7 @@ fn update(
 
     if let Some(grid_material) = grid_material.iter_mut().next() {
         let window = q_windows.single();
-        
+
         grid_material.1.offset = res_grid.offset;
         grid_material.1.tile_size = res_grid.tile_size;
         grid_material.1.mouse_pos = window.cursor_position().unwrap_or(Vec2::default());
@@ -279,26 +248,7 @@ fn update(
     }
 }
 
-fn switch_project(
-    mut e_switch_project: EventReader<SwitchProject>,
-    mut e_clear_tiles: EventWriter<ClearTiles>,
-    mut e_spawn_map_entity: EventWriter<SpawnMapEntity>,
-    mut r_editor_data: ResMut<EditorData>,
-) {
-    for switch_project in e_switch_project.read() {
-        let new_project = r_editor_data.projects.get(switch_project.index as usize).unwrap();
-        
-        e_clear_tiles.send(ClearTiles {});
-
-        e_spawn_map_entity.send(SpawnMapEntity {
-            map_entity: Arc::new(new_project.map_entity.clone())
-        });
-
-        r_editor_data.current_project_index = Some(switch_project.index);
-    }
-}
-
-fn exit_system(
+fn exit(
     e_exit: EventReader<AppExit>,
     r_settings: Res<Settings>,
     r_editor_data: Res<EditorData>,

@@ -1,6 +1,6 @@
-use bevy::prelude::{Component, Entity};
+use bevy::prelude::{Component, Entity, Resource};
 use serde::{Deserialize, Serialize};
-
+use bevy::math::Vec2;
 use crate::common::Coordinates;
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, Component, PartialEq)]
@@ -68,4 +68,9 @@ impl From<char> for Tile {
             toilets: SpriteRepresentation::default(),
         };
     }
+}
+
+#[derive(Resource, Debug)]
+pub struct PlaceInfo {
+    pub last_place_position: Option<Vec2>,
 }

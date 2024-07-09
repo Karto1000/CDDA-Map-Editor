@@ -8,19 +8,15 @@ use directories::ProjectDirs;
 use serde_json::{Map, Value};
 
 use crate::common::io::{Load, LoadError, Save, SaveError};
-use crate::editor_data::{EditorData, Menus};
-use crate::map::resources::MapEntity;
-use crate::project::resources::{Project, ProjectSaveState};
-use crate::project::saver::ProjectSaver;
-use crate::settings::Settings;
+use crate::editor_data::data::{EditorData, Menus};
+use crate::project::data::{Project, ProjectSaveState};
+use crate::project::io::ProjectSaver;
 
-pub struct EditorDataSaver {
-}
+pub struct EditorDataSaver {}
 
 impl EditorDataSaver {
     pub fn new() -> Self {
-        return Self {
-        };
+        return Self {};
     }
 }
 
@@ -65,15 +61,11 @@ impl Save<EditorData> for EditorDataSaver {
     }
 }
 
-pub struct EditorDataLoader {
-    
-}
+pub struct EditorDataLoader {}
 
 impl EditorDataLoader {
     pub fn new() -> Self {
-        return Self {
-            
-        }
+        return Self {};
     }
 }
 

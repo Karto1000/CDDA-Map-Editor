@@ -3,8 +3,8 @@ use bevy::hierarchy::{BuildChildren, ChildBuilder};
 use bevy::prelude::{AlignItems, BackgroundColor, Bundle, ButtonBundle, Color, Commands, default, Display, FlexDirection, Image, ImageBundle, JustifyContent, NodeBundle, Res, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val};
 use bevy::ui::PositionType;
 
-use crate::editor_data::EditorData;
-use crate::ui::components::{HoverEffect, OriginalColor};
+use crate::editor_data::data::EditorData;
+use crate::ui::{HoverEffect, OriginalColor};
 use crate::ui::hotbar::components::{CloseIconMarker, ImportIconMarker, OpenIconMarker, SaveIconMarker, SettingsIconMarker, TopHotbarMarker};
 
 pub(crate) mod components;
@@ -202,11 +202,11 @@ pub fn build_hotbar(
             ..default()
         }).with_children(|icons_container| {
             spawn_button_icon(
-                icons_container, 
+                icons_container,
                 editor_data,
-                asset_server.load("icons/cog.png"), 
-                editor_data.config.style.gray_darker, 
-                SettingsIconMarker {}
+                asset_server.load("icons/cog.png"),
+                editor_data.config.style.gray_darker,
+                SettingsIconMarker {},
             );
         });
     });

@@ -1162,13 +1162,9 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
 
 #[cfg(test)]
 pub mod tests {
-    use std::fs;
-    use std::fs::File;
     use std::path::PathBuf;
-    use bevy::asset::saver::ErasedAssetSaver;
-    use image::{DynamicImage, RgbaImage};
+
     use image::io::Reader;
-    use imageproc::definitions::Image;
 
     use crate::common::io::Load;
     use crate::graphics::tileset::legacy::{get_image_from_tileset, LegacyTilesetLoader};
@@ -1202,9 +1198,9 @@ pub mod tests {
         let data = LegacyTilesetLoader::new(PathBuf::from("./testing_data")).load_textures().unwrap();
 
         let image = Reader::open(PathBuf::from("./testing_data/normal_items.png"))
-                .unwrap()
-                .decode()
-                .unwrap();
+            .unwrap()
+            .decode()
+            .unwrap();
 
         let item = data.get(&1).unwrap();
 
@@ -1213,7 +1209,7 @@ pub mod tests {
             32,
             0,
             32,
-            32
+            32,
         );
 
         assert_eq!(item.data, supposed_data.data);

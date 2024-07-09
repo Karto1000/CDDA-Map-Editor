@@ -8,12 +8,12 @@ use bevy_egui::egui::{Align, Color32, Margin, Ui, WidgetText};
 use bevy_file_dialog::{DialogDirectoryPicked, DialogFileLoaded, FileDialogExt};
 use bevy_inspector_egui::bevy_egui::EguiContexts;
 
-use crate::editor_data::{EditorData, IntoColor32};
-use crate::map::resources::MapEntity;
-use crate::project::resources::{Project, ProjectSaveState};
-use crate::ui::components::CDDADirContents;
+use crate::editor_data::data::{EditorData, IntoColor32};
+use crate::map::data::MapEntity;
+use crate::project::data::{Project, ProjectSaveState};
+use crate::settings::data::Settings;
+use crate::ui::CDDADirContents;
 use crate::ui::hotbar::components::{CloseIconMarker, ImportIconMarker, OpenIconMarker, SaveIconMarker, SettingsIconMarker};
-use crate::settings::Settings;
 use crate::ui::tabs::events::SpawnTab;
 
 pub fn close_button_interaction(
@@ -162,12 +162,10 @@ pub fn cdda_folder_picked(
 }
 
 #[derive(Debug, Event)]
-pub struct TilesetSelected {
-
-}
+pub struct TilesetSelected {}
 
 pub fn tileset_selected(
-    mut e_tileset_selected: EventReader<TilesetSelected>
+    e_tileset_selected: EventReader<TilesetSelected>
 ) {}
 
 pub fn settings_button_interaction(

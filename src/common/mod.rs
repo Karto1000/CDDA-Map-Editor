@@ -3,8 +3,7 @@ use std::fmt::{Debug, Formatter};
 use std::ops::{Add, DerefMut};
 use std::sync::{Arc, RwLock};
 
-use bevy::math::Vec3;
-use bevy::prelude::{Color, Component};
+use bevy::prelude::Component;
 use bevy::prelude::Event;
 use color_print::cformat;
 use lazy_static::lazy_static;
@@ -265,8 +264,8 @@ impl<'de> Visitor<'de> for CoordinatesVisitor {
     }
 
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
+        where
+            E: serde::de::Error,
     {
         let split: Vec<&str> = v.split(";").collect::<Vec<&str>>();
 
@@ -302,8 +301,8 @@ impl Add for Coordinates {
 
 impl Serialize for Coordinates {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
+        where
+            S: Serializer,
     {
         return Ok(serializer.serialize_str(&format!("{};{}", self.x, self.y))?);
     }
@@ -311,8 +310,8 @@ impl Serialize for Coordinates {
 
 impl<'de> Deserialize<'de> for Coordinates {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
+        where
+            D: Deserializer<'de>,
     {
         return Ok(deserializer.deserialize_str(CoordinatesVisitor)?);
     }

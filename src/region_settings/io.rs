@@ -5,7 +5,7 @@ use log::info;
 use serde_json::Value;
 
 use crate::common::io::{Load, LoadError};
-use crate::region_settings::RegionSettings;
+use crate::region_settings::data::RegionSettings;
 
 pub struct RegionSettingsLoader {
     pub path: PathBuf,

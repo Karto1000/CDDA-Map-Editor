@@ -9,12 +9,11 @@ use bevy::window::{PrimaryWindow, Window};
 use log::warn;
 
 use crate::common::Coordinates;
-use crate::editor_data::EditorData;
+use crate::editor_data::data::EditorData;
 use crate::graphics::{GetTexture, GraphicsResource, Sprite, SpriteState, TileSprite};
 use crate::graphics::tileset::{GetBackground, GetForeground};
-use crate::map::{TileDeleteEvent, TilePlaceEvent};
-use crate::map::events::{ClearTiles, SpawnMapEntity, UpdateSpriteEvent};
-use crate::tiles::components::{Offset, Tile};
+use crate::map::data::{ClearTiles, SpawnMapEntity, TileDeleteEvent, TilePlaceEvent, UpdateSpriteEvent};
+use crate::tiles::data::{Offset, Tile};
 use crate::ui::grid::GridMaterial;
 use crate::ui::grid::resources::Grid;
 
@@ -574,7 +573,7 @@ pub fn spawn_map_entity_reader(
     mut meshes: ResMut<Assets<Mesh>>,
     mut r_grid: ResMut<Grid>,
     r_editor_data: Res<EditorData>,
-    q_windows: Query<&Window, With<PrimaryWindow>>
+    q_windows: Query<&Window, With<PrimaryWindow>>,
 ) {
     for event in e_spawn_map_entity.read() {
         if let None = r_grid.instantiated_grid {

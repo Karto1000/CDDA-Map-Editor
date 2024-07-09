@@ -9,10 +9,10 @@ use serde_json::Value;
 
 use crate::common::{Coordinates, MeabyWeighted, TileId};
 use crate::common::io::{Load, LoadError};
-use crate::editor_data::CDDAData;
-use crate::map::resources::{ComputedParameters, Multi, Nested, Single, TileSelection};
-use crate::palettes::{MapGenValue, MapObjectId, MeabyParam, PaletteId, ParameterType};
-use crate::tiles::components::Tile;
+use crate::editor_data::data::CDDAData;
+use crate::map::data::{ComputedParameters, Multi, Nested, Single, TileSelection};
+use crate::palettes::data::{MapGenValue, MapObjectId, MeabyParam, PaletteId, ParameterType};
+use crate::tiles::data::Tile;
 
 pub type ParameterId = String;
 

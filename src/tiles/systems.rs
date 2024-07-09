@@ -4,11 +4,11 @@ use bevy::prelude::{EventReader, EventWriter, MouseButton, Query, Res, ResMut, T
 use bevy::window::{PrimaryWindow, WindowResized};
 
 use crate::common::Coordinates;
-use crate::editor_data::EditorData;
-use crate::IsCursorCaptured;
-use crate::map::events::{TileDeleteEvent, TilePlaceEvent};
-use crate::tiles::components::Tile;
-use crate::tiles::resources::PlaceInfo;
+use crate::editor_data::data::EditorData;
+use crate::ui::IsCursorCaptured;
+use crate::map::data::{TileDeleteEvent, TilePlaceEvent};
+use crate::tiles::data::PlaceInfo;
+use crate::tiles::data::Tile;
 use crate::ui::grid::GridMarker;
 use crate::ui::grid::resources::Grid;
 

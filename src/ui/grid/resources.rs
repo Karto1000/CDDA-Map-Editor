@@ -15,6 +15,6 @@ pub struct Grid {
 
     pub min_zoom: f32,
     pub max_zoom: f32,
-    
-    pub instantiated_grid: Option<Entity>
+
+    pub instantiated_grid: Option<Entity>,
 }
