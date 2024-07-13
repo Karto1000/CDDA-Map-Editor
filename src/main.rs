@@ -159,11 +159,17 @@ fn setup(
 
     let settings = match (SettingsLoader {}.load()) {
         Ok(s) => {
-            e_cdda_dir_picked.send(CDDADirPicked {
-                path: s.selected_cdda_dir.clone()
-            });
+            if let Some(path) = &s.selected_cdda_dir {
+                e_cdda_dir_picked.send(CDDADirPicked {
+                    path: path.clone()
+                });
+            }
 
-            e_tileset_selected.send(TilesetSelected {});
+            if let Some(name) = &s.selected_tileset {
+                e_tileset_selected.send(TilesetSelected {
+                    name: name.clone()
+                });
+            }
 
             s
         }
@@ -248,6 +254,7 @@ fn update(
     q_windows: Query<&Window, With<PrimaryWindow>>,
     mut e_write_line: EventWriter<PrintConsoleLine>,
     q_opened_project: Query<(Entity, &OpenedProject)>,
+    r_settings: Res<Settings>,
 ) {
     for log in LOGGER.log_queue.read().unwrap().iter() {
         e_write_line.send(PrintConsoleLine::new(StyledStr::from(cformat!(r#"<g>[{}] {}</g>"#, log.level.as_str(), log.message))));
@@ -259,7 +266,7 @@ fn update(
             None => return,
             Some(o) => o.1.index
         };
-        
+
         let project = match r_program.projects.get(index) {
             None => return,
             Some(p) => p

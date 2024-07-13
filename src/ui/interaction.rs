@@ -2,15 +2,18 @@ use std::fs;
 use std::path::PathBuf;
 
 use bevy::app::AppExit;
-use bevy::prelude::{Changed, Commands, Entity, Event, EventReader, EventWriter, Interaction, Query, Res, ResMut, State, With};
+use bevy::prelude::{Assets, Changed, Commands, Entity, Event, EventReader, EventWriter, Image, Interaction, Query, Res, ResMut, State, With};
 use bevy_egui::egui;
 use bevy_egui::egui::{Align, Color32, Margin, Ui, WidgetText};
 use bevy_file_dialog::{DialogDirectoryPicked, DialogFileLoaded, FileDialogExt};
 use bevy_inspector_egui::bevy_egui::EguiContexts;
 
+use crate::graphics::{GraphicsResource, LegacyTextures};
+use crate::graphics::tileset::legacy::LegacyTilesetLoader;
 use crate::map::data::MapEntity;
 use crate::program::data::{IntoColor32, OpenedProject, Program, ProgramState};
 use crate::project::data::{Project, ProjectSaveState};
+use crate::region_settings::io::RegionSettingsLoader;
 use crate::settings::data::Settings;
 use crate::ui::CDDADirContents;
 use crate::ui::hotbar::components::{CloseIconMarker, ImportIconMarker, OpenIconMarker, SaveIconMarker, SettingsIconMarker};
@@ -39,7 +42,7 @@ pub fn save_button_interaction(
         None => return,
         Some(o) => o.1.index
     };
-    
+
     let project = match r_program.projects.get(index) {
         None => return,
         Some(p) => p
@@ -152,9 +155,9 @@ pub fn cdda_folder_picked(
     mut r_program: ResMut<Program>,
 ) {
     for e in e_cdda_dir_picked.read() {
-        r_settings.selected_cdda_dir = e.path.clone();
-        r_program.config.load_cdda_dir(r_settings.selected_cdda_dir.clone());
-
+        r_settings.selected_cdda_dir = Some(e.path.clone());
+        r_program.config.load_cdda_dir(e.path.clone());
+        
         fs::read_dir(&e.path.join("gfx")).unwrap().into_iter().for_each(|e| {
             match e {
                 Ok(e) => {
@@ -169,11 +172,37 @@ pub fn cdda_folder_picked(
 }
 
 #[derive(Debug, Event)]
-pub struct TilesetSelected {}
+pub struct TilesetSelected {
+    pub name: String,
+}
 
 pub fn tileset_selected(
-    e_tileset_selected: EventReader<TilesetSelected>
-) {}
+    mut e_tileset_selected: EventReader<TilesetSelected>,
+    r_settings: Res<Settings>,
+    mut r_graphics_resource: ResMut<GraphicsResource>,
+    mut r_images: ResMut<Assets<Image>>,
+) {
+    match &r_settings.selected_cdda_dir {
+        None => return,
+        Some(_) => {}
+    };
+    
+    for e in e_tileset_selected.read() {
+        let tileset_loader = LegacyTilesetLoader::new(r_settings.gfx_dir().unwrap().join(e.name.clone()));
+        let region_settings_loader = RegionSettingsLoader::new(
+            r_settings.data_json_dir().unwrap().join(r"regional_map_settings.json"),
+            "default".into(),
+        );
+
+        let textures = LegacyTextures::new(
+            tileset_loader,
+            region_settings_loader,
+            &mut r_images,
+        );
+
+        r_graphics_resource.textures = Some(Box::new(textures));
+    }
+}
 
 pub fn settings_button_interaction(
     q_interaction: Query<&Interaction, (Changed<Interaction>, With<SettingsIconMarker>)>,
@@ -181,6 +210,7 @@ pub fn settings_button_interaction(
     mut r_program: ResMut<Program>,
     mut commands: Commands,
     mut r_settings: ResMut<Settings>,
+    mut e_tileset_selected: EventWriter<TilesetSelected>,
 ) {
     let gray_dark_color32 = r_program.config.style.gray_dark.into_color32();
 
@@ -216,7 +246,12 @@ pub fn settings_button_interaction(
                     gray_dark_color32,
                     ui,
                     |ui| {
-                        let mut string = r_settings.selected_cdda_dir.to_str().unwrap().to_string();
+                        let mut string = r_settings.selected_cdda_dir
+                            .as_ref()
+                            .unwrap()
+                            .to_str()
+                            .unwrap()
+                            .to_string();
 
                         ui.horizontal(|ui| {
                             ui.spacing_mut().item_spacing.x = 12.;
@@ -248,7 +283,17 @@ pub fn settings_button_interaction(
                                 .show_ui(ui, |ui| {
                                     let entries = r_settings.selectable_tilesets.clone();
                                     for tileset_name in entries.into_iter() {
-                                        ui.selectable_value(&mut r_settings.selected_tileset, Some(tileset_name.clone()), tileset_name.clone());
+                                        let value = ui.selectable_value(
+                                            &mut r_settings.selected_tileset,
+                                            Some(tileset_name.clone()),
+                                            tileset_name.clone(),
+                                        );
+
+                                        if value.clicked() {
+                                            e_tileset_selected.send(TilesetSelected {
+                                                name: tileset_name
+                                            });
+                                        }
                                     }
                                 });
                         });

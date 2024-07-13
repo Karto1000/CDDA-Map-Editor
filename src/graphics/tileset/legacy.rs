@@ -684,8 +684,6 @@ impl TilesetLoader<LegacyTileset, i32> for LegacyTilesetLoader {
                                             continue;
                                         }
 
-                                        println!("{:?} {} {}", xy, fg, start);
-
                                         let image = get_image_from_tileset(
                                             &image,
                                             xy.x as u32 * group_width,
