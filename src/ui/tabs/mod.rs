@@ -1,18 +1,27 @@
 use bevy::asset::AssetServer;
 use bevy::hierarchy::BuildChildren;
-use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Changed, Color, Commands, default, Display, Entity, EventReader, EventWriter, ImageBundle, Interaction, NodeBundle, Query, Res, ResMut, State, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val, With};
+use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Changed, Color, Commands, default, Display, Entity, EventReader, EventWriter, ImageBundle, Interaction, IVec2, NodeBundle, Query, Res, ResMut, Resource, State, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val, With};
+use bevy_egui::egui::{Align2, Button, Vec2, Window};
+use bevy_inspector_egui::bevy_egui::EguiContexts;
 
-use crate::map::data::MapEntity;
-use crate::program::data::{OpenedProject, Program, ProgramState};
-use crate::project::data::{CloseProject, Project, ProjectSaveState};
+use crate::map::data::{MapEntity, Single};
+use crate::program::data::{IntoColor32, OpenedProject, Program, ProgramState};
+use crate::project::data::{CloseProject, CreateProject, Project};
 use crate::project::data::OpenProjectAtIndex;
 use crate::ui::{HoverEffect, ToggleEffect};
+use crate::ui::egui_utils::{add_settings_frame, input_group};
 use crate::ui::hotbar::components::TopHotbarMarker;
 use crate::ui::tabs::components::{AddTabButtonMarker, Tab, TabContainerMarker};
 use crate::ui::tabs::events::SpawnTab;
 
 pub(crate) mod events;
 pub(crate) mod components;
+
+#[derive(Resource, Debug, Default)]
+pub struct CreateData {
+    name: String,
+    size: String,
+}
 
 pub fn setup(
     r_asset_server: Res<AssetServer>,
@@ -80,9 +89,99 @@ pub fn setup(
     });
 }
 
+pub fn create_project_menu(
+    mut contexts: EguiContexts,
+    mut r_program: ResMut<Program>,
+    mut r_create_data: Option<ResMut<CreateData>>,
+    mut e_spawn_tab: EventWriter<SpawnTab>,
+    mut e_create_project: EventWriter<CreateProject>,
+    mut commands: Commands
+) {
+    let mut r_create_data = match r_create_data {
+        None => return,
+        Some(r) => r
+    };
+
+    let gray_dark_color32 = r_program.config.style.gray_dark.into_color32();
+    let amount_of_projects = r_program.projects.len();
+
+    Window::new("Create new Project")
+        .open(&mut r_program.menus.is_create_project_menu_open)
+        .collapsible(false)
+        .resizable(false)
+        .movable(false)
+        .anchor(Align2::CENTER_CENTER, Vec2::default())
+        .show(contexts.ctx_mut(), |ui| {
+            ui.set_max_width(500.);
+
+            add_settings_frame(
+                "Config",
+                gray_dark_color32,
+                ui,
+                |ui| {
+                    input_group(
+                        ui,
+                        &mut r_create_data.name,
+                        "Name".into(),
+                    );
+
+                    input_group(
+                        ui,
+                        &mut r_create_data.size,
+                        "Map Size".into(),
+                    );
+                },
+            );
+
+            let button = Button::new("Create");
+            let response = ui.add_sized([64., 32.], button);
+
+            if response.clicked() {
+                if r_create_data.name.is_empty() { return; }
+                if r_create_data.size.is_empty() { return; }
+
+                let nums = r_create_data.size.splitn(2, "x").collect::<Vec<&str>>();
+
+                let map_size: IVec2 = match (nums.get(0), nums.get(1)) {
+                    (Some(width), Some(height)) => {
+                        match (width.parse(), height.parse()) {
+                            (Ok(v1), Ok(v2)) => IVec2::new(v1, v2),
+                            _ => return
+                        }
+                    }
+                    _ => return
+                };
+
+                let project = Project {
+                    name: r_create_data.name.clone(),
+                    map_entity: MapEntity::Single(Single {
+                        om_terrain: r_create_data.name.clone(),
+                        tile_selection: Default::default(),
+                        tiles: Default::default(),
+                        size: map_size
+                    }),
+                    save_state: Default::default(),
+                };
+                
+                e_create_project.send(CreateProject {
+                    project
+                });
+                
+                e_spawn_tab.send(SpawnTab {
+                    name: r_create_data.name.clone(),
+                    index: amount_of_projects as u32,
+                });
+                
+                commands.remove_resource::<CreateData>();
+            }
+        });
+}
+
 pub fn on_add_tab_button_click(
     q_interaction: Query<&Interaction, (Changed<Interaction>, With<AddTabButtonMarker>)>,
+    mut contexts: EguiContexts,
     mut r_program: ResMut<Program>,
+    mut commands: Commands,
     mut e_spawn_tab: EventWriter<SpawnTab>,
 ) {
     let interaction = match q_interaction.iter().next() {
@@ -96,20 +195,22 @@ pub fn on_add_tab_button_click(
 
             match project.map_entity {
                 MapEntity::Single(ref mut s) => {
-                    let amount_of_unnamed = r_program.projects.iter()
-                        .filter(|p| p.save_state == ProjectSaveState::NotSaved)
-                        .map(|p| s.om_terrain.clone())
-                        .filter(|n| n.contains("unnamed"))
-                        .count();
-
-                    let name = format!("unnamed{}", amount_of_unnamed).to_string();
-                    s.om_terrain = name.clone();
-                    project.name = name.clone();
-
-                    let name = s.om_terrain.clone();
-
-                    r_program.projects.push(project);
-                    e_spawn_tab.send(SpawnTab { name, index: r_program.projects.len() as u32 - 1 });
+                    // let amount_of_unnamed = r_program.projects.iter()
+                    //     .filter(|p| p.save_state == ProjectSaveState::NotSaved)
+                    //     .map(|p| s.om_terrain.clone())
+                    //     .filter(|n| n.contains("unnamed"))
+                    //     .count();
+                    //
+                    // let name = format!("unnamed{}", amount_of_unnamed).to_string();
+                    // s.om_terrain = name.clone();
+                    // project.name = name.clone();
+                    //
+                    // let name = s.om_terrain.clone();
+                    //
+                    // r_program.projects.push(project);
+                    // e_spawn_tab.send(SpawnTab { name, index: r_program.projects.len() as u32 - 1 });
+                    r_program.menus.is_create_project_menu_open = !r_program.menus.is_create_project_menu_open;
+                    commands.insert_resource(CreateData::default())
                 }
                 _ => todo!()
             }
@@ -212,7 +313,7 @@ pub fn tab_clicked(
                             None => return,
                             Some(o) => o.1.index
                         };
-                        
+
                         if tab.index == index as u32 {
                             e_close_project.send(CloseProject {});
                             return;

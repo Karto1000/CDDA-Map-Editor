@@ -5,7 +5,7 @@ use bevy::ui::PositionType;
 use crate::program::data::Program;
 
 use crate::ui::{HoverEffect, OriginalColor};
-use crate::ui::hotbar::components::{CloseIconMarker, ImportIconMarker, OpenIconMarker, SaveIconMarker, SettingsIconMarker, TopHotbarMarker};
+use crate::ui::hotbar::components::{CloseIconMarker, CustomTitleBarMarker, ImportIconMarker, OpenIconMarker, SaveIconMarker, SettingsIconMarker, TopHotbarMarker};
 
 pub(crate) mod components;
 
@@ -63,8 +63,8 @@ pub fn build_hotbar(
     let grass = asset_server.load("grass.png");
     let font = asset_server.load("fonts/unifont.ttf");
 
-    commands.spawn(
-        NodeBundle {
+    commands.spawn((
+        ButtonBundle {
             style: Style {
                 display: Display::Flex,
                 justify_content: JustifyContent::SpaceBetween,
@@ -75,7 +75,7 @@ pub fn build_hotbar(
             },
             background_color: BackgroundColor::from(editor_data.config.style.gray_dark),
             ..default()
-        },
+        }, CustomTitleBarMarker {}),
     ).with_children(|parent| {
         parent.spawn((
             NodeBundle {

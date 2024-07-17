@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use bevy::math::Vec2;
+use bevy::math::{IVec2, Vec2};
 use bevy::prelude::{Event, Resource};
 use serde::{Deserialize, Serialize};
 
@@ -126,7 +126,7 @@ impl MapEntity {
 
     pub fn size(&self) -> Vec2 {
         return match self {
-            MapEntity::Single(_) => Vec2::new(24., 24.),
+            MapEntity::Single(s) => s.size.as_vec2(),
             MapEntity::Multi(_) => Vec2::new(24., 24.),
             MapEntity::Nested(n) => Vec2::new(n.om_terrain.len() as f32, n.row_size as f32)
         };
@@ -237,6 +237,7 @@ pub struct Single {
     pub om_terrain: String,
     pub tile_selection: TileSelection,
     pub tiles: HashMap<Coordinates, Tile>,
+    pub size: IVec2
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]

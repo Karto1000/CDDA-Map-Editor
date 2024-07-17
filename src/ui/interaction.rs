@@ -16,6 +16,7 @@ use crate::project::data::{Project, ProjectSaveState};
 use crate::region_settings::io::RegionSettingsLoader;
 use crate::settings::data::Settings;
 use crate::ui::CDDADirContents;
+use crate::ui::egui_utils::add_settings_frame;
 use crate::ui::hotbar::components::{CloseIconMarker, ImportIconMarker, OpenIconMarker, SaveIconMarker, SettingsIconMarker};
 use crate::ui::tabs::events::SpawnTab;
 
@@ -157,13 +158,17 @@ pub fn cdda_folder_picked(
     for e in e_cdda_dir_picked.read() {
         r_settings.selected_cdda_dir = Some(e.path.clone());
         r_program.config.load_cdda_dir(e.path.clone());
-        
+
         fs::read_dir(&e.path.join("gfx")).unwrap().into_iter().for_each(|e| {
             match e {
                 Ok(e) => {
-                    if e.path().is_dir() {
-                        r_settings.selectable_tilesets.push(e.file_name().to_str().unwrap().to_string())
+                    if !e.path().is_dir() { return; }
+
+                    if r_settings.selectable_tilesets.contains(&e.file_name().to_str().unwrap().to_string()) {
+                        return;
                     }
+
+                    r_settings.selectable_tilesets.push(e.file_name().to_str().unwrap().to_string());
                 }
                 Err(_) => {}
             };
@@ -186,7 +191,7 @@ pub fn tileset_selected(
         None => return,
         Some(_) => {}
     };
-    
+
     for e in e_tileset_selected.read() {
         let tileset_loader = LegacyTilesetLoader::new(r_settings.gfx_dir().unwrap().join(e.name.clone()));
         let region_settings_loader = RegionSettingsLoader::new(
@@ -222,36 +227,15 @@ pub fn settings_button_interaction(
                 ui.label("Here you can change the general settings of the editor which applies to all Projects");
                 ui.set_max_width(500.);
 
-                fn add_settings_menu(
-                    name: impl Into<WidgetText>,
-                    fill: Color32, ui: &mut Ui,
-                    add: impl FnOnce(&mut Ui),
-                ) {
-                    egui::Frame::none()
-                        .fill(fill)
-                        .inner_margin(Margin::same(8.))
-                        .show(ui, |ui| {
-                            ui.set_width(ui.available_width());
-
-                            ui.spacing_mut().item_spacing.y = 12.;
-                            ui.vertical(|ui| {
-                                ui.label(name);
-                                add(ui);
-                            });
-                        });
-                }
-
-                add_settings_menu(
+                add_settings_frame(
                     "General",
                     gray_dark_color32,
                     ui,
                     |ui| {
-                        let mut string = r_settings.selected_cdda_dir
-                            .as_ref()
-                            .unwrap()
-                            .to_str()
-                            .unwrap()
-                            .to_string();
+                        let mut string = match &r_settings.selected_cdda_dir {
+                            Some(v) => v.to_str().unwrap().to_string(),
+                            None => "".into()
+                        };
 
                         ui.horizontal(|ui| {
                             ui.spacing_mut().item_spacing.x = 12.;
@@ -272,7 +256,7 @@ pub fn settings_button_interaction(
                     },
                 );
 
-                add_settings_menu(
+                add_settings_frame(
                     "Tile Settings",
                     gray_dark_color32,
                     ui,

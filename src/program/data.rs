@@ -38,9 +38,7 @@ impl Program {
             projects,
             history,
             config: Config::default(),
-            menus: Menus {
-                is_settings_menu_open: false
-            },
+            menus: Menus::default(),
         };
     }
 }
@@ -93,5 +91,6 @@ impl IntoColor32 for Color {
 #[derive(Debug, Default)]
 pub struct Menus {
     pub is_settings_menu_open: bool,
+    pub is_create_project_menu_open: bool
 }
 

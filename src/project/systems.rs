@@ -4,7 +4,7 @@ use bevy::prelude::{Commands, Entity, EventReader, EventWriter, NextState, Query
 
 use crate::map::data::{ClearTiles, SpawnMapEntity};
 use crate::program::data::{OpenedProject, Program, ProgramState};
-use crate::project::data::{CloseProject, OpenProjectAtIndex};
+use crate::project::data::{CloseProject, CreateProject, OpenProjectAtIndex};
 use crate::ui::grid::resources::Grid;
 
 pub fn open_project(
@@ -20,12 +20,12 @@ pub fn open_project(
         let new_project = r_program.projects.get(switch_project.index as usize).unwrap();
 
         s_next.set(ProgramState::ProjectOpen);
-        
+
         if let Some(o) = q_opened_project.iter().next() {
             // Despawn the already existing entity
             commands.get_entity(o).unwrap().despawn();
         }
-        
+
         commands.spawn(OpenedProject { index: switch_project.index as usize });
 
         e_clear_tiles.send(ClearTiles {});
@@ -33,6 +33,15 @@ pub fn open_project(
         e_spawn_map_entity.send(SpawnMapEntity {
             map_entity: Arc::new(new_project.map_entity.clone())
         });
+    }
+}
+
+pub fn create_project(
+    mut e_create_project: EventReader<CreateProject>,
+    mut r_program: ResMut<Program>,
+) {
+    for e in e_create_project.read() {
+        r_program.projects.push(e.project.clone());
     }
 }
 

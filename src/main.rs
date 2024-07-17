@@ -47,6 +47,7 @@ use crate::tiles::plugin::TilePlugin;
 use crate::ui::grid::GridMaterial;
 use crate::ui::grid::GridPlugin;
 use crate::ui::grid::resources::Grid;
+use crate::ui::hotbar::components::CustomTitleBarMarker;
 use crate::ui::interaction::{CDDADirPicked, TilesetSelected};
 use crate::ui::UiPlugin;
 
@@ -119,7 +120,7 @@ fn main() {
     // Update
     let not_open_sys = (
         update,
-        exit
+        exit,
     );
 
     let open_sys = (
@@ -134,7 +135,7 @@ fn main() {
         apply_deferred,
         spawn_sprite,
         update_sprite_reader,
-        exit
+        exit,
     );
 
     app.add_systems(Update, (
@@ -177,7 +178,7 @@ fn setup(
     };
 
     let program_loader = ProgramdataLoader {};
-    let program_data = program_loader.load().unwrap();
+    let program_data = program_loader.load().unwrap_or(Program::new(vec![], vec![]));
 
     let texture_resource = GraphicsResource::default();
 
@@ -233,6 +234,30 @@ fn setup_egui(
                 bg_stroke: Default::default(),
                 rounding: Default::default(),
                 fg_stroke: Default::default(),
+                expansion: 0.0,
+            },
+            inactive: WidgetVisuals {
+                bg_fill: r_program.config.style.white.into_color32(),
+                weak_bg_fill: r_program.config.style.blue_dark.into_color32(),
+                bg_stroke: Default::default(),
+                rounding: Default::default(),
+                fg_stroke: Stroke::new(1., r_program.config.style.white.into_color32()),
+                expansion: 0.0,
+            },
+            hovered: WidgetVisuals {
+                bg_fill: Default::default(),
+                weak_bg_fill: r_program.config.style.selected.into_color32(),
+                bg_stroke: Default::default(),
+                rounding: Default::default(),
+                fg_stroke: Stroke::new(1., r_program.config.style.white.into_color32()),
+                expansion: 0.0,
+            },
+            active: WidgetVisuals {
+                bg_fill: Default::default(),
+                weak_bg_fill: r_program.config.style.selected.into_color32(),
+                bg_stroke: Default::default(),
+                rounding: Default::default(),
+                fg_stroke: Stroke::new(1., r_program.config.style.white.into_color32()),
                 expansion: 0.0,
             },
             ..Default::default()

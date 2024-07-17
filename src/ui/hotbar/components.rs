@@ -17,3 +17,6 @@ pub struct CloseIconMarker;
 
 #[derive(Component)]
 pub struct SettingsIconMarker;
+
+#[derive(Component)]
+pub struct CustomTitleBarMarker;

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::path::PathBuf;
-
+use bevy::math::IVec2;
 use bevy::tasks::futures_lite::StreamExt;
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -80,7 +80,7 @@ fn compute_palettes(
 
 impl Load<Single> for MapEntityLoader<'_> {
     fn load(&self) -> Result<Single, LoadError> {
-        let objects = serde_json::from_str::<Vec<HashMap<String, Value>>>(std::fs::read_to_string(&self.path).unwrap().as_str()).unwrap();
+        let objects = serde_json::from_str::<Vec<HashMap<String, Value>>>(read_to_string(&self.path).unwrap().as_str()).unwrap();
 
         let mapgen_entity = objects
             .into_iter()
@@ -110,7 +110,9 @@ impl Load<Single> for MapEntityLoader<'_> {
             None => HashMap::new(),
             Some(v) => serde_json::from_value::<HashMap<ParameterId, Parameter>>(v.clone()).unwrap()
         };
-        let palettes: Vec<MapObjectId<MeabyParam>> = serde_json::from_value(object.get("palettes").unwrap_or(&Value::Array(Vec::new())).clone()).unwrap();
+        let palettes: Vec<MapObjectId<MeabyParam>> = serde_json::from_value(object.get("palettes")
+            .unwrap_or(&Value::Array(Vec::new())).clone())
+            .unwrap();
 
         let mut tiles = HashMap::new();
 
@@ -166,6 +168,7 @@ impl Load<Single> for MapEntityLoader<'_> {
                     furniture,
                 },
                 tiles,
+                size: IVec2::new(rows.get(0).unwrap().len() as i32, rows.len() as i32),
             }
         );
     }

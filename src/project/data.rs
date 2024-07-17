@@ -32,6 +32,11 @@ pub struct OpenProjectAtIndex {
 }
 
 #[derive(Event)]
+pub struct CreateProject {
+    pub project: Project
+}
+
+#[derive(Event)]
 pub struct CloseProject {}
 
 
