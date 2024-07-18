@@ -50,7 +50,7 @@ fn fragment(output: VertexOutput) -> @location(0) vec4<f32> {
              color.x = 1.0;
              color.y = 1.0;
              color.z = 1.0;
-             alpha = 0.05;
+             alpha = 0.1;
         }
     }
 

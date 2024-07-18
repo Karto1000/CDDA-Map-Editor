@@ -38,7 +38,7 @@ use crate::common::{BufferedLogger, Coordinates, LogMessage};
 use crate::common::io::{Load, Save};
 use crate::graphics::GraphicsResource;
 use crate::map::plugin::MapPlugin;
-use crate::map::systems::{set_tile_reader, spawn_sprite, tile_despawn_reader, tile_remove_reader, tile_spawn_reader, update_sprite_reader};
+use crate::map::systems::{clear_tiles_reader, set_tile_reader, spawn_map_entity_reader, spawn_sprite, tile_despawn_reader, tile_remove_reader, tile_spawn_reader, update_sprite_reader};
 use crate::program::data::{OpenedProject, Program, ProgramState};
 use crate::program::io::{ProgramdataLoader, ProgramdataSaver};
 use crate::program::plugin::ProgramPlugin;
@@ -47,7 +47,6 @@ use crate::tiles::plugin::TilePlugin;
 use crate::ui::grid::GridMaterial;
 use crate::ui::grid::GridPlugin;
 use crate::ui::grid::resources::Grid;
-use crate::ui::hotbar::components::CustomTitleBarMarker;
 use crate::ui::interaction::{CDDADirPicked, TilesetSelected};
 use crate::ui::UiPlugin;
 
@@ -97,15 +96,6 @@ fn main() {
         ProjectPlugin
     ));
 
-    // -- Add Resources --
-    app.insert_resource(ConsoleConfiguration {
-        keys: vec![
-            // TODO: Localize
-            KeyCode::F1
-        ],
-        ..default()
-    });
-
     // -- Add Events --
     app.add_event::<LogMessage>();
 
@@ -118,34 +108,27 @@ fn main() {
     app.add_systems(PostStartup, setup_egui);
 
     // Update
-    let not_open_sys = (
-        update,
+    let sys = (
         exit,
-    );
-
-    let open_sys = (
         update,
         tile_despawn_reader,
         apply_deferred,
         tile_remove_reader,
         apply_deferred,
-        set_tile_reader,
+        spawn_map_entity_reader,
         apply_deferred,
+        clear_tiles_reader,
+        apply_deferred,
+        set_tile_reader,
         tile_spawn_reader,
         apply_deferred,
         spawn_sprite,
+        apply_deferred,
         update_sprite_reader,
         exit,
     );
 
-    app.add_systems(Update, (
-        not_open_sys
-            .chain()
-            .run_if(in_state(ProgramState::NoneOpen)),
-        open_sys
-            .chain()
-            .run_if(in_state(ProgramState::ProjectOpen))
-    ));
+    app.add_systems(Update, sys.chain());
 
     app.run();
 }
@@ -194,6 +177,10 @@ fn setup(
 
     win_windows.windows.iter().for_each(|(_, w)| w.set_window_icon(Some(icon.clone())));
 
+    commands.insert_resource(ConsoleConfiguration {
+        keys: program_data.config.keybindings.open_console.clone(),
+        ..default()
+    });
     commands.insert_resource(settings);
     commands.insert_resource(ClearColor(program_data.config.style.gray_dark.clone()));
     commands.insert_resource(program_data);
@@ -274,12 +261,12 @@ fn update(
     r_grid: Res<Grid>,
     r_cursor: Res<IsCursorCaptured>,
     r_program: Res<Program>,
+    r_program_state: Res<State<ProgramState>>,
     mut r_grid_material: ResMut<Assets<GridMaterial>>,
     mut q_tiles: Query<(&mut Transform, &Coordinates, &Offset), With<Tile>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     mut e_write_line: EventWriter<PrintConsoleLine>,
     q_opened_project: Query<(Entity, &OpenedProject)>,
-    r_settings: Res<Settings>,
 ) {
     for log in LOGGER.log_queue.read().unwrap().iter() {
         e_write_line.send(PrintConsoleLine::new(StyledStr::from(cformat!(r#"<g>[{}] {}</g>"#, log.level.as_str(), log.message))));

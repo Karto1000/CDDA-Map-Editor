@@ -61,6 +61,7 @@ pub fn close_project(
         };
 
         s_next.set(ProgramState::NoneOpen);
+
         commands.get_entity(entity).unwrap().despawn();
 
         e_clear_tiles.send(ClearTiles {});

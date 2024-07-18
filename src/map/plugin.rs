@@ -10,11 +10,10 @@ pub struct MapPlugin;
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
-            Update, (
-                spawn_map_entity_reader,
-                clear_tiles_reader,
+            Update, 
+            (
                 update_animated_sprites
-            ).run_if(in_state(ProgramState::ProjectOpen))
+            )
         );
 
         app.add_event::<TilePlaceEvent>();

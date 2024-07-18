@@ -1,6 +1,6 @@
 use bevy::app::App;
-use bevy::prelude::{in_state, IntoSystemConfigs, Plugin, Update};
-
+use bevy::prelude::{apply_deferred, in_state, IntoSystemConfigs, Plugin, Update};
+use crate::map::systems::spawn_map_entity_reader;
 use crate::program::data::ProgramState;
 use crate::project::data::{CloseProject, CreateProject, OpenProjectAtIndex};
 use crate::project::systems::{close_project, create_project, open_project};
@@ -19,16 +19,7 @@ impl Plugin for ProjectPlugin {
                 open_project,
                 close_project,
                 create_project
-            ).run_if(in_state(ProgramState::NoneOpen)),
-        );
-
-        app.add_systems(
-            Update,
-            (
-                open_project,
-                close_project,
-                create_project
-            ).run_if(in_state(ProgramState::ProjectOpen)),
+            ).chain(),
         );
     }
 }

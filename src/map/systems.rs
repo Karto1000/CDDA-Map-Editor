@@ -625,7 +625,7 @@ pub fn spawn_map_entity_reader(
                 None => return,
                 Some(o) => o.1.index
             };
-            
+
             let window = q_windows.single();
 
             r_grid.instantiated_grid = Some(commands.spawn((

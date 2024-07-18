@@ -19,4 +19,11 @@ pub struct CloseIconMarker;
 pub struct SettingsIconMarker;
 
 #[derive(Component)]
+pub struct TileSettingsMarker;
+
+#[derive(Component)]
+pub struct ProjectSettingsMarker;
+
+
+#[derive(Component)]
 pub struct CustomTitleBarMarker;

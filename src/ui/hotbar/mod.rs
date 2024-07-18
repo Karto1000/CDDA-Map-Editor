@@ -2,10 +2,10 @@ use bevy::asset::{AssetServer, Handle};
 use bevy::hierarchy::{BuildChildren, ChildBuilder};
 use bevy::prelude::{AlignItems, BackgroundColor, Bundle, ButtonBundle, Color, Commands, default, Display, FlexDirection, Image, ImageBundle, JustifyContent, NodeBundle, Res, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val};
 use bevy::ui::PositionType;
-use crate::program::data::Program;
 
+use crate::program::data::Program;
 use crate::ui::{HoverEffect, OriginalColor};
-use crate::ui::hotbar::components::{CloseIconMarker, CustomTitleBarMarker, ImportIconMarker, OpenIconMarker, SaveIconMarker, SettingsIconMarker, TopHotbarMarker};
+use crate::ui::hotbar::components::{CloseIconMarker, CustomTitleBarMarker, ImportIconMarker, OpenIconMarker, ProjectSettingsMarker, SaveIconMarker, SettingsIconMarker, TileSettingsMarker, TopHotbarMarker};
 
 pub(crate) mod components;
 
@@ -64,18 +64,18 @@ pub fn build_hotbar(
     let font = asset_server.load("fonts/unifont.ttf");
 
     commands.spawn((
-        ButtonBundle {
-            style: Style {
-                display: Display::Flex,
-                justify_content: JustifyContent::SpaceBetween,
-                width: Val::Percent(100.),
-                padding: UiRect::px(3., 0., 3., 3.),
-                height: Val::Px(32.),
-                ..default()
-            },
-            background_color: BackgroundColor::from(editor_data.config.style.gray_dark),
-            ..default()
-        }, CustomTitleBarMarker {}),
+                       ButtonBundle {
+                           style: Style {
+                               display: Display::Flex,
+                               justify_content: JustifyContent::SpaceBetween,
+                               width: Val::Percent(100.),
+                               padding: UiRect::px(3., 0., 3., 3.),
+                               height: Val::Px(32.),
+                               ..default()
+                           },
+                           background_color: BackgroundColor::from(editor_data.config.style.gray_dark),
+                           ..default()
+                       }, CustomTitleBarMarker {}),
     ).with_children(|parent| {
         parent.spawn((
             NodeBundle {
@@ -204,9 +204,25 @@ pub fn build_hotbar(
             spawn_button_icon(
                 icons_container,
                 editor_data,
+                asset_server.load("icons/variation.png"),
+                editor_data.config.style.gray_darker,
+                TileSettingsMarker,
+            );
+
+            spawn_button_icon(
+                icons_container,
+                editor_data,
+                asset_server.load("icons/edit.png"),
+                editor_data.config.style.gray_darker,
+                ProjectSettingsMarker,
+            );
+
+            spawn_button_icon(
+                icons_container,
+                editor_data,
                 asset_server.load("icons/cog.png"),
                 editor_data.config.style.gray_darker,
-                SettingsIconMarker {},
+                SettingsIconMarker,
             );
         });
     });

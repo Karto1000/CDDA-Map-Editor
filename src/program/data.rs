@@ -1,12 +1,13 @@
-use bevy::prelude::{Color, Component, Resource, States};
-use bevy_egui::egui::Color32;
-use std::sync::Arc;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use num::ToPrimitive;
-use crate::common::io::Load;
+use std::sync::Arc;
 
+use bevy::prelude::{Color, Component, KeyCode, Resource, States};
+use bevy_egui::egui::Color32;
+use num::ToPrimitive;
+use serde::{Deserialize, Serialize};
+
+use crate::common::io::Load;
 use crate::palettes::data::Palette;
 use crate::palettes::io::PalettesLoader;
 use crate::project::data::{Project, ProjectSaveState};
@@ -21,7 +22,7 @@ pub enum ProgramState {
 
 #[derive(Component, Debug)]
 pub struct OpenedProject {
-    pub index: usize
+    pub index: usize,
 }
 
 #[derive(Resource)]
@@ -51,6 +52,7 @@ pub struct CDDAData {
 #[derive(Debug)]
 pub struct Config {
     pub cdda_data: Option<Arc<CDDAData>>,
+    pub keybindings: Keybinds,
     pub style: Style,
 }
 
@@ -69,6 +71,7 @@ impl Default for Config {
     fn default() -> Self {
         return Self {
             cdda_data: Default::default(),
+            keybindings: Default::default(),
             style: Style::dark(),
         };
     }
@@ -91,6 +94,20 @@ impl IntoColor32 for Color {
 #[derive(Debug, Default)]
 pub struct Menus {
     pub is_settings_menu_open: bool,
-    pub is_create_project_menu_open: bool
+    pub is_create_project_menu_open: bool,
 }
 
+#[derive(Debug)]
+pub struct Keybinds {
+    pub open_console: Vec<KeyCode>,
+    pub save_project: Vec<KeyCode>,
+}
+
+impl Default for Keybinds {
+    fn default() -> Self {
+        return Self {
+            open_console: vec![KeyCode::F1],
+            save_project: vec![KeyCode::ControlLeft, KeyCode::KeyS],
+        };
+    }
+}
