@@ -29,7 +29,6 @@ pub struct OpenedProject {
 pub struct Program {
     pub history: Vec<ProjectSaveState>,
     pub config: Config,
-    pub menus: Menus,
     pub projects: Vec<Project>,
 }
 
@@ -39,7 +38,6 @@ impl Program {
             projects,
             history,
             config: Config::default(),
-            menus: Menus::default(),
         };
     }
 }
@@ -91,10 +89,11 @@ impl IntoColor32 for Color {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Resource, Debug, Default)]
 pub struct Menus {
     pub is_settings_menu_open: bool,
     pub is_create_project_menu_open: bool,
+    pub is_define_terrain_menu_open: bool,
 }
 
 #[derive(Debug)]

@@ -13,6 +13,7 @@ use crate::ui::egui_utils::{add_settings_frame, input_group};
 use crate::ui::hotbar::components::TopHotbarMarker;
 use crate::ui::tabs::components::{AddTabButtonMarker, Tab, TabContainerMarker};
 use crate::ui::tabs::events::SpawnTab;
+use crate::program::data::Menus;
 
 pub(crate) mod events;
 pub(crate) mod components;
@@ -92,6 +93,7 @@ pub fn setup(
 pub fn create_project_menu(
     mut contexts: EguiContexts,
     mut r_program: ResMut<Program>,
+    mut r_menus: ResMut<Menus>,
     mut r_create_data: Option<ResMut<CreateData>>,
     mut e_spawn_tab: EventWriter<SpawnTab>,
     mut e_create_project: EventWriter<CreateProject>,
@@ -106,7 +108,7 @@ pub fn create_project_menu(
     let amount_of_projects = r_program.projects.len();
 
     Window::new("Create new Project")
-        .open(&mut r_program.menus.is_create_project_menu_open)
+        .open(&mut r_menus.is_create_project_menu_open)
         .collapsible(false)
         .resizable(false)
         .movable(false)
@@ -179,10 +181,8 @@ pub fn create_project_menu(
 
 pub fn on_add_tab_button_click(
     q_interaction: Query<&Interaction, (Changed<Interaction>, With<AddTabButtonMarker>)>,
-    mut contexts: EguiContexts,
-    mut r_program: ResMut<Program>,
+    mut r_menus: ResMut<Menus>,
     mut commands: Commands,
-    mut e_spawn_tab: EventWriter<SpawnTab>,
 ) {
     let interaction = match q_interaction.iter().next() {
         None => { return; }
@@ -195,21 +195,7 @@ pub fn on_add_tab_button_click(
 
             match project.map_entity {
                 MapEntity::Single(ref mut s) => {
-                    // let amount_of_unnamed = r_program.projects.iter()
-                    //     .filter(|p| p.save_state == ProjectSaveState::NotSaved)
-                    //     .map(|p| s.om_terrain.clone())
-                    //     .filter(|n| n.contains("unnamed"))
-                    //     .count();
-                    //
-                    // let name = format!("unnamed{}", amount_of_unnamed).to_string();
-                    // s.om_terrain = name.clone();
-                    // project.name = name.clone();
-                    //
-                    // let name = s.om_terrain.clone();
-                    //
-                    // r_program.projects.push(project);
-                    // e_spawn_tab.send(SpawnTab { name, index: r_program.projects.len() as u32 - 1 });
-                    r_program.menus.is_create_project_menu_open = !r_program.menus.is_create_project_menu_open;
+                    r_menus.is_create_project_menu_open = !r_menus.is_create_project_menu_open;
                     commands.insert_resource(CreateData::default())
                 }
                 _ => todo!()

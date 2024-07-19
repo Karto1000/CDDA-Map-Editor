@@ -468,8 +468,12 @@ pub struct WeightedForeground {
 }
 
 impl GetForeground for WeightedForeground {
-    fn get_sprite(&self) -> &Handle<Image> {
+    fn get_randomized_sprite(&self) -> &Handle<Image> {
         return self.weighted_sprites.get_random_weighted().unwrap();
+    }
+
+    fn get_representative_sprite(&self) -> &Handle<Image> {
+        return &self.weighted_sprites.first().unwrap().value;
     }
 }
 
@@ -486,7 +490,11 @@ impl SingleForeground {
 }
 
 impl GetForeground for SingleForeground {
-    fn get_sprite(&self) -> &Handle<Image> {
+    fn get_randomized_sprite(&self) -> &Handle<Image> {
+        return &self.sprite;
+    }
+
+    fn get_representative_sprite(&self) -> &Handle<Image> {
         return &self.sprite;
     }
 }
@@ -497,8 +505,12 @@ pub struct WeightedBackground {
 }
 
 impl GetBackground for WeightedBackground {
-    fn get_sprite(&self) -> &Handle<Image> {
+    fn get_randomized_sprite(&self) -> &Handle<Image> {
         return self.weighted_sprites.get_random_weighted().unwrap();
+    }
+
+    fn get_representative_sprite(&self) -> &Handle<Image> {
+        return &self.weighted_sprites.first().unwrap().value
     }
 }
 
@@ -507,7 +519,11 @@ pub struct SingleBackground {
 }
 
 impl GetBackground for SingleBackground {
-    fn get_sprite(&self) -> &Handle<Image> {
+    fn get_randomized_sprite(&self) -> &Handle<Image> {
+        return &self.sprite;
+    }
+
+    fn get_representative_sprite(&self) -> &Handle<Image> {
         return &self.sprite;
     }
 }

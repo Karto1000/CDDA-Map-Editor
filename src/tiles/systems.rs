@@ -79,7 +79,7 @@ pub fn tile_place_system(
         }
 
         // TODO - REPLACE
-        let tile_to_place: char = 'g';
+        let tile_to_place: char = 'w';
 
         let tile_cords = Coordinates::new(
             ((xy.x + r_grid.offset.x) / r_grid.tile_size).floor() as i32,

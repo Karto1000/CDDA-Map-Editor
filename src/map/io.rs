@@ -162,6 +162,7 @@ impl Load<Single> for MapEntityLoader<'_> {
                 om_terrain: om_terrain.to_string(),
                 tile_selection: TileSelection {
                     fill_ter: fill,
+                    parameters,
                     computed_parameters,
                     palettes,
                     terrain,
@@ -255,6 +256,7 @@ impl Load<Nested> for MapEntityLoader<'_> {
                 tile_selection: TileSelection {
                     fill_ter: entity.object.fill_ter.clone(),
                     computed_parameters,
+                    parameters,
                     palettes: entity.object.palettes.clone(),
                     terrain,
                     furniture,

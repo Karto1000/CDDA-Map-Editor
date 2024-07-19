@@ -11,11 +11,17 @@ pub(crate) mod current;
 pub(crate) mod legacy;
 
 pub trait GetForeground: Send + Sync {
-    fn get_sprite(&self) -> &Handle<Image>;
+    fn get_randomized_sprite(&self) -> &Handle<Image>;
+
+    /// A Function to get an unchanging image
+    fn get_representative_sprite(&self) -> &Handle<Image>;
 }
 
 pub trait GetBackground: Send + Sync {
-    fn get_sprite(&self) -> &Handle<Image>;
+    fn get_randomized_sprite(&self) -> &Handle<Image>;
+
+    /// A Function to get an unchanging image
+    fn get_representative_sprite(&self) -> &Handle<Image>;
 }
 
 pub trait TilesetLoader<T, Id>: Load<T> {

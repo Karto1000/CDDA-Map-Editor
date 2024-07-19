@@ -17,8 +17,10 @@ use crate::region_settings::io::RegionSettingsLoader;
 use crate::settings::data::Settings;
 use crate::ui::CDDADirContents;
 use crate::ui::egui_utils::add_settings_frame;
-use crate::ui::hotbar::components::{CloseIconMarker, ImportIconMarker, OpenIconMarker, SaveIconMarker, SettingsIconMarker};
+use crate::ui::hotbar::components::{CloseIconMarker, ImportIconMarker, OpenIconMarker, SaveIconMarker, SettingsIconMarker, TileSettingsMarker};
 use crate::ui::tabs::events::SpawnTab;
+use crate::ui::tiles::TerrainMenuData;
+use crate::program::data::Menus;
 
 pub fn close_button_interaction(
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<CloseIconMarker>)>,
@@ -209,10 +211,37 @@ pub fn tileset_selected(
     }
 }
 
+pub fn define_terrain_button_interaction(
+    q_interaction: Query<&Interaction, (Changed<Interaction>, With<TileSettingsMarker>)>,
+    r_program_state: Res<State<ProgramState>>,
+    mut r_program: ResMut<Program>,
+    mut r_menus: ResMut<Menus>,
+    mut commands: Commands
+) {
+    match r_program_state.get() {
+        ProgramState::ProjectOpen => {},
+        _ => return
+    }
+    
+    for interaction in q_interaction.iter() {
+        match interaction {
+            Interaction::Pressed => {
+                match r_menus.is_define_terrain_menu_open {
+                    false => commands.insert_resource(TerrainMenuData::default()),
+                    true => commands.remove_resource::<TerrainMenuData>()
+                };
+                r_menus.is_define_terrain_menu_open = !r_menus.is_define_terrain_menu_open;
+            },
+            _ => {}
+        }
+    }
+}
+
 pub fn settings_button_interaction(
     q_interaction: Query<&Interaction, (Changed<Interaction>, With<SettingsIconMarker>)>,
     mut contexts: EguiContexts,
     mut r_program: ResMut<Program>,
+    mut r_menus: ResMut<Menus>,
     mut commands: Commands,
     mut r_settings: ResMut<Settings>,
     mut e_tileset_selected: EventWriter<TilesetSelected>,
@@ -220,7 +249,7 @@ pub fn settings_button_interaction(
     let gray_dark_color32 = r_program.config.style.gray_dark.into_color32();
 
     egui::Window::new("General Settings")
-        .open(&mut r_program.menus.is_settings_menu_open)
+        .open(&mut r_menus.is_settings_menu_open)
         .resizable(true)
         .show(contexts.ctx_mut(), |ui| {
             ui.vertical(|ui| {
@@ -289,7 +318,7 @@ pub fn settings_button_interaction(
     for interaction in q_interaction.iter() {
         match interaction {
             Interaction::Pressed => {
-                r_program.menus.is_settings_menu_open = !r_program.menus.is_settings_menu_open;
+                r_menus.is_settings_menu_open = !r_menus.is_settings_menu_open;
             }
             _ => {}
         }

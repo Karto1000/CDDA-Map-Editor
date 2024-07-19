@@ -9,7 +9,7 @@ use crate::common::{Coordinates, MeabyWeighted, TileId};
 use crate::common::GetRandom;
 use crate::common::Weighted;
 use crate::program::data::CDDAData;
-use crate::map::io::ParameterId;
+use crate::map::io::{Parameter, ParameterId};
 use crate::palettes::data::{MapObjectId, MeabyParam, PaletteId};
 use crate::tiles::data::Tile;
 
@@ -40,6 +40,7 @@ impl ComputedParameters {
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct TileSelection {
     pub computed_parameters: ComputedParameters,
+    pub parameters: HashMap<ParameterId, Parameter>,
 
     pub fill_ter: Option<TileId>,
 

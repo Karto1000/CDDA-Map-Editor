@@ -217,6 +217,8 @@ pub trait GetTexture: Send + Sync {
         };
     }
 
+    fn get_terrain_representation(&self, tile_id: &TileId) -> &Sprite;
+
     fn get_terrain_texture_from_tile_id(&self, project: &Project, cdda_data: &CDDAData, coordinates: &Coordinates, id: &TileId) -> Option<&Sprite>;
     fn get_terrain(&self, project: &Project, cdda_data: &CDDAData, character: &char, coordinates: &Coordinates) -> SpriteState;
     fn get_furniture(&self, project: &Project, cdda_data: &CDDAData, character: &char, coordinates: &Coordinates) -> SpriteState;
@@ -435,6 +437,29 @@ impl GetTexture for LegacyTextures {
             Some(id),
             sprite_type,
         ));
+    }
+
+    fn get_terrain_representation(&self, tile_or_region_id: &TileId) -> &Sprite {
+        let tile_id = match self.region_settings.region_terrain_and_furniture.terrain.get(tile_or_region_id) {
+            None => tile_or_region_id,
+            Some(v) => v.iter().next().unwrap().0
+        };
+        
+        let sprite_type = match self.textures.get(tile_id) {
+            None => {
+                let char: char = tile_or_region_id.splitn(2, "_")
+                    .collect::<Vec<&str>>()
+                    .get(1).map(|s| {s.chars().next().unwrap_or('?')})
+                    .unwrap_or('?');
+                return self.get_fallback_texture(&char);
+            },
+            Some(v) => v
+        };
+
+        return match sprite_type {
+            SpriteType::Single(s) => s,
+            SpriteType::Multitile { center, .. } => center
+        }
     }
 
     fn get_terrain(&self, project: &Project, cdda_data: &CDDAData, character: &char, coordinates: &Coordinates) -> SpriteState {

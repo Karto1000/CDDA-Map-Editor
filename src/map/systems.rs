@@ -92,7 +92,7 @@ pub fn spawn_sprite(
             let mut fg_entity_commands = commands.spawn((
                 e.tile.clone(),
                 SpriteBundle {
-                    texture: fg.as_ref().unwrap().get_sprite().clone(),
+                    texture: fg.as_ref().unwrap().get_randomized_sprite().clone(),
                     transform: Transform {
                         translation: Vec3 {
                             // Spawn off-screen
@@ -137,7 +137,7 @@ pub fn spawn_sprite(
             let bg_entity_commands = commands.spawn((
                 e.tile.clone(),
                 SpriteBundle {
-                    texture: bg.as_ref().unwrap().get_sprite().clone(),
+                    texture: bg.as_ref().unwrap().get_randomized_sprite().clone(),
                     transform: Transform {
                         translation: Vec3 {
                             // Spawn off screen
@@ -219,7 +219,7 @@ pub fn update_animated_sprites(
                     return;
                 }
 
-                let fg = terrain.fg.as_ref().unwrap().get_sprite();
+                let fg = terrain.fg.as_ref().unwrap().get_randomized_sprite();
 
                 let mut entity_commands = commands.get_entity(entity).unwrap();
                 let fg_entity_commands = entity_commands
@@ -351,7 +351,7 @@ pub fn update_sprite_reader(
                             let fg_entity_commands = commands.spawn((
                                 e.tile,
                                 SpriteBundle {
-                                    texture: fg.get_sprite().clone(),
+                                    texture: fg.get_randomized_sprite().clone(),
                                     transform: Transform {
                                          translation: Vec3 {
                                                // Spawn off screen
@@ -382,7 +382,7 @@ pub fn update_sprite_reader(
                         Some(i) => {
                             match q_sprite.get_mut(i) {
                                Ok(mut i) => {
-                                   *i = fg.get_sprite().clone()
+                                   *i = fg.get_randomized_sprite().clone()
                                }
                                    Err(_) => {}
                                }
@@ -396,7 +396,7 @@ pub fn update_sprite_reader(
                             let bg_entity_commands = commands.spawn((
                                 e.tile,
                                 SpriteBundle {
-                                     texture: bg.get_sprite().clone(),
+                                     texture: bg.get_randomized_sprite().clone(),
                                      transform: Transform {
                                           translation: Vec3 {
                                               // Spawn off screen
@@ -427,7 +427,7 @@ pub fn update_sprite_reader(
                                       // Sprite was deleted
                                     }
                                     Some(s) => {
-                                      *i = s.get_sprite().clone();
+                                      *i = s.get_randomized_sprite().clone();
                                     }
                                 }
                             }

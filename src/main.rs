@@ -1,6 +1,7 @@
 use std::default::Default;
 use std::io::Write;
 use std::ops::Deref;
+use std::path::PathBuf;
 use std::string::ToString;
 
 use bevy::{prelude::*, window::PrimaryWindow};
@@ -37,17 +38,21 @@ use ui::{CDDADirContents, IsCursorCaptured};
 use crate::common::{BufferedLogger, Coordinates, LogMessage};
 use crate::common::io::{Load, Save};
 use crate::graphics::GraphicsResource;
+use crate::map::data::MapEntity;
+use crate::map::io::MapEntityLoader;
 use crate::map::plugin::MapPlugin;
 use crate::map::systems::{clear_tiles_reader, set_tile_reader, spawn_map_entity_reader, spawn_sprite, tile_despawn_reader, tile_remove_reader, tile_spawn_reader, update_sprite_reader};
-use crate::program::data::{OpenedProject, Program, ProgramState};
+use crate::program::data::{Menus, OpenedProject, Program, ProgramState};
 use crate::program::io::{ProgramdataLoader, ProgramdataSaver};
 use crate::program::plugin::ProgramPlugin;
+use crate::project::data::CreateProject;
 use crate::project::plugin::ProjectPlugin;
 use crate::tiles::plugin::TilePlugin;
 use crate::ui::grid::GridMaterial;
 use crate::ui::grid::GridPlugin;
 use crate::ui::grid::resources::Grid;
-use crate::ui::interaction::{CDDADirPicked, TilesetSelected};
+use crate::ui::interaction::{cdda_folder_picked, CDDADirPicked, close_button_interaction, TilesetSelected};
+use crate::ui::tabs::events::SpawnTab;
 use crate::ui::UiPlugin;
 
 mod tiles;
@@ -96,20 +101,22 @@ fn main() {
         ProjectPlugin
     ));
 
+    // -- Add Resources --
+    app.insert_resource(Menus::default());
+
     // -- Add Events --
     app.add_event::<LogMessage>();
 
     // -- Add Systems --
 
     // Startup
-    app.add_systems(Startup, setup);
+    app.add_systems(Startup, (setup, apply_deferred, cdda_folder_picked, apply_deferred, load).chain());
 
     // Post Startup
     app.add_systems(PostStartup, setup_egui);
 
     // Update
     let sys = (
-        exit,
         update,
         tile_despawn_reader,
         apply_deferred,
@@ -125,12 +132,43 @@ fn main() {
         spawn_sprite,
         apply_deferred,
         update_sprite_reader,
+        close_button_interaction,
+        apply_deferred,
         exit,
     );
 
     app.add_systems(Update, sys.chain());
 
     app.run();
+}
+
+fn load(
+    r_program: Res<Program>,
+    mut e_create_project: EventWriter<CreateProject>,
+    mut e_spawn_tab: EventWriter<SpawnTab>
+) {
+    let loader = MapEntityLoader {
+        path: PathBuf::from(r"C:\DEV\SelfDEV\CDDA\CDDA-Map-Editor\entities\field.json"),
+        id: "field".into(),
+        cdda_data: r_program.config.cdda_data.as_ref().unwrap(),
+    };
+
+    let entity: MapEntity = MapEntity::Single(loader.load().unwrap());
+
+    let project = Project {
+        name: "Field".into(),
+        map_entity: entity,
+        save_state: Default::default(),
+    };
+
+    e_create_project.send(CreateProject {
+        project
+    });
+
+    e_spawn_tab.send(SpawnTab {
+        name: "Field".into(),
+        index: 0,
+    });
 }
 
 fn setup(
