@@ -19,7 +19,7 @@ use crate::ui::CDDADirContents;
 use crate::ui::egui_utils::add_settings_frame;
 use crate::ui::hotbar::components::{CloseIconMarker, ImportIconMarker, OpenIconMarker, SaveIconMarker, SettingsIconMarker, TileSettingsMarker};
 use crate::ui::tabs::events::SpawnTab;
-use crate::ui::tiles::TerrainMenuData;
+use crate::ui::terrain::TerrainMenuData;
 use crate::program::data::Menus;
 
 pub fn close_button_interaction(

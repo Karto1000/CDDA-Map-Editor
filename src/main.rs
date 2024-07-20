@@ -148,7 +148,7 @@ fn load(
     mut e_spawn_tab: EventWriter<SpawnTab>
 ) {
     let loader = MapEntityLoader {
-        path: PathBuf::from(r"C:\DEV\SelfDEV\CDDA\CDDA-Map-Editor\entities\field.json"),
+        path: PathBuf::from(r"C:\CDDA\testing\data\json\mapgen\basic\field.json"),
         id: "field".into(),
         cdda_data: r_program.config.cdda_data.as_ref().unwrap(),
     };
