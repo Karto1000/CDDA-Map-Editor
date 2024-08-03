@@ -16,6 +16,7 @@ use bevy::window::{WindowMode, WindowPlugin};
 use bevy::winit::WinitWindows;
 use bevy_console::{ConsoleConfiguration, ConsolePlugin, PrintConsoleLine};
 use bevy_egui::egui::style::{Widgets, WidgetVisuals};
+use bevy_egui::EguiPlugin;
 use bevy_file_dialog::FileDialogPlugin;
 use bevy_inspector_egui::bevy_egui::EguiContexts;
 use bevy_inspector_egui::egui;
@@ -52,6 +53,7 @@ use crate::ui::grid::GridMaterial;
 use crate::ui::grid::GridPlugin;
 use crate::ui::grid::resources::Grid;
 use crate::ui::interaction::{cdda_folder_picked, CDDADirPicked, close_button_interaction, TilesetSelected};
+use crate::ui::minimap::plugin::MinimapPlugin;
 use crate::ui::tabs::events::SpawnTab;
 use crate::ui::UiPlugin;
 
@@ -98,7 +100,8 @@ fn main() {
         TilePlugin,
         UiPlugin,
         ProgramPlugin,
-        ProjectPlugin
+        ProjectPlugin,
+        MinimapPlugin
     ));
 
     // -- Add Resources --
@@ -113,7 +116,7 @@ fn main() {
     app.add_systems(Startup, (setup, apply_deferred, cdda_folder_picked, apply_deferred, load).chain());
 
     // Post Startup
-    app.add_systems(PostStartup, setup_egui);
+    app.add_systems(PostStartup, (setup_egui));
 
     // Update
     let sys = (

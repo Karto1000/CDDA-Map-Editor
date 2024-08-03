@@ -1,19 +1,24 @@
+use std::collections::HashMap;
+
 use bevy::asset::AssetServer;
 use bevy::hierarchy::BuildChildren;
 use bevy::prelude::{AlignContent, BackgroundColor, ButtonBundle, Changed, Color, Commands, default, Display, Entity, EventReader, EventWriter, ImageBundle, Interaction, IVec2, NodeBundle, Query, Res, ResMut, Resource, State, Style, Text, TextBundle, TextStyle, UiImage, UiRect, Val, With};
+use bevy::utils::petgraph::visit::Walker;
 use bevy_egui::egui::{Align2, Button, Vec2, Window};
 use bevy_inspector_egui::bevy_egui::EguiContexts;
 
+use crate::common::Coordinates;
 use crate::map::data::{MapEntity, Single};
 use crate::program::data::{IntoColor32, OpenedProject, Program, ProgramState};
+use crate::program::data::Menus;
 use crate::project::data::{CloseProject, CreateProject, Project};
 use crate::project::data::OpenProjectAtIndex;
+use crate::tiles::data::Tile;
 use crate::ui::{HoverEffect, ToggleEffect};
 use crate::ui::egui_utils::{add_settings_frame, input_group};
 use crate::ui::hotbar::components::TopHotbarMarker;
 use crate::ui::tabs::components::{AddTabButtonMarker, Tab, TabContainerMarker};
 use crate::ui::tabs::events::SpawnTab;
-use crate::program::data::Menus;
 
 pub(crate) mod events;
 pub(crate) mod components;
@@ -97,7 +102,7 @@ pub fn create_project_menu(
     mut r_create_data: Option<ResMut<CreateData>>,
     mut e_spawn_tab: EventWriter<SpawnTab>,
     mut e_create_project: EventWriter<CreateProject>,
-    mut commands: Commands
+    mut commands: Commands,
 ) {
     let mut r_create_data = match r_create_data {
         None => return,
@@ -154,26 +159,37 @@ pub fn create_project_menu(
                     _ => return
                 };
 
+                let mut default_tiles = HashMap::new();
+
+                for y in 0..map_size.y {
+                    for x in 0..map_size.x {
+                        default_tiles.insert(
+                            Coordinates::new(x, y),
+                            Tile::from(' '),
+                        );
+                    }
+                }
+
                 let project = Project {
                     name: r_create_data.name.clone(),
                     map_entity: MapEntity::Single(Single {
                         om_terrain: r_create_data.name.clone(),
                         tile_selection: Default::default(),
-                        tiles: Default::default(),
-                        size: map_size
+                        tiles: default_tiles,
+                        size: map_size,
                     }),
                     save_state: Default::default(),
                 };
-                
+
                 e_create_project.send(CreateProject {
                     project
                 });
-                
+
                 e_spawn_tab.send(SpawnTab {
                     name: r_create_data.name.clone(),
                     index: amount_of_projects as u32,
                 });
-                
+
                 commands.remove_resource::<CreateData>();
             }
         });
