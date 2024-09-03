@@ -24,9 +24,12 @@ pub fn show_minimap(
         None => return,
         Some(o) => o.1
     };
-    
+
     let window = q_windows.single();
-    
+
+    let selected_color = r_program.config.style.black.into_color32();
+    let white = r_program.config.style.white.into_color32();
+
     Window::new("")
         .resizable(false)
         .anchor(Align2::RIGHT_BOTTOM, Vec2::new(-8., -8.))
@@ -47,27 +50,42 @@ pub fn show_minimap(
             };
 
             let tile_camera_offset = r_grid.offset / r_grid.tile_size;
-            
+
             let window_tile_center_w = (window.resolution.width() / r_grid.tile_size) / 2.;
             let window_tile_center_h = (window.resolution.height() / r_grid.tile_size) / 2.;
+            let cursor_position = ((window.cursor_position().unwrap_or(bevy::prelude::Vec2::new(0., 0.)) + r_grid.offset) / r_grid.tile_size).as_ivec2();
 
             ui.vertical(|ui| {
-                for y in (tile_camera_offset.y + window_tile_center_h) as i32.. (16. + tile_camera_offset.y + window_tile_center_h) as i32 {
-                    let mut row: String = "".into();
+                for y in (tile_camera_offset.y + window_tile_center_h) as i32..(16. + tile_camera_offset.y + window_tile_center_h) as i32 {
+                    let mut row: Vec<RichText> = vec![];
 
                     for x in (tile_camera_offset.x + window_tile_center_w) as i32..(16. + tile_camera_offset.x + window_tile_center_w) as i32 {
                         let tile = match project.map_entity.tiles().get(&Coordinates::new(x, y)) {
                             None => {
-                                row.push_str(" ");
+                                row.push(" ".into());
                                 continue;
                             }
                             Some(t) => t
                         };
 
-                        row.push(tile.character);
+
+                        let character = RichText::new(tile.character)
+                            .size(12.)
+                            .extra_letter_spacing(6.);
+
+                        let character = match x == cursor_position.x && y == cursor_position.y {
+                            true => character.color(selected_color)
+                                .background_color(white),
+                            false => character.color(white)
+                        };
+
+                        row.push(character);
                     }
 
-                    ui.label(RichText::new(row).size(12.).extra_letter_spacing(6.));
+
+                    ui.horizontal(|ui| {
+                        row.into_iter().for_each(|rt| { ui.label(rt); })
+                    });
                 }
             });
         });
